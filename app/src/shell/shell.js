@@ -59,6 +59,14 @@ const ctx = {
   pathInfo: (filePath) => window.desktop.pathInfo(filePath),
   listImages: (dirPath) => window.desktop.listImages(dirPath),
   saveImageNextTo: (options) => window.desktop.saveImageNextTo(options),
+  // 通用保存（与 saveImageNextTo 同一实现，PDF/文档等输出同样适用）
+  saveNextTo: (options) => window.desktop.saveImageNextTo(options),
+  // PDF 工具用：专用文件对话框与 LibreOffice 加装包
+  openPdfs: () => window.desktop.openPdfs(),
+  openDocuments: () => window.desktop.openDocuments(),
+  libreofficeStatus: () => window.desktop.libreofficeStatus(),
+  libreofficeConvert: (options) => window.desktop.libreofficeConvert(options),
+  officeToPdf: (options) => window.desktop.officeToPdf(options),
   getPathForFile: (file) => window.desktop.getPathForFile(file),
   // 剪贴板
   readClipboardImage: () => window.desktop.readClipboardImage(),

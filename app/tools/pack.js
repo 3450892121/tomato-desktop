@@ -71,9 +71,40 @@ fs.mkdirSync(appTarget, { recursive: true });
 fs.copyFileSync(path.join(appRoot, 'main.js'), path.join(appTarget, 'main.js'));
 fs.copyFileSync(path.join(appRoot, 'preload.js'), path.join(appTarget, 'preload.js'));
 copyTree(path.join(appRoot, 'src'), path.join(appTarget, 'src'));
-// 附带自检脚本：打包产物可用 `--ui-test` 自检（交付前验收用）
+// 附带自检脚本：打包产物可用 `--ui-test` / `--pdf-test` 自检（交付前验收用）
 fs.mkdirSync(path.join(appTarget, 'tests'), { recursive: true });
 fs.copyFileSync(path.join(appRoot, 'tests', 'ui-test.js'), path.join(appTarget, 'tests', 'ui-test.js'));
+fs.copyFileSync(path.join(appRoot, 'tests', 'pdf-test.js'), path.join(appTarget, 'tests', 'pdf-test.js'));
+fs.copyFileSync(path.join(appRoot, 'tests', 'pdf-ui-test.js'), path.join(appTarget, 'tests', 'pdf-ui-test.js'));
+
+// —— 4b) 复制 PDF 工具运行时依赖（纯 JS，界面进程按相对路径直接引用） ——
+// 说明：本项目没有打包器，工具代码里写的是 ../../../../node_modules/pdfjs-dist/... 这样的
+// 相对路径；绿色版没有 npm，必须把用到的文件原样带过去（路径结构保持一致）。
+log('步骤4b：复制 PDF 依赖（pdfjs-dist / pdf-lib）');
+const nmSrc = path.join(appRoot, 'node_modules');
+const nmDst = path.join(appTarget, 'node_modules');
+const copyIfExists = (relPath) => {
+  const from = path.join(nmSrc, relPath);
+  if (!fs.existsSync(from)) throw new Error(`缺少 PDF 依赖文件：${relPath}（请先在 app 目录 npm install）`);
+  copyTree(from, path.join(nmDst, relPath));
+};
+// pdfjs-dist：主构建 + worker + 中文等 CID 字体所需的 cmaps / 标准字体数据
+copyIfExists(path.join('pdfjs-dist', 'build', 'pdf.mjs'));
+copyIfExists(path.join('pdfjs-dist', 'build', 'pdf.worker.mjs'));
+copyIfExists(path.join('pdfjs-dist', 'cmaps'));
+copyIfExists(path.join('pdfjs-dist', 'standard_fonts'));
+copyIfExists(path.join('pdfjs-dist', 'LICENSE'));
+// pdf-lib：界面进程用 ESM 产物；自检脚本（Node）用 UMD 产物
+copyIfExists(path.join('pdf-lib', 'dist', 'pdf-lib.esm.js'));
+copyIfExists(path.join('pdf-lib', 'dist', 'pdf-lib.js'));
+copyIfExists(path.join('pdf-lib', 'LICENSE.md'));
+// 内置降级（Word/Excel→PDF）用：docx-preview + JSZip + SheetJS 的 UMD 构建
+copyIfExists(path.join('docx-preview', 'dist', 'docx-preview.js'));
+copyIfExists(path.join('docx-preview', 'LICENSE'));
+copyIfExists(path.join('jszip', 'dist', 'jszip.min.js'));
+copyIfExists(path.join('jszip', 'LICENSE.markdown'));
+copyIfExists(path.join('xlsx', 'dist', 'xlsx.full.min.js'));
+copyIfExists(path.join('xlsx', 'dist', 'LICENSE'));
 fs.writeFileSync(
   path.join(appTarget, 'package.json'),
   JSON.stringify(

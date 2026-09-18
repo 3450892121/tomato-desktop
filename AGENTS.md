@@ -43,10 +43,12 @@
 - 安装依赖：`cd app` → `npm install`（npm registry 用 `https://registry.npmmirror.com`；Electron 二进制需设 `ELECTRON_MIRROR=https://registry.npmmirror.com/-/binary/electron/`）。
 - 启动调试：`cd app` → `npm start`。
 - 算法测试：`cd app` → `npm test`（55 项：MD5 对照、洗牌、Gilbert 覆盖、六模式往返、填充规则、密钥校验）。
-- 冒烟自检：`cd app` → `.\node_modules\electron\dist\electron.exe . --smoke-test`（输出 `SMOKE_TEST_OK tools=1 options=6 …` 与 `SMOKE_UI {...}`，界面元素完整、按钮可点即正常）。
+- 冒烟自检：`cd app` → `.\node_modules\electron\dist\electron.exe . --smoke-test`（输出 `SMOKE_TEST_OK tools=2 options=6 …` 与 `SMOKE_UI {...}`，界面元素完整、按钮可点即正常）。
 - 端到端自检：`cd app` → `.\node_modules\electron\dist\electron.exe . --self-test`（在界面进程里跑「PNG 无损往返 + 算法链路 + JPG 保存 + 方块填充」，输出 `SELF_TEST {...}`）。
 - 界面自动测试：`cd app` → `.\node_modules\electron\dist\electron.exe . --ui-test`（模拟真人点按钮走完整流程：选图→混淆→保存→还原→批量→清空，逐步截图并做像素级校验，输出 `UI_TEST {..., "pass":true}`；截图落在 `%TEMP%\tomato-uitest`）。
-- 交付前必须四套全绿：算法测试 + 冒烟自检 + 端到端自检 + 界面自动测试，且截图人工过目一遍；打包产物需再跑一次冒烟与界面自测。
+- PDF 工具自检：`cd app` → `.\node_modules\electron\dist\electron.exe . --pdf-test`（pdfjs 渲染 / 图片↔PDF 往返 / 合并拆分提取 / 内置降级 docx·xlsx→PDF / 界面接线；结果写 `%TEMP%\tomato-pdf-test.json`，`ok:true` 为通过）。
+- PDF 工具界面自动测试：`cd app` → `.\node_modules\electron\dist\electron.exe . --pdf-ui-test`（五个方向真人操作 + 截图；结果写 `%TEMP%\tomato-pdf-ui-test.json`，`pass:true` 为通过）。
+- 交付前必须全绿：算法测试 + 冒烟自检 + 端到端自检 + 界面自动测试 + PDF 工具自检 + PDF 工具界面自动测试，且截图人工过目一遍；打包产物需再跑一次冒烟与各界面自测。
 - 生成图标：`cd app` → `npm run icon`（产出 `src/assets/icon.png` 与 `build/icon.ico`）。
 - 打包免安装版：`cd app` → `npm run pack`（产物：`app/release/番茄图片混淆-桌面版-v<版本>-win64/` 免安装文件夹 + 同名 `.zip`；exe 图标与版本信息由 `build/rcedit.exe` 写入，缺失则跳过）。
 - 兼容性样本工具（锁定 variants.js 用）：

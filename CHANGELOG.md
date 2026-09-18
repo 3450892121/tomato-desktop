@@ -2,6 +2,29 @@
 
 本项目遵循语义化版本（x.y.z）：修 bug → z+1；加功能 → y+1；重要改动 → x+1。
 
+## v1.1.0（2026-09-18）新增「PDF 转格式」工具
+
+**交付物**：`app/release/番茄图片混淆-桌面版-v1.1.0-win64/`（免安装文件夹）与同名 `.zip`。
+
+**功能**
+- 新工具「PDF 转格式」（左侧第二个入口），五个方向：
+  - PDF → 图片：逐页导出 PNG/JPG，可批量、指定页、清晰度 1×/2×/3×；输出到「原文件名_图片」文件夹
+  - 图片 → PDF：多图合成一份（顺序可调；JPG 直嵌不重编码），可选原尺寸 / 适应 A4（含页边距）
+  - 合并 / 拆分 / 提取页：多份合并、每页或每 N 页拆分、按页码范围抽取
+  - Word/Excel → PDF：无加装包时走内置方式（docx-preview + SheetJS + Chromium printToPDF）；装加装包后走 LibreOffice（高保真、支持旧版 .doc/.xls）
+  - PDF → Word：依赖 LibreOffice 加装包（显式 `writer_pdf_import` 过滤器），未装时明确提示、不产出文件
+- LibreOffice 可选加装包：放到软件目录 `addons/libreoffice/` 即自动检测（MPL-2.0；主安装包不含）
+
+**工程**
+- 新依赖全部纯 JS、随包离线：pdfjs-dist（Apache-2.0）、pdf-lib（MIT）、docx-preview（Apache-2.0）、JSZip（MIT）、SheetJS CE（Apache-2.0）
+- 新增两套自动化验证：`--pdf-test`（渲染往返 / 结构操作 / 内置降级 / 界面接线）与 `--pdf-ui-test`（五个方向真人操作 + 7 张截图 + 产物文件校验），均 `pass: true`
+- 打包脚本按需复制依赖子集并保持相对路径；pdfjs worker 在绿色版中为真线程加载（`workerFallback: no`）
+- 实测并修复两处坑：pdfjs 会把输入字节转移给 worker（`openPdf` 内置拷贝，调用方可复用同一份字节）；渲染收尾的 destroy 清理异常曾把「已成功导出」误判为失败
+
+**待办**
+- LibreOffice 加装包到位后实测 soffice 链路（高保真 Office→PDF、PDF→Word）
+- 复杂版式的内置降级效果人工抽测
+
 ## v1.0.0（2026-09-18）首次交付
 
 **交付物**：`app/release/番茄图片混淆-桌面版-v1.0.0-win64/`（免安装文件夹，367.5 MB）与 `…-v1.0.0-win64.zip`（150.8 MB）。

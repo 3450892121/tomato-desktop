@@ -62,11 +62,12 @@
 - 规避 AGPL：Ghostscript（AGPL 或商业双许可，Artifex 官网）、PyMuPDF（AGPL-3.0，PyPI）——均不捆绑分发。
 
 ## 开放问题（实现前/中必须验证，验证结论回填本节）
-1. **pdfjs worker 打包后路径**（asar 内）是否正常——开发第一步先做最小验证（spike），不通过不进入正式开发。
-2. LibreOffice 便携包可精简到多小、启动与单文档转换耗时实测。
-3. 加装包的分发形式（第二个压缩包 / 放置说明图示）——待用户确定。
-4. 图片→PDF 对 webp 等格式的重编码路径（走 imageio 解码）——待验证。
-5. 内置降级（docx-preview + printToPDF）的实际版式效果——需用真实文档实测。
+1. ~~pdfjs worker 打包后路径（asar 内）是否正常~~ → **已验证通过**（2026-09-18）：开发态与打包态自检均显示 `workerFallback: "no"`（真 worker 加载成功）；绿色版体积增加约 6.4 MB（373.9 MB）。
+2. LibreOffice 便携包可精简到多小、启动与单文档转换耗时实测——**待加装包到位后实测**（本机未安装 LibreOffice，soffice 链路尚未端到端验证）。
+3. ~~内置降级（docx-preview + printToPDF）的实际效果~~ → **已验证可用**（2026-09-18）：自检里 docx/xlsx 各生成 A4 PDF（约 27KB / 21KB，单份约 380ms），回读渲染确认有正文像素；复杂版式效果仍需人工抽测。
+4. ~~图片→PDF 对 webp 等格式的重编码路径~~ → **已验证可用**（2026-09-18）：非 JPG/PNG 先经 imageio 解码、以 PNG 嵌入。
+5. 加装包的分发形式（第二个压缩包 / 放置说明图示）——待用户确定。
+6. 另一处实现经验（已修复并记录）：pdfjs 会把 `getDocument({data})` 的底层 buffer **转移**给 worker，原数组随即失效；核心模块 `openPdf` 已内置拷贝，调用方可安全复用同一份字节（渲染 + 结构操作共存）。
 
 ## 依赖的其他模块
 - 依赖 `imageio`（非 JPG/PNG 图片解码）、`settings`（输出目录、重名序号规则）、`ui`（样式令牌与通用组件）。

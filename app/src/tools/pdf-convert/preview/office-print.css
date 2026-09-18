@@ -1,0 +1,24 @@
+/* 内置降级渲染页的样式（仅本页使用；不进主界面） */
+
+html, body {
+  margin: 0;
+  padding: 0;
+  background: #ffffff;
+  color: #111111;
+  font-family: "Microsoft YaHei", "Segoe UI", sans-serif;
+}
+#content { padding: 0; }
+#status {
+  position: fixed;
+  right: 8px;
+  bottom: 8px;
+  font-size: 12px;
+  color: #888888;
+}
+
+/* Excel：每个工作表一段，第二段起另起一页 */
+.xlsx-sheet { padding: 0 0 8px; }
+.xlsx-sheet h2 { margin: 8px 0 4px; font-size: 14px; }
+.xlsx-sheet + .xlsx-sheet { break-before: page; }
+.xlsx-sheet table { border-collapse: collapse; font-size: 12px; }
+.xlsx-sheet td, .xlsx-sheet th { border: 1px solid #bbbbbb; padding: 2px 6px; }

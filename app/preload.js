@@ -24,6 +24,13 @@ contextBridge.exposeInMainWorld('desktop', {
   listImages: (dirPath) => ipcRenderer.invoke('fs:list-images', dirPath),
   saveImageNextTo: (options) => ipcRenderer.invoke('fs:save-image', options),
 
+  // PDF 工具：专用文件对话框与 LibreOffice 加装包
+  openPdfs: () => ipcRenderer.invoke('dialog:open-pdfs'),
+  openDocuments: () => ipcRenderer.invoke('dialog:open-documents'),
+  libreofficeStatus: () => ipcRenderer.invoke('libreoffice:status'),
+  libreofficeConvert: (options) => ipcRenderer.invoke('libreoffice:convert', options),
+  officeToPdf: (options) => ipcRenderer.invoke('office:to-pdf', options),
+
   // 设置（绿色版：存在软件目录内）
   settingsRead: () => ipcRenderer.invoke('settings:read'),
   settingsWrite: (patch) => ipcRenderer.invoke('settings:write', patch),

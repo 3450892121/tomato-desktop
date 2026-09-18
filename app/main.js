@@ -6,6 +6,9 @@ const { app, BrowserWindow, ipcMain, dialog, clipboard, nativeImage } = require(
 const path = require('path');
 const fs = require('fs/promises');
 const fsSync = require('fs');
+const os = require('os');
+const { spawn } = require('child_process');
+const { pathToFileURL } = require('url');
 
 /** @type {BrowserWindow | null} */
 let mainWindow = null;
@@ -20,8 +23,14 @@ const selfTest = process.argv.includes('--self-test');
 // 界面自动测试：`electron . --ui-test` 像真人一样点按钮走完整流程，逐步截图并做像素级校验
 const uiTest = process.argv.includes('--ui-test');
 
+// PDF 工具界面自动测试：`electron . --pdf-ui-test` 完整走一遍 PDF 工具五个方向并截图
+const pdfUiTest = process.argv.includes('--pdf-ui-test');
+
+// PDF 工具自检：`electron . --pdf-test` 验证 pdfjs/pdf-lib 加载、页面渲染与图片↔PDF 往返
+const pdfTest = process.argv.includes('--pdf-test');
+
 // 测试模式下关闭硬件加速：保证截图（capturePage）在任何机器上都能稳定拿到画面
-if (uiTest) {
+if (uiTest || pdfUiTest) {
   app.disableHardwareAcceleration();
 }
 
@@ -210,6 +219,34 @@ function createMainWindow() {
     });
   }
 
+  if (pdfTest) {
+    mainWindow.webContents.once('did-finish-load', async () => {
+      try {
+        const { runPdfTest } = require('./tests/pdf-test.js');
+        const result = await runPdfTest(mainWindow);
+        console.log(`PDF_TEST ${JSON.stringify(result)}`);
+      } catch (err) {
+        console.log(`PDF_TEST_FAIL ${err.message}\n${err.stack}`);
+      }
+      app.quit();
+    });
+  }
+
+  if (pdfUiTest) {
+    const { runPdfUiTest, writeResult } = require('./tests/pdf-ui-test.js');
+    mainWindow.webContents.once('did-finish-load', async () => {
+      try {
+        const result = await runPdfUiTest(mainWindow);
+        console.log(`PDF_UI_TEST ${JSON.stringify(result)}`);
+        writeResult({ ok: !!result.pass, at: new Date().toISOString(), result });
+      } catch (err) {
+        console.log(`PDF_UI_TEST_FAIL ${err.message}\n${err.stack}`);
+        writeResult({ ok: false, at: new Date().toISOString(), error: err.message, stack: err.stack });
+      }
+      app.quit();
+    });
+  }
+
   if (makeSamplesDir) {
     mainWindow.webContents.once('did-finish-load', async () => {
       try {
@@ -258,7 +295,7 @@ app.on('window-all-closed', () => {
 // 打开图片文件对话框（返回所选路径列表）
 ipcMain.handle('dialog:open-images', async () => {
   // 界面自动测试模式：跳过系统对话框，直接返回测试目录内的图片
-  if (uiTest) {
+  if (uiTest || pdfUiTest) {
     const { TEST_DIR } = require('./tests/ui-test.js');
     const IMAGE_EXTS = new Set(['.png', '.jpg', '.jpeg', '.webp', '.bmp']);
     const entries = await fs.readdir(TEST_DIR, { withFileTypes: true }).catch(() => []);
@@ -278,7 +315,7 @@ ipcMain.handle('dialog:open-images', async () => {
 // 打开文件夹对话框（用于批量导入 / 选择输出目录）
 ipcMain.handle('dialog:open-folder', async () => {
   // 界面自动测试模式：直接返回测试目录
-  if (uiTest) {
+  if (uiTest || pdfUiTest) {
     const { TEST_DIR } = require('./tests/ui-test.js');
     return TEST_DIR;
   }
@@ -369,4 +406,180 @@ ipcMain.handle('clipboard:write-image', async (_event, bytes) => {
   if (img.isEmpty()) return false;
   clipboard.writeImage(img);
   return true;
+});
+
+// —— PDF 转格式 工具：文件对话框与 LibreOffice 加装包（见 spec/modules/pdf-convert.md） ——
+
+// 打开 PDF 文件对话框（可多选）
+ipcMain.handle('dialog:open-pdfs', async () => {
+  // 界面自动测试模式：跳过系统对话框，直接返回测试目录里的 PDF
+  if (uiTest || pdfUiTest) {
+    const { TEST_DIR } = require('./tests/ui-test.js');
+    const entries = await fs.readdir(TEST_DIR, { withFileTypes: true }).catch(() => []);
+    return entries
+      .filter((e) => e.isFile() && e.name.toLowerCase().endsWith('.pdf'))
+      .map((e) => path.join(TEST_DIR, e.name))
+      .sort();
+  }
+  const result = await dialog.showOpenDialog(mainWindow, {
+    title: '选择 PDF 文件',
+    properties: ['openFile', 'multiSelections'],
+    filters: [{ name: 'PDF 文件', extensions: ['pdf'] }]
+  });
+  return result.canceled ? [] : result.filePaths;
+});
+
+// 打开 Word/Excel 文件对话框（可多选）
+ipcMain.handle('dialog:open-documents', async () => {
+  if (uiTest || pdfUiTest) {
+    const { TEST_DIR } = require('./tests/ui-test.js');
+    const DOC_EXTS = new Set(['.doc', '.docx', '.xls', '.xlsx']);
+    const entries = await fs.readdir(TEST_DIR, { withFileTypes: true }).catch(() => []);
+    return entries
+      .filter((e) => e.isFile() && DOC_EXTS.has(path.extname(e.name).toLowerCase()))
+      .map((e) => path.join(TEST_DIR, e.name))
+      .sort();
+  }
+  const result = await dialog.showOpenDialog(mainWindow, {
+    title: '选择 Word / Excel 文件',
+    properties: ['openFile', 'multiSelections'],
+    filters: [{ name: 'Word / Excel', extensions: ['doc', 'docx', 'xls', 'xlsx'] }]
+  });
+  return result.canceled ? [] : result.filePaths;
+});
+
+// LibreOffice 加装包：位置约定 = 软件目录/addons/libreoffice/program/soffice.(com|exe)
+const LIBREOFFICE_ADDON_DIR = path.join(PORTABLE_DIR, 'addons', 'libreoffice');
+
+function findLibreOffice() {
+  const candidates = [
+    { p: path.join(LIBREOFFICE_ADDON_DIR, 'program', 'soffice.com'), where: 'addon' },
+    { p: path.join(LIBREOFFICE_ADDON_DIR, 'program', 'soffice.exe'), where: 'addon' },
+    { p: 'C:\\Program Files\\LibreOffice\\program\\soffice.com', where: 'system' },
+    { p: 'C:\\Program Files (x86)\\LibreOffice\\program\\soffice.com', where: 'system' }
+  ];
+  for (const c of candidates) {
+    if (fsSync.existsSync(c.p)) return { found: true, path: c.p, where: c.where };
+  }
+  return { found: false, path: null, where: null };
+}
+
+ipcMain.handle('libreoffice:status', async () => {
+  const lo = findLibreOffice();
+  return { found: lo.found, where: lo.where };
+});
+
+// 转换单个文件（Office→PDF 或 PDF→DOCX）：在临时目录里转换，读完字节即清理，绝不覆盖已有文件
+ipcMain.handle('libreoffice:convert', async (_event, options) => {
+  const inputPath = options && options.inputPath;
+  const target = options && options.target === 'docx' ? 'docx' : 'pdf';
+  if (!inputPath) return { ok: false, message: '缺少输入文件' };
+
+  const lo = findLibreOffice();
+  if (!lo.found) {
+    return { ok: false, message: '未检测到 LibreOffice（可把加装包解压到软件目录的 addons/libreoffice）' };
+  }
+
+  const workDir = path.join(os.tmpdir(), `tomato-lo-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`);
+  await fs.mkdir(workDir, { recursive: true });
+  const profileDir = path.join(USER_DATA_DIR, 'libreoffice-profile');
+  await fs.mkdir(profileDir, { recursive: true });
+
+  const args = ['--headless', '--norestore', '--invisible', `-env:UserInstallation=${pathToFileURL(profileDir).href}`];
+  // 关键：PDF 转 Word 必须显式走 Writer 的 PDF 导入过滤器，否则 LibreOffice 会走 Draw 通道输出散架文本框
+  if (target === 'docx') args.push('--infilter=writer_pdf_import');
+  args.push('--convert-to', target, '--outdir', workDir, inputPath);
+
+  const t0 = Date.now();
+  const res = await new Promise((resolve) => {
+    const child = spawn(lo.path, args, { windowsHide: true });
+    let stdout = '';
+    let stderr = '';
+    let timedOut = false;
+    const timer = setTimeout(() => {
+      timedOut = true;
+      try { child.kill(); } catch { /* 已退出则忽略 */ }
+    }, 180000);
+    child.stdout.on('data', (d) => { stdout += d; });
+    child.stderr.on('data', (d) => { stderr += d; });
+    child.on('error', (err) => {
+      clearTimeout(timer);
+      resolve({ code: -1, stdout, stderr: String((err && err.message) || err), timedOut });
+    });
+    child.on('close', (code) => {
+      clearTimeout(timer);
+      resolve({ code, stdout, stderr, timedOut });
+    });
+  });
+
+  // 找输出文件（LibreOffice 以输入文件的基础名为输出名）
+  let outPath = null;
+  try {
+    const entries = await fs.readdir(workDir);
+    const wanted = entries.find((n) => n.toLowerCase().endsWith(`.${target}`));
+    if (wanted) outPath = path.join(workDir, wanted);
+  } catch { /* 读不到就按“无输出”处理 */ }
+
+  if (!outPath) {
+    await fs.rm(workDir, { recursive: true, force: true }).catch(() => {});
+    const detail = res.timedOut ? '超时（超过 3 分钟）' : `LibreOffice 退出码 ${res.code}`;
+    const extra = (res.stderr || '').trim().slice(0, 300);
+    return { ok: false, message: `转换失败：${detail}${extra ? `｜${extra}` : ''}` };
+  }
+
+  const bytes = await fs.readFile(outPath);
+  await fs.rm(workDir, { recursive: true, force: true }).catch(() => {});
+  return { ok: true, bytes, ms: Date.now() - t0 };
+});
+
+// —— 内置降级：docx / xlsx → PDF（隐藏窗口渲染 + Chromium printToPDF，不依赖加装包） ——
+
+/** 轮询隐藏窗口里的渲染状态（页内脚本写 window.__officeRenderState） */
+async function waitForRenderState(win, timeoutMs) {
+  const t0 = Date.now();
+  for (;;) {
+    const state = await win.webContents
+      .executeJavaScript('window.__officeRenderState || ""')
+      .catch(() => '');
+    if (state === 'done' || (typeof state === 'string' && state.startsWith('error:'))) return state;
+    if (Date.now() - t0 > timeoutMs) return 'error: 渲染超时';
+    await new Promise((resolve) => setTimeout(resolve, 150));
+  }
+}
+
+ipcMain.handle('office:to-pdf', async (_event, options) => {
+  const inputPath = options && options.inputPath;
+  const kind = options && options.kind === 'xlsx' ? 'xlsx' : 'docx';
+  if (!inputPath) return { ok: false, message: '缺少输入文件' };
+
+  const win = new BrowserWindow({
+    show: false,
+    webPreferences: {
+      preload: path.join(__dirname, 'preload.js'),
+      contextIsolation: true,
+      nodeIntegration: false,
+      sandbox: true
+    }
+  });
+
+  try {
+    await win.loadFile(path.join(__dirname, 'src', 'tools', 'pdf-convert', 'preview', 'office-print.html'), {
+      query: { file: inputPath, kind }
+    });
+    const state = await waitForRenderState(win, 60000);
+    if (state !== 'done') {
+      return { ok: false, message: `内置转换失败：${state.replace(/^error:\s*/, '')}` };
+    }
+    const t0 = Date.now();
+    const pdf = await win.webContents.printToPDF({
+      pageSize: 'A4',
+      printBackground: true,
+      margins: { top: 0.55, bottom: 0.55, left: 0.55, right: 0.55 } // 单位：英寸（约 14mm）
+    });
+    return { ok: true, bytes: pdf, ms: Date.now() - t0 };
+  } catch (err) {
+    return { ok: false, message: `内置转换失败：${(err && err.message) || err}` };
+  } finally {
+    if (!win.isDestroyed()) win.destroy();
+  }
 });
