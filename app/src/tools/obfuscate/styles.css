@@ -28,10 +28,12 @@
   justify-content: center;
   flex: 1 1 auto;
   min-height: 220px;
+  padding: var(--space-3);
   overflow: hidden;
   background: var(--color-surface-soft);
 }
-.preview-canvas { max-width: 100%; max-height: 100%; object-fit: contain; }
+/* 预览画布：等比缩放到可用空间（与手机版的 fitCenter 一致：小图放大、大图缩小） */
+.preview-canvas { width: 100%; height: 100%; object-fit: contain; }
 .drop-hint {
   position: absolute;
   bottom: var(--space-2);

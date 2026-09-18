@@ -1,0 +1,233 @@
+// 界面自动测试（仅 `electron . --ui-test` 时运行）
+// 作用：像真人一样点按钮，走完整流程（选图 → 混淆 → 保存 → 还原 → 批量 → 清空），
+//      每一步截图留证，并对结果做像素级校验。
+// 说明：测试模式下「添加图片」对话框直接返回测试目录里的图片，避免需要人手动选文件。
+'use strict';
+
+const path = require('path');
+const os = require('os');
+const fs = require('fs/promises');
+
+const TEST_DIR = path.join(os.tmpdir(), 'tomato-uitest');
+
+const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+/** 渲染进程内：读取预览画布并做简易校验和 */
+const CANVAS_CHECKSUM = `(() => {
+  const c = document.getElementById('previewCanvas');
+  if (!c || c.hidden) return { ok: false, reason: '预览画布不可见' };
+  const d = c.getContext('2d').getImageData(0, 0, c.width, c.height).data;
+  let h = 2166136261;
+  for (let i = 0; i < d.length; i += 7) { h ^= d[i]; h = Math.imul(h, 16777619) >>> 0; }
+  return { ok: true, w: c.width, h: c.height, sum: h };
+})()`;
+
+async function runUiTest(win) {
+  const wc = win.webContents;
+  const evalJs = (code) => wc.executeJavaScript(code);
+  const result = { steps: {}, checks: {}, shots: [] };
+
+  await fs.mkdir(TEST_DIR, { recursive: true });
+
+  // 清理上次运行留下的测试图片，保证重复运行结果干净
+  const existing = await fs.readdir(TEST_DIR).catch(() => []);
+  for (const f of existing) {
+    if (f.startsWith('测试原图') && (f.endsWith('.png') || f.endsWith('.jpg'))) {
+      await fs.rm(path.join(TEST_DIR, f), { force: true });
+    }
+  }
+
+  const shot = async (name) => {
+    const file = path.join(TEST_DIR, `shot-${name}.png`);
+    let lastErr = null;
+    for (let attempt = 0; attempt < 4; attempt++) {
+      try {
+        win.show();
+        win.focus();
+        if (wc.setBackgroundThrottling) wc.setBackgroundThrottling(false);
+        await wait(200);
+        const image = await wc.capturePage();
+        if (image && !image.isEmpty()) {
+          await fs.writeFile(file, image.toPNG());
+          result.shots.push(file);
+          return true;
+        }
+        lastErr = new Error('截图为空');
+      } catch (err) {
+        lastErr = err;
+        await wait(400);
+      }
+    }
+    result.shotErrors = result.shotErrors || [];
+    result.shotErrors.push(`${name}: ${lastErr ? lastErr.message : '未知错误'}`);
+    return false;
+  };
+
+  // 0) 初始界面
+  await shot('01-初始');
+  result.steps.initialStatus = await evalJs('document.getElementById("statusText").textContent');
+  // 元素显隐自检：进度遮罩必须默认隐藏（曾因 CSS 覆盖 hidden 导致整屏发白）
+  result.checks.initialVisibility = await evalJs(`(() => {
+    const shown = (sel) => {
+      const el = document.querySelector(sel);
+      if (!el) return 'missing';
+      const s = getComputedStyle(el);
+      return s.display !== 'none' && s.visibility !== 'hidden' && !el.hidden;
+    };
+    return {
+      progress: shown('#progressBar'),
+      thumbs: shown('#thumbStrip'),
+      addButton: shown('#btnAddFirst'),
+      modeControl: shown('#modeSelect')
+    };
+  })()`);
+
+  // 1) 生成两张测试原图并落盘（走真实保存通道）
+  const seedDir = TEST_DIR;
+  result.steps.seed = await evalJs(`(async () => {
+    const { encodeImageToBytes } = await import('../shared/imageio.js');
+    const mk = async (w, h, name, tint) => {
+      const px = new Uint8ClampedArray(w * h * 4);
+      for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+        const p = (x + y * w) * 4;
+        px[p] = Math.round((x / (w - 1)) * 255);
+        px[p + 1] = Math.round((y / (h - 1)) * 255);
+        px[p + 2] = ((x >> 4) + (y >> 4)) % 2 ? 200 : 80;
+        px[p + 3] = 255;
+        if (tint) { px[p] = 255 - px[p]; }
+      }
+      const bytes = await encodeImageToBytes(px, w, h, { format: 'png' });
+      return window.desktop.saveImageNextTo({
+        sourcePath: ${JSON.stringify(path.join(seedDir, 'seed.png'))},
+        baseName: name, ext: '.png', bytes
+      });
+    };
+    return [await mk(120, 80, '测试原图A', false), await mk(100, 50, '测试原图B', true)];
+  })()`);
+
+  // 2) 点击「添加图片」（测试模式下直接载入测试目录的图片）
+  await evalJs('document.getElementById("btnAddFirst").click()');
+  await wait(900);
+  await shot('02-已载入图片');
+  result.steps.afterAdd = await evalJs(`JSON.stringify({
+    status: document.getElementById('statusText').textContent,
+    thumbs: document.querySelectorAll('#thumbList .thumb').length,
+    stripVisible: !document.getElementById('thumbStrip').hidden,
+    info: document.getElementById('infoText').textContent
+  })`);
+  result.checks.originalCanvas = await evalJs(CANVAS_CHECKSUM);
+  // 载入图片后：「添加图片」大按钮与进度遮罩都应隐藏，缩略图条应出现
+  result.checks.afterAddVisibility = await evalJs(`(() => {
+    const shown = (sel) => {
+      const el = document.querySelector(sel);
+      if (!el) return 'missing';
+      const s = getComputedStyle(el);
+      return s.display !== 'none' && s.visibility !== 'hidden' && !el.hidden;
+    };
+    return { addButton: shown('#btnAddFirst'), progress: shown('#progressBar'), thumbs: shown('#thumbStrip') };
+  })()`);
+
+  // 3) 切换到「像素混淆 (C)」并设置字符串密钥
+  await evalJs(`(() => {
+    const sel = document.getElementById('modeSelect');
+    sel.value = 'c';
+    sel.dispatchEvent(new Event('change'));
+    const key = document.getElementById('keyInput');
+    key.value = '测试密钥abc';
+    key.dispatchEvent(new Event('input'));
+    return true;
+  })()`);
+  await wait(200);
+
+  // 4) 点击「混淆」（当前图）
+  await evalJs(`document.querySelector('[data-action="obfuscate"]').click()`);
+  await wait(700);
+  await shot('03-混淆后');
+  result.steps.afterObfuscate = await evalJs('document.getElementById("statusText").textContent');
+  result.checks.obfuscatedCanvas = await evalJs(CANVAS_CHECKSUM);
+  result.checks.obfuscatedDiffers = result.checks.originalCanvas.sum !== result.checks.obfuscatedCanvas.sum;
+
+  // 5) 点击「保存」（当前图）
+  await evalJs(`document.querySelector('[data-action="save"]').click()`);
+  await wait(1200);
+  await shot('04-保存后');
+  result.steps.afterSave = await evalJs('document.getElementById("statusText").textContent');
+  result.steps.filesAfterSave = (await fs.readdir(TEST_DIR)).filter((f) => f.startsWith('测试原图A')).sort();
+
+  // 6) 点击「还原」→ 应回到原图
+  await evalJs(`document.querySelector('[data-action="revert"]').click()`);
+  await wait(400);
+  await shot('05-还原后');
+  result.checks.revertedCanvas = await evalJs(CANVAS_CHECKSUM);
+  result.checks.revertEqualsOriginal = result.checks.revertedCanvas.sum === result.checks.originalCanvas.sum;
+
+  // 7) 全部混淆 + 全部保存（批量）
+  await evalJs(`document.querySelector('[data-action="batch-obfuscate"]').click()`);
+  await wait(900);
+  result.steps.afterBatchObfuscate = await evalJs('document.getElementById("statusText").textContent');
+  await evalJs(`document.querySelector('[data-action="batch-save"]').click()`);
+  await wait(1600);
+  result.steps.afterBatchSave = await evalJs('document.getElementById("statusText").textContent');
+  await shot('06-批量保存后');
+  result.steps.allFiles = (await fs.readdir(TEST_DIR)).filter((f) => f.endsWith('.png') || f.endsWith('.jpg')).sort();
+
+  // 8) 校验保存出来的文件能被解回原图（像素级）
+  const savedA = result.steps.filesAfterSave.find((f) => f.includes('_混淆')) || '';
+  result.checks.decodeSavedFile = await evalJs(`(async () => {
+    const { decodeImageFromBytes } = await import('../shared/imageio.js');
+    const { processPixels } = await import('../tools/obfuscate/core/engine.js');
+    const bytes = await window.desktop.readFile(${JSON.stringify(path.join(TEST_DIR, savedA || ''))});
+    const img = await decodeImageFromBytes(bytes);
+    const back = processPixels({ mode: 'c', key: '测试密钥abc', direction: 'decrypt', width: img.width, height: img.height, pixels: img.pixels });
+    let h = 2166136261;
+    for (let i = 0; i < back.pixels.length; i += 7) { h ^= back.pixels[i]; h = Math.imul(h, 16777619) >>> 0; }
+    return { file: ${JSON.stringify(savedA)}, w: back.width, h: back.height, sum: h };
+  })()`);
+
+  // 9) gilbert 模式：密钥行应隐藏；PE1：密钥行显示且提示小数
+  result.checks.keyRowByMode = await evalJs(`(() => {
+    const sel = document.getElementById('modeSelect');
+    const row = document.getElementById('keyRow');
+    const hint = document.getElementById('keyHint');
+    const out = {};
+    sel.value = 'gilbert'; sel.dispatchEvent(new Event('change'));
+    out.gilbertHidden = row.hidden;
+    sel.value = 'pe1'; sel.dispatchEvent(new Event('change'));
+    out.pe1Hidden = row.hidden;
+    out.pe1Hint = hint.textContent;
+    out.pe1Value = document.getElementById('keyInput').value;
+    return out;
+  })()`);
+  await shot('07-切到PE1模式');
+
+  // 10) 清空（确认框自动确认）
+  await evalJs('(() => { window.confirm = () => true; return true; })()');
+  await evalJs(`document.querySelector('[data-action="batch-clear"]').click()`);
+  await wait(400);
+  await shot('08-清空后');
+  result.steps.afterClear = await evalJs('document.getElementById("statusText").textContent');
+  result.checks.clearedThumbs = await evalJs('document.querySelectorAll("#thumbList .thumb").length');
+
+  // 汇总判定
+  const c = result.checks;
+  result.pass =
+    result.steps.afterAdd.includes('已添加') &&
+    c.initialVisibility.progress === false &&
+    c.initialVisibility.thumbs === false &&
+    c.initialVisibility.addButton === true &&
+    c.afterAddVisibility.addButton === false &&
+    c.afterAddVisibility.progress === false &&
+    c.afterAddVisibility.thumbs === true &&
+    c.obfuscatedDiffers === true &&
+    c.revertEqualsOriginal === true &&
+    result.steps.filesAfterSave.length >= 1 &&
+    result.steps.afterBatchObfuscate.includes('成功 2 张') &&
+    c.decodeSavedFile.sum === c.originalCanvas.sum &&
+    c.keyRowByMode.gilbertHidden === true &&
+    c.keyRowByMode.pe1Hidden === false &&
+    c.clearedThumbs === 0;
+
+  return result;
+}
+
+module.exports = { runUiTest, TEST_DIR };

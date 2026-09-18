@@ -5,6 +5,10 @@
 
 * { box-sizing: border-box; }
 
+/* 关键：本文件多处把元素设为 display:flex，会覆盖浏览器默认的 [hidden] 规则，
+   导致 hidden 属性失效（遮罩一直显示、按钮藏不掉）。这里统一兜底。 */
+[hidden] { display: none !important; }
+
 html, body {
   margin: 0;
   height: 100%;

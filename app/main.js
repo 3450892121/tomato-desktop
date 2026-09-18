@@ -17,6 +17,14 @@ const smokeTest = process.argv.includes('--smoke-test');
 // 端到端自检：`electron . --self-test` 在界面进程里跑「图片编解码 + 算法 + 保存格式」全链路
 const selfTest = process.argv.includes('--self-test');
 
+// 界面自动测试：`electron . --ui-test` 像真人一样点按钮走完整流程，逐步截图并做像素级校验
+const uiTest = process.argv.includes('--ui-test');
+
+// 测试模式下关闭硬件加速：保证截图（capturePage）在任何机器上都能稳定拿到画面
+if (uiTest) {
+  app.disableHardwareAcceleration();
+}
+
 const SELF_TEST_SCRIPT = `
   (async () => {
     const { processPixels } = await import('../tools/obfuscate/core/engine.js');
@@ -151,6 +159,19 @@ function createMainWindow() {
       app.quit();
     });
   }
+
+  if (uiTest) {
+    mainWindow.webContents.once('did-finish-load', async () => {
+      try {
+        const { runUiTest } = require('./tests/ui-test.js');
+        const result = await runUiTest(mainWindow);
+        console.log(`UI_TEST ${JSON.stringify(result)}`);
+      } catch (err) {
+        console.log(`UI_TEST_FAIL ${err.message}\n${err.stack}`);
+      }
+      app.quit();
+    });
+  }
 }
 
 app.whenReady().then(() => {
@@ -173,6 +194,16 @@ app.on('window-all-closed', () => {
 
 // 打开图片文件对话框（返回所选路径列表）
 ipcMain.handle('dialog:open-images', async () => {
+  // 界面自动测试模式：跳过系统对话框，直接返回测试目录内的图片
+  if (uiTest) {
+    const { TEST_DIR } = require('./tests/ui-test.js');
+    const IMAGE_EXTS = new Set(['.png', '.jpg', '.jpeg', '.webp', '.bmp']);
+    const entries = await fs.readdir(TEST_DIR, { withFileTypes: true }).catch(() => []);
+    return entries
+      .filter((e) => e.isFile() && IMAGE_EXTS.has(path.extname(e.name).toLowerCase()) && e.name.startsWith('测试原图'))
+      .map((e) => path.join(TEST_DIR, e.name))
+      .sort();
+  }
   const result = await dialog.showOpenDialog(mainWindow, {
     title: '选择图片',
     properties: ['openFile', 'multiSelections'],

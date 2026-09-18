@@ -23,3 +23,5 @@ desktop.ini
 .env
 .env.*
 *.local
+# 测试证据（截图等，不进 git）
+artifacts

@@ -26,7 +26,7 @@ const MARKUP = `
     <main class="card preview" id="previewArea">
       <canvas id="previewCanvas" class="preview-canvas" hidden></canvas>
       <button class="btn btn-obfuscate btn-lg" id="btnAddFirst">添加图片（可选多张）</button>
-      <div class="drop-hint">也可直接把图片或文件夹拖进来；Ctrl+V 粘贴、Ctrl+C 复制结果</div>
+      <div class="drop-hint" id="dropHint">也可直接把图片或文件夹拖进来；Ctrl+V 粘贴、Ctrl+C 复制结果</div>
     </main>
 
     <section class="thumbs" id="thumbStrip" hidden>
@@ -110,11 +110,13 @@ function drawPreview() {
   if (!entry) {
     els.previewCanvas.hidden = true;
     els.btnAddFirst.hidden = false;
+    els.dropHint.hidden = false;
     state.ctx.setInfo({});
     return;
   }
   els.previewCanvas.hidden = false;
   els.btnAddFirst.hidden = true;
+  els.dropHint.hidden = true;
   drawPixelsToCanvas(els.previewCanvas, entry.current.pixels, entry.current.width, entry.current.height);
   state.ctx.setInfo({ width: entry.current.width, height: entry.current.height, ms: entry.lastMs });
 }
@@ -442,6 +444,7 @@ export function mount(container, ctx) {
     keyInput: container.querySelector('#keyInput'),
     keyHint: container.querySelector('#keyHint'),
     previewCanvas: container.querySelector('#previewCanvas'),
+    dropHint: container.querySelector('#dropHint'),
     btnAddFirst: container.querySelector('#btnAddFirst'),
     btnAddMore: container.querySelector('#btnAddMore'),
     thumbStrip: container.querySelector('#thumbStrip'),
