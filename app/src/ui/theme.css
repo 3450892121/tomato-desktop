@@ -1,0 +1,63 @@
+/* ============================================================
+   设计令牌（唯一改样式的地方）
+   全部颜色 / 字号 / 间距 / 圆角 / 阴影都集中在这里，改一处全局生效。
+   风格：清爽浅色现代风
+   ============================================================ */
+:root {
+  /* 颜色 —— 基础 */
+  --color-bg: #f5f6f8;
+  --color-surface: #ffffff;
+  --color-surface-soft: #fafbfc;
+  --color-border: #e7e9ee;
+  --color-border-strong: #d8dbe2;
+
+  /* 颜色 —— 文字 */
+  --color-text: #1f2329;
+  --color-text-secondary: #6b7280;
+  --color-text-inverse: #ffffff;
+
+  /* 颜色 —— 语义（按钮） */
+  --color-primary: #ff5a4e;          /* 混淆：番茄红 */
+  --color-primary-hover: #f04a3e;
+  --color-primary-active: #dc3f34;
+  --color-deobfuscate: #2f80ed;      /* 解混淆：蓝 */
+  --color-deobfuscate-hover: #2570d4;
+  --color-save: #12a150;             /* 保存：绿 */
+  --color-save-hover: #0e8c45;
+  --color-neutral: #eef0f3;          /* 清除/还原：浅灰 */
+  --color-neutral-hover: #e3e6ea;
+  --color-neutral-text: #3f4652;
+
+  /* 颜色 —— 状态 */
+  --color-success: #12a150;
+  --color-warning: #d97706;
+  --color-danger: #dc2626;
+
+  /* 字体 */
+  --font-family: "Segoe UI", "Microsoft YaHei", "PingFang SC", "Helvetica Neue", Arial, sans-serif;
+  --font-size-xs: 12px;
+  --font-size-sm: 13px;
+  --font-size-md: 14px;
+  --font-size-lg: 16px;
+  --font-size-xl: 20px;
+
+  /* 间距 */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+
+  /* 圆角 */
+  --radius-sm: 8px;
+  --radius-md: 10px;
+  --radius-lg: 14px;
+
+  /* 阴影 */
+  --shadow-card: 0 1px 2px rgba(16, 24, 40, 0.04), 0 2px 8px rgba(16, 24, 40, 0.05);
+  --shadow-btn: 0 1px 2px rgba(16, 24, 40, 0.08);
+
+  /* 动画 */
+  --transition-fast: 120ms ease;
+}

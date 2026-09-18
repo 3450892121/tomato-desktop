@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta http-equiv="Content-Security-Policy"
+        content="default-src 'self'; img-src 'self' data: blob:; style-src 'self'; script-src 'self'" />
+  <title>番茄图片混淆 桌面版</title>
+  <link rel="stylesheet" href="theme.css" />
+  <link rel="stylesheet" href="app.css" />
+</head>
+<body>
+  <div class="app">
+    <!-- 顶部：状态提示 + 参数信息 -->
+    <header class="topbar">
+      <div class="topbar-status" id="statusText">建议先查看右上角「帮助」</div>
+      <div class="topbar-info" id="infoText">分辨率: --- x --- ｜ 耗时: --- ms</div>
+    </header>
+
+    <!-- 模式与密钥 -->
+    <section class="card controls">
+      <div class="control-row">
+        <label class="control-label" for="modeSelect">模式:</label>
+        <select id="modeSelect" class="select"></select>
+        <button class="btn btn-ghost" id="btnHelp">帮助</button>
+      </div>
+      <div class="control-row" id="keyRow">
+        <label class="control-label" for="keyInput">密钥:</label>
+        <input id="keyInput" class="input" type="text" autocomplete="off" spellcheck="false" />
+        <span class="control-hint" id="keyHint"></span>
+      </div>
+    </section>
+
+    <!-- 图片预览区 -->
+    <main class="card preview" id="previewArea">
+      <img id="previewImage" class="preview-image" alt="图片预览" hidden />
+      <button class="btn btn-primary btn-lg" id="btnAddFirst">添加图片（可选多张）</button>
+    </main>
+
+    <!-- 缩略图条（多图时显示） -->
+    <section class="thumbs" id="thumbStrip" hidden>
+      <div class="thumb-list" id="thumbList"></div>
+      <button class="thumb-add" id="btnAddMore" title="继续添加图片">＋</button>
+    </section>
+
+    <!-- 操作按钮：第一排=当前图，第二排=全部图 -->
+    <footer class="actions">
+      <div class="action-row">
+        <button class="btn btn-obfuscate" data-action="obfuscate">混淆</button>
+        <button class="btn btn-deobfuscate" data-action="deobfuscate">解混淆</button>
+        <button class="btn btn-plain" data-action="clear">清除</button>
+        <button class="btn btn-plain" data-action="revert">还原</button>
+        <button class="btn btn-save" data-action="save">保存</button>
+      </div>
+      <div class="action-row">
+        <button class="btn btn-obfuscate" data-action="batch-obfuscate">全部</button>
+        <button class="btn btn-deobfuscate" data-action="batch-deobfuscate">全部</button>
+        <button class="btn btn-plain" data-action="batch-clear">全部</button>
+        <button class="btn btn-plain" data-action="batch-revert">全部</button>
+        <button class="btn btn-save" data-action="batch-save">全部</button>
+      </div>
+    </footer>
+
+    <!-- 处理进度 -->
+    <div class="progress" id="progressBar" hidden>
+      <div class="progress-track"><div class="progress-fill" id="progressFill"></div></div>
+      <div class="progress-text" id="progressText">处理中…</div>
+    </div>
+  </div>
+
+  <script type="module" src="app.js"></script>
+</body>
+</html>
