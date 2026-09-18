@@ -40,3 +40,8 @@ PNG / JPG / WebP / GIF（取首帧）/ BMP / ICO / AVIF / SVG（自带尺寸时�
 ## 已知限制
 - SVG 转其它格式按内核渲染结果（不支持外部引用资源）。
 - 大图转 BMP/TIFF 体积会显著变大（无压损格式的正常现象）。
+
+## 验证结论（2026-09-18 实测回填）
+- `--media-test`：BMP 头 `BM`、96×64 = 24,698 B；ICO 类型 1、含 2 个尺寸项；两者均能被 ffmpeg 完整解码；TIFF（LZW）15,269 B、静态 GIF 4,514 B、AVIF 5,017 B 生成成功且可解码。
+- `--media-ui-test`：PNG → PNG 转换成功落盘，界面状态「转换完成：成功 N 个」。
+- HEIC 提示逻辑已在界面文案中落实（内核与 ffmpeg 静态包均无 HEIC 解码，实测确认构建无 libheif）。
