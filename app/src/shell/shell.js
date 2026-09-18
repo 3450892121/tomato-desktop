@@ -49,9 +49,20 @@ const ctx = {
   setInfo,
   showProgress,
   hideProgress,
+  // 文件对话框
   openImages: () => window.desktop.openImages(),
   openFolder: () => window.desktop.openFolder(),
   saveFile: (options) => window.desktop.saveFile(options),
+  // 文件读写（界面进程在沙箱中，统一经主进程）
+  readFile: (filePath) => window.desktop.readFile(filePath),
+  pathInfo: (filePath) => window.desktop.pathInfo(filePath),
+  listImages: (dirPath) => window.desktop.listImages(dirPath),
+  saveImageNextTo: (options) => window.desktop.saveImageNextTo(options),
+  getPathForFile: (file) => window.desktop.getPathForFile(file),
+  // 剪贴板
+  readClipboardImage: () => window.desktop.readClipboardImage(),
+  writeClipboardImage: (bytes) => window.desktop.writeClipboardImage(bytes),
+  // 通用设置与版本信息
   settings,
   versions: window.desktop.versions
 };
