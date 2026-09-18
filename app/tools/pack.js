@@ -212,4 +212,24 @@ if (!zipped) {
 }
 if (zipped) log(`压缩包已生成：${zipPath}（${mb(fs.statSync(zipPath).size)}）`);
 
+// —— 9) 清理旧版本产物（用户要求：只保留最新版本，避免拿错） ——
+// 只在本次打包产出成功后执行；只删本软件的旧版文件夹/压缩包，不动其它文件。
+log('步骤9：清理旧版本产物');
+try {
+  let removed = 0;
+  for (const entry of fs.readdirSync(releaseRoot, { withFileTypes: true })) {
+    if (entry.name === folderName) continue;
+    const oldFolder = entry.isDirectory() && entry.name.startsWith('番茄图片混淆-桌面版-v') && entry.name.endsWith('-win64');
+    const oldZip = entry.isFile() && entry.name.startsWith('番茄图片混淆-桌面版-v') && entry.name.endsWith('-win64.zip');
+    if (oldFolder || oldZip) {
+      fs.rmSync(path.join(releaseRoot, entry.name), { recursive: true, force: true });
+      log(`已删除旧版本产物：${entry.name}`);
+      removed += 1;
+    }
+  }
+  if (removed === 0) log('没有需要清理的旧版本产物');
+} catch (err) {
+  log(`旧版本清理失败（不影响本次产物）：${err.message}`);
+}
+
 log('完成。可双击文件夹内的 exe 直接使用，或把 zip 发给别人。');
