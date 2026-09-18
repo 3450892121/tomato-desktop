@@ -33,7 +33,16 @@ function copyTree(src, dst) {
 }
 
 // —— 1) 准备输出目录 ——
-fs.rmSync(outDir, { recursive: true, force: true });
+try {
+  fs.rmSync(outDir, { recursive: true, force: true });
+} catch (err) {
+  if (err.code === 'EBUSY' || err.code === 'EPERM') {
+    throw new Error(
+      `输出目录被占用：${outDir}\n请先关闭正在运行的「番茄图片混淆桌面版」再重新打包（或手动删除该文件夹）。`
+    );
+  }
+  throw err;
+}
 fs.mkdirSync(outDir, { recursive: true });
 
 // —— 2) 复制 Electron 运行时，去掉自带示例应用 ——

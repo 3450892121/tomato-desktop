@@ -114,6 +114,18 @@ const SELF_TEST_SCRIPT = `
     const encB = processPixels({ mode: 'b', key: 'k', direction: 'encrypt', width: 100, height: 50, pixels: big });
     result.blockSize = encB.width + 'x' + encB.height;
 
+    // 5) 性能参考：4000×3000（1200 万像素）各模式耗时（毫秒）
+    const pw = 4000, ph = 3000;
+    const bigBuf = new Uint8ClampedArray(pw * ph * 4);
+    for (let i = 0; i < bigBuf.length; i += 997) bigBuf[i] = (i * 31) & 255;
+    const perf = {};
+    for (const [m, k] of [['gilbert', undefined], ['b', 'k'], ['c', 'k'], ['c2', 'k'], ['pe1', 0.666], ['pe2', 0.666]]) {
+      const t0 = performance.now();
+      processPixels({ mode: m, key: k, direction: 'encrypt', width: pw, height: ph, pixels: bigBuf });
+      perf[m] = Math.round(performance.now() - t0);
+    }
+    result.perf12MP_ms = perf;
+
     return JSON.stringify(result);
   })()
 `;
@@ -263,8 +275,13 @@ ipcMain.handle('dialog:open-images', async () => {
   return result.canceled ? [] : result.filePaths;
 });
 
-// 打开文件夹对话框（用于批量导入）
+// 打开文件夹对话框（用于批量导入 / 选择输出目录）
 ipcMain.handle('dialog:open-folder', async () => {
+  // 界面自动测试模式：直接返回测试目录
+  if (uiTest) {
+    const { TEST_DIR } = require('./tests/ui-test.js');
+    return TEST_DIR;
+  }
   const result = await dialog.showOpenDialog(mainWindow, {
     title: '选择文件夹',
     properties: ['openDirectory']

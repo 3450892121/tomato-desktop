@@ -164,7 +164,7 @@ function showModal({ title, bodyHTML, actions = [] }) {
 
 function openSettings() {
   const s = settings.getSettings();
-  showModal({
+  const modal = showModal({
     title: '设置',
     bodyHTML: `
       <div class="field">
@@ -184,8 +184,12 @@ function openSettings() {
       </div>
       <div class="field">
         <label class="field-label">输出目录</label>
-        <input class="input" id="setOutputDir" type="text" value="${s.outputDir}" placeholder="留空 = 保存在原图旁边" />
-        <div class="field-hint">留空时与手机版一致：保存到原图所在目录。</div>
+        <div class="control-row">
+          <input class="input" id="setOutputDir" type="text" value="${s.outputDir}" placeholder="留空 = 保存在原图旁边" />
+          <button class="btn btn-ghost" id="setOutputDirPick" type="button">选择文件夹…</button>
+          <button class="btn btn-ghost" id="setOutputDirClear" type="button">用原图旁边</button>
+        </div>
+        <div class="field-hint">点「选择文件夹…」直接挑选；留空或点「用原图旁边」＝与手机版一致：保存到原图所在目录。</div>
       </div>
       <label class="field-check">
         <input type="checkbox" id="setAskSavePath" ${s.askSavePath ? 'checked' : ''} />
@@ -241,6 +245,20 @@ function openSettings() {
         }
       }
     ]
+  });
+
+  // 「选择文件夹…」「用原图旁边」——与添加图片一样用系统选择框，省得手打路径
+  const dirInput = modal.backdrop.querySelector('#setOutputDir');
+  modal.backdrop.querySelector('#setOutputDirPick').addEventListener('click', async () => {
+    const dir = await ctx.openFolder();
+    if (dir) {
+      dirInput.value = dir;
+      setStatus(`输出目录已选择：${dir}`);
+    }
+  });
+  modal.backdrop.querySelector('#setOutputDirClear').addEventListener('click', () => {
+    dirInput.value = '';
+    setStatus('输出目录已设为「保存在原图旁边」');
   });
 }
 

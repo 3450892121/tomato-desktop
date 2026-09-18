@@ -212,7 +212,13 @@ async function runUiTest(win) {
       .filter((s) => !document.querySelector(s))
   }))()`);
 
-  // 设置文件位置：开发时在 app/userdata，打包后在 exe 同级的 userdata（绿色版约定）
+  // 输出目录：点「选择文件夹…」应弹出系统选择框并把路径填进输入框（测试模式下返回测试目录）
+  result.steps.outputDirPick = await evalJs(`(async () => {
+    document.querySelector('#setOutputDirPick').click();
+    await new Promise((r) => setTimeout(r, 700));
+    return document.querySelector('#setOutputDir').value + '｜' + document.getElementById('statusText').textContent;
+  })()`);
+
   const settingsFile = path.join(
     app.isPackaged ? path.dirname(process.execPath) : path.join(__dirname, '..'),
     'userdata',
@@ -263,7 +269,46 @@ async function runUiTest(win) {
   })()`);
   await wait(200);
 
-  // 12) 清空（确认框自动确认）
+  // 12) 批量与容错：20 张正常 + 1 张损坏文件
+  // 先清掉此前产生的测试图片，保证目录里只有本轮样本
+  for (const f of await fs.readdir(TEST_DIR)) {
+    if (f.startsWith('测试原图')) await fs.rm(path.join(TEST_DIR, f), { force: true });
+  }
+  await evalJs(`(async () => {
+    const { encodeImageToBytes } = await import('../shared/imageio.js');
+    for (let i = 1; i <= 20; i++) {
+      const w = 16 + (i % 5), h = 12 + (i % 4);
+      const px = new Uint8ClampedArray(w * h * 4);
+      for (let p = 0; p < w * h; p++) { px[p * 4] = (p * 13 + i) & 255; px[p * 4 + 1] = (p * 7) & 255; px[p * 4 + 2] = i * 5 & 255; px[p * 4 + 3] = 255; }
+      const bytes = await encodeImageToBytes(px, w, h, { format: 'png' });
+      await window.desktop.saveImageNextTo({ sourcePath: ${JSON.stringify(path.join(TEST_DIR, 'seed.png'))}, baseName: '测试原图批量' + String(i).padStart(2, '0'), ext: '.png', bytes });
+    }
+    // 1 张损坏文件（扩展名冒充 png）
+    const bad = new TextEncoder().encode('这不是图片');
+    await window.desktop.saveImageNextTo({ sourcePath: ${JSON.stringify(path.join(TEST_DIR, 'seed.png'))}, baseName: '测试原图批量21损坏', ext: '.png', bytes: bad });
+    return true;
+  })()`);
+
+  await evalJs('(() => { window.confirm = () => true; return true; })()');
+  await evalJs(`document.querySelector('[data-action="batch-clear"]').click()`);
+  await wait(300);
+  await evalJs('document.getElementById("btnAddFirst").click()');
+  await wait(3000);
+  result.steps.batchAdd = await evalJs(`JSON.stringify({
+    status: document.getElementById('statusText').textContent,
+    thumbs: document.querySelectorAll('#thumbList .thumb').length
+  })`);
+
+  await evalJs(`document.querySelector('[data-action="batch-obfuscate"]').click()`);
+  await wait(2500);
+  result.steps.batchObfuscate20 = await evalJs('document.getElementById("statusText").textContent');
+  await shot('11-批量20张');
+  await evalJs(`document.querySelector('[data-action="batch-save"]').click()`);
+  await wait(3000);
+  result.steps.batchSave20 = await evalJs('document.getElementById("statusText").textContent');
+  result.steps.batchSavedFiles = (await fs.readdir(TEST_DIR)).filter((f) => f.includes('_混淆')).length;
+
+  // 13) 清空（确认框自动确认）
   await evalJs('(() => { window.confirm = () => true; return true; })()');
   await evalJs(`document.querySelector('[data-action="batch-clear"]').click()`);
   await wait(400);
@@ -291,12 +336,20 @@ async function runUiTest(win) {
     c.settingsModal.open === true &&
     c.settingsModal.missingFields.length === 0 &&
     c.settingsFileAfterSave.jpegQuality === 90 &&
+    c.settingsFileAfterSave.outputDir === TEST_DIR &&
+    result.steps.outputDirPick.startsWith(TEST_DIR) &&
     c.settingsFileAfterReset.jpegQuality === 95 &&
     result.steps.settingsReset.includes('剩余弹窗数=0') &&
     c.helpModal.open === true &&
     c.helpModal.title === '使用帮助' &&
     c.helpModal.sections >= 3 &&
     c.helpModal.modalCount === 1 &&
+    JSON.parse(result.steps.batchAdd).status.includes('已添加 20 张图片') &&
+    JSON.parse(result.steps.batchAdd).status.includes('1 张失败') &&
+    JSON.parse(result.steps.batchAdd).thumbs === 20 &&
+    result.steps.batchObfuscate20.includes('成功 20 张') &&
+    result.steps.batchSave20.includes('成功 20 张') &&
+    result.steps.batchSavedFiles >= 20 &&
     c.clearedThumbs === 0;
 
   return result;
