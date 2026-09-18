@@ -200,7 +200,64 @@ async function runUiTest(win) {
   })()`);
   await shot('07-切到PE1模式');
 
-  // 10) 清空（确认框自动确认）
+  // 10) 设置面板：打开 → 改 JPG 画质 → 保存 → 校验落盘 → 恢复默认
+  await evalJs('document.getElementById("btnSettings").click()');
+  await wait(300);
+  await shot('09-设置面板');
+  result.checks.settingsModal = await evalJs(`(() => ({
+    open: !!document.querySelector('.modal-backdrop'),
+    title: document.querySelector('.modal-title') ? document.querySelector('.modal-title').textContent : '',
+    missingFields: ['#setBlockSize','#setJpegQuality','#setDefaultKey','#setOutputDir','#setAskSavePath']
+      .filter((s) => !document.querySelector(s))
+  }))()`);
+
+  const settingsFile = path.join(__dirname, '..', 'userdata', 'settings.json');
+  result.steps.settingsSave = await evalJs(`(async () => {
+    document.querySelector('#setJpegQuality').value = '90';
+    [...document.querySelectorAll('.modal-actions .btn')].find((b) => b.textContent === '保存').click();
+    await new Promise((r) => setTimeout(r, 400));
+    return document.getElementById('statusText').textContent;
+  })()`);
+  try {
+    result.checks.settingsFileAfterSave = JSON.parse(await fs.readFile(settingsFile, 'utf8'));
+  } catch (err) {
+    result.checks.settingsFileAfterSave = { error: err.message };
+  }
+
+  // 恢复默认（保持开发环境干净）
+  await evalJs('document.getElementById("btnSettings").click()');
+  await wait(250);
+  result.steps.settingsReset = await evalJs(`(async () => {
+    [...document.querySelectorAll('.modal-actions .btn')].find((b) => b.textContent.includes('恢复默认')).click();
+    await new Promise((r) => setTimeout(r, 700));
+    const status = document.getElementById('statusText').textContent;
+    const closeBtn = [...document.querySelectorAll('.modal-actions .btn')].find((b) => b.textContent === '取消');
+    if (closeBtn) closeBtn.click();
+    await new Promise((r) => setTimeout(r, 150));
+    return status + '｜剩余弹窗数=' + document.querySelectorAll('.modal-backdrop').length;
+  })()`);
+  try {
+    result.checks.settingsFileAfterReset = JSON.parse(await fs.readFile(settingsFile, 'utf8'));
+  } catch (err) {
+    result.checks.settingsFileAfterReset = { error: err.message };
+  }
+
+  // 11) 帮助弹窗
+  await evalJs('document.getElementById("btnHelp").click()');
+  await wait(300);
+  await shot('10-帮助');
+  result.checks.helpModal = await evalJs(`(() => {
+    const modals = document.querySelectorAll('.modal-backdrop');
+    const backdrop = modals[modals.length - 1];   // 取最新打开的弹窗
+    const title = backdrop ? backdrop.querySelector('.modal-title').textContent : '';
+    const sections = backdrop ? backdrop.querySelectorAll('.help-section').length : 0;
+    const closeBtn = backdrop ? [...backdrop.querySelectorAll('.modal-actions .btn')].find((b) => b.textContent === '知道了') : null;
+    if (closeBtn) closeBtn.click();
+    return { open: !!backdrop, title, sections, modalCount: modals.length };
+  })()`);
+  await wait(200);
+
+  // 12) 清空（确认框自动确认）
   await evalJs('(() => { window.confirm = () => true; return true; })()');
   await evalJs(`document.querySelector('[data-action="batch-clear"]').click()`);
   await wait(400);
@@ -225,6 +282,15 @@ async function runUiTest(win) {
     c.decodeSavedFile.sum === c.originalCanvas.sum &&
     c.keyRowByMode.gilbertHidden === true &&
     c.keyRowByMode.pe1Hidden === false &&
+    c.settingsModal.open === true &&
+    c.settingsModal.missingFields.length === 0 &&
+    c.settingsFileAfterSave.jpegQuality === 90 &&
+    c.settingsFileAfterReset.jpegQuality === 95 &&
+    result.steps.settingsReset.includes('剩余弹窗数=0') &&
+    c.helpModal.open === true &&
+    c.helpModal.title === '使用帮助' &&
+    c.helpModal.sections >= 3 &&
+    c.helpModal.modalCount === 1 &&
     c.clearedThumbs === 0;
 
   return result;

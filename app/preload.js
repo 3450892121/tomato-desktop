@@ -19,9 +19,14 @@ contextBridge.exposeInMainWorld('desktop', {
 
   // 文件读写（界面进程处于沙箱中，必须经由主进程）
   readFile: (filePath) => ipcRenderer.invoke('fs:read-file', filePath),
+  writeFile: (filePath, bytes) => ipcRenderer.invoke('fs:write-file', filePath, bytes),
   pathInfo: (filePath) => ipcRenderer.invoke('fs:path-info', filePath),
   listImages: (dirPath) => ipcRenderer.invoke('fs:list-images', dirPath),
   saveImageNextTo: (options) => ipcRenderer.invoke('fs:save-image', options),
+
+  // 设置（绿色版：存在软件目录内）
+  settingsRead: () => ipcRenderer.invoke('settings:read'),
+  settingsWrite: (patch) => ipcRenderer.invoke('settings:write', patch),
 
   // 拖拽文件取真实路径（Electron 新版不再提供 file.path）
   getPathForFile: (file) => {

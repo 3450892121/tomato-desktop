@@ -25,6 +25,20 @@ if (uiTest) {
   app.disableHardwareAcceleration();
 }
 
+// 绿色版约定：所有运行期数据（设置等）都放在软件目录内，不写系统 AppData
+const PORTABLE_DIR = app.isPackaged ? path.dirname(process.execPath) : __dirname;
+const USER_DATA_DIR = path.join(PORTABLE_DIR, 'userdata');
+const SETTINGS_FILE = path.join(USER_DATA_DIR, 'settings.json');
+app.setPath('userData', USER_DATA_DIR);
+
+async function readSettingsFile() {
+  try {
+    return JSON.parse(await fs.readFile(SETTINGS_FILE, 'utf8'));
+  } catch {
+    return {};
+  }
+}
+
 const SELF_TEST_SCRIPT = `
   (async () => {
     const { processPixels } = await import('../tools/obfuscate/core/engine.js');
@@ -256,9 +270,9 @@ ipcMain.handle('fs:list-images', async (_event, dirPath) => {
     .sort();
 });
 
-// 保存图片到「原图所在目录」（与原图同目录，重名自动加序号，绝不覆盖已有文件）
-ipcMain.handle('fs:save-image', async (_event, { sourcePath, baseName, ext, bytes }) => {
-  const dir = sourcePath ? path.dirname(sourcePath) : app.getPath('pictures');
+// 保存图片（默认存到原图同目录；可指定输出目录；重名自动加序号，绝不覆盖已有文件）
+ipcMain.handle('fs:save-image', async (_event, { sourcePath, targetDir, baseName, ext, bytes }) => {
+  const dir = targetDir || (sourcePath ? path.dirname(sourcePath) : app.getPath('pictures'));
   const suffix = ext.startsWith('.') ? ext : `.${ext}`;
   let target = path.join(dir, `${baseName}${suffix}`);
   let i = 1;
@@ -266,8 +280,26 @@ ipcMain.handle('fs:save-image', async (_event, { sourcePath, baseName, ext, byte
     target = path.join(dir, `${baseName}(${i})${suffix}`);
     i += 1;
   }
+  await fs.mkdir(dir, { recursive: true });
   await fs.writeFile(target, Buffer.from(bytes));
   return target;
+});
+
+// 写文件（用于「保存前询问路径」的情况）
+ipcMain.handle('fs:write-file', async (_event, filePath, bytes) => {
+  await fs.writeFile(filePath, Buffer.from(bytes));
+  return filePath;
+});
+
+// —— 设置读写（绿色版：存在软件目录的 userdata/settings.json） ——
+
+ipcMain.handle('settings:read', async () => readSettingsFile());
+
+ipcMain.handle('settings:write', async (_event, patch) => {
+  const next = { ...(await readSettingsFile()), ...patch };
+  await fs.mkdir(USER_DATA_DIR, { recursive: true });
+  await fs.writeFile(SETTINGS_FILE, JSON.stringify(next, null, 2), 'utf8');
+  return next;
 });
 
 // —— 剪贴板 ——

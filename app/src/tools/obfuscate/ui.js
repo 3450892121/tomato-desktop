@@ -92,7 +92,7 @@ function applyModeToKeyInput() {
   }
   els.keyRow.hidden = false;
   if (mode.keyType === 'double') {
-    els.keyInput.value = DEFAULT_DOUBLE_KEY;
+    els.keyInput.value = state.ctx.settings.getSettings().defaultDoubleKey || DEFAULT_DOUBLE_KEY;
     els.keyInput.inputMode = 'decimal';
     els.keyHint.textContent = '输入 0 到 1 之间的小数';
   } else {
@@ -217,7 +217,8 @@ async function runProcess(direction, targets, label) {
         direction,
         width: entry.current.width,
         height: entry.current.height,
-        pixels: entry.current.pixels
+        pixels: entry.current.pixels,
+        blockSize: state.ctx.settings.getSettings().blockSize
       });
       entry.current = { pixels: out.pixels, width: out.width, height: out.height };
       entry.lastOp = direction === 'encrypt' ? '混淆' : '解混淆';
@@ -269,6 +270,7 @@ async function saveEntries(entries, label) {
     return;
   }
   const modeDef = getMode(state.els.mode.value);
+  const config = state.ctx.settings.getSettings();
   const format = modeDef.saveFormat || 'png';
   const ext = format === 'jpg' ? '.jpg' : '.png';
   let done = 0;
@@ -281,15 +283,31 @@ async function saveEntries(entries, label) {
     try {
       const bytes = await encodeImageToBytes(entry.current.pixels, entry.current.width, entry.current.height, {
         format,
-        quality: modeDef.jpegQuality || 95
+        quality: config.jpegQuality || modeDef.jpegQuality || 95
       });
       const suffix = entry.lastOp ? `_${entry.lastOp}` : '_混淆';
-      lastPath = await state.ctx.saveImageNextTo({
-        sourcePath: entry.path,
-        baseName: `${entry.baseName}${suffix}`,
-        ext,
-        bytes
-      });
+
+      if (config.askSavePath) {
+        // 用户在设置里要求「每次保存前询问位置」
+        const chosen = await state.ctx.saveFile({
+          defaultPath: `${entry.baseName}${suffix}${ext}`,
+          filters: format === 'jpg' ? [{ name: 'JPEG 图片', extensions: ['jpg'] }] : [{ name: 'PNG 图片', extensions: ['png'] }]
+        });
+        if (!chosen) {
+          state.ctx.hideProgress();
+          state.ctx.setStatus('已取消保存');
+          return;
+        }
+        lastPath = await state.ctx.writeFile(chosen, bytes);
+      } else {
+        lastPath = await state.ctx.saveImageNextTo({
+          sourcePath: entry.path,
+          targetDir: config.outputDir || undefined,
+          baseName: `${entry.baseName}${suffix}`,
+          ext,
+          bytes
+        });
+      }
       done += 1;
     } catch (err) {
       failed += 1;

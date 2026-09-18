@@ -20,7 +20,16 @@ export const BLOCK_SIZE = 32;
  * @param {object} [opts.variants] 兼容性变体（见 variants.js，默认用当前默认值）
  * @returns {{pixels: Uint8ClampedArray, width: number, height: number}}
  */
-export function processPixels({ mode, key, direction, width, height, pixels, variants = VARIANTS }) {
+export function processPixels({
+  mode,
+  key,
+  direction,
+  width,
+  height,
+  pixels,
+  variants = VARIANTS,
+  blockSize = BLOCK_SIZE
+}) {
   if (!pixels || pixels.length !== width * height * 4) {
     throw new Error('像素缓冲长度与尺寸不匹配');
   }
@@ -38,7 +47,7 @@ export function processPixels({ mode, key, direction, width, height, pixels, var
         height,
         key,
         direction,
-        blockSize: BLOCK_SIZE,
+        blockSize,
         variant: variants.blockVariant
       });
     case 'c':
