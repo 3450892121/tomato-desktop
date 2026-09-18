@@ -1,0 +1,29 @@
+LibreOffice 加装包（可选）—— 番茄图片混淆 桌面版
+==================================================
+
+【用途】
+装上它以后，「PDF 转格式」工具里这两项才能用 / 才更准：
+  1. Word/Excel → PDF：高保真转换（支持旧版 .doc/.xls，PPT 也支持）
+  2. PDF → Word：把 PDF 转成可编辑的 Word 文档
+不装它也不影响其他功能（PDF↔图片、合并/拆分/提取页、.docx/.xlsx → PDF 的内置方式都照常可用）。
+
+【怎么安装】
+把本压缩包里的 addons 文件夹，整个解压到「番茄图片混淆桌面版」的软件目录下
+（就是和「番茄图片混淆桌面版.exe」位于同一层的那个目录）。
+解压后应形成这样的路径：
+    软件目录\addons\libreoffice\program\soffice.com
+然后重新打开软件（或重开「PDF 转格式」工具），
+方向选「Word/Excel → PDF」或「PDF → Word」，看到「✓ 已检测到 LibreOffice」就成了。
+
+【说明】
+- 加装包解压后约 1.5 GB，来自 LibreOffice 26.2.6（开源免费，MPL-2.0 许可），
+  只是把它的文件放在软件目录里，不会安装到系统、不写注册表。
+- 完全离线运行，不联网。
+- 运行时的临时配置放在 软件目录\userdata\libreoffice-profile 下，
+  整个软件文件夹拷走就能一起带走。
+- 不需要了：直接删掉 addons\libreoffice 文件夹即可，不影响其他功能。
+
+【许可】
+本加装包的文件来自 The Document Foundation 的 LibreOffice（MPL-2.0），
+版权归其所有；许可证与版权信息见：
+    addons\libreoffice\LICENSE.html 与 addons\libreoffice\license.txt

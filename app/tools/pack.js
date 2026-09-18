@@ -130,6 +130,23 @@ if (fs.existsSync(readmeSrc)) {
 }
 fs.mkdirSync(path.join(outDir, 'userdata'), { recursive: true });
 
+// —— 5b) 可选加装包（LibreOffice）：存在就一起打包，保证「解压即用全部功能」 ——
+// 说明：加装包不进 git（体积约 1.5GB），放在 app/addons/libreoffice/（见 spec/modules/pdf-convert.md）。
+//       没有它时 PDF→Word 与高保真 Office→PDF 会提示需加装，其余功能不受影响。
+const addonSrc = path.join(appRoot, 'addons', 'libreoffice');
+if (fs.existsSync(addonSrc)) {
+  log('步骤5b：复制 LibreOffice 加装包（约 1.5GB，稍等）…');
+  const rc2 = spawnSync('robocopy', [addonSrc, path.join(outDir, 'addons', 'libreoffice'), '/E', '/NFL', '/NDL', '/NJH', '/NJS', '/NP', '/R:1', '/W:1', '/MT:8'], { stdio: 'ignore' });
+  if (rc2.error) throw new Error(`robocopy 复制加装包失败：${rc2.error.message}`);
+  if (typeof rc2.status === 'number' && rc2.status >= 8) throw new Error(`robocopy 复制加装包失败（退出码 ${rc2.status}）`);
+  const addonReadme = path.join(repoRoot, 'docs', '加装包说明.txt');
+  if (fs.existsSync(addonReadme)) {
+    fs.copyFileSync(addonReadme, path.join(outDir, '加装包说明.txt'));
+  }
+} else {
+  log('未发现 app/addons/libreoffice：本次不打包加装包（PDF→Word / 高保真转换将提示需加装）');
+}
+
 // —— 6) 设置 exe 图标与版本信息（需要 build/rcedit.exe，缺失则跳过） ——
 log('步骤6：设置 exe 图标与版本信息');
 const rcedit = path.join(appRoot, 'build', 'rcedit.exe');

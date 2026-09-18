@@ -16,6 +16,8 @@ const els = {
 
 /** 当前活动的工具 */
 let activeTool = null;
+/** 应用信息（版本号等，启动时读取一次） */
+let appInfo = null;
 /** 已加载过的工具样式（同一份只加载一次） */
 const loadedStyles = new Set();
 
@@ -73,7 +75,8 @@ const ctx = {
   writeClipboardImage: (bytes) => window.desktop.writeClipboardImage(bytes),
   // 通用设置与版本信息
   settings,
-  versions: window.desktop.versions
+  versions: window.desktop.versions,
+  appInfo: () => window.desktop.appInfo()
 };
 
 // —— 工具列表与挂载 ——
@@ -303,6 +306,10 @@ function openHelp() {
           <li>方块模式遇到尺寸不是 32 的倍数时会自动补边，输出尺寸会变大，这是正常现象。</li>
         </ul>
       </div>
+      <div class="help-section">
+        <h4>关于</h4>
+        <p>当前版本：<b>v${appInfo && appInfo.version ? appInfo.version : '未知'}</b>${appInfo && appInfo.packaged ? '（免安装版）' : '（开发调试版）'} ｜ 内核：Electron ${ctx.versions.electron} · Chrome ${ctx.versions.chrome}</p>
+      </div>
     `,
     actions: [{ label: '知道了', className: 'btn-obfuscate' }]
   });
@@ -310,6 +317,17 @@ function openHelp() {
 
 async function init() {
   await settings.loadSettings();
+
+  // 版本号：异步补上即可，绝不能阻塞工具列表渲染（否则窗口刚打开时列表会短暂为空）
+  window.desktop.appInfo()
+    .then((info) => {
+      appInfo = info;
+      const versionEl = document.getElementById('appVersion');
+      if (versionEl && info && info.version) versionEl.textContent = `v${info.version}`;
+    })
+    .catch(() => {
+      /* 读不到版本时保持占位符，不影响使用 */
+    });
 
   els.btnSettings.addEventListener('click', openSettings);
   els.btnHelp.addEventListener('click', openHelp);

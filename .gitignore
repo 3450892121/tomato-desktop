@@ -16,6 +16,9 @@ app/build
 # 软件运行期用户数据（绿色版配置随文件夹走，不进 git）
 app/userdata
 
+# LibreOffice 可选加装包（体积数百 MB，不进 git；放置位置见 spec/modules/pdf-convert.md）
+app/addons
+
 # 日志与系统文件
 *.log
 .DS_Store

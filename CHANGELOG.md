@@ -4,7 +4,7 @@
 
 ## v1.1.0（2026-09-18）新增「PDF 转格式」工具
 
-**交付物**：`app/release/番茄图片混淆-桌面版-v1.1.0-win64/`（免安装文件夹）与同名 `.zip`。
+**交付物**：`app/release/番茄图片混淆-桌面版-v1.1.0-win64/`（免安装文件夹）与同名 `.zip`——**已内含 LibreOffice 加装包，解压即用全部功能，无需用户另行安装**。
 
 **功能**
 - 新工具「PDF 转格式」（左侧第二个入口），五个方向：
@@ -13,7 +13,9 @@
   - 合并 / 拆分 / 提取页：多份合并、每页或每 N 页拆分、按页码范围抽取
   - Word/Excel → PDF：无加装包时走内置方式（docx-preview + SheetJS + Chromium printToPDF）；装加装包后走 LibreOffice（高保真、支持旧版 .doc/.xls）
   - PDF → Word：依赖 LibreOffice 加装包（显式 `writer_pdf_import` 过滤器），未装时明确提示、不产出文件
-- LibreOffice 可选加装包：放到软件目录 `addons/libreoffice/` 即自动检测（MPL-2.0；主安装包不含）
+- LibreOffice 加装包：**随主包一起分发**（放到软件目录 `addons/libreoffice/` 即自动检测，MPL-2.0；解压后约 1.5 GB）
+- 版本号可见：左上角徽章 + 窗口标题 + 帮助弹窗「关于」（便于确认打开的是哪个版本）
+- 修复「加装包放在发布路径下 PDF→Word 失败」的路径坑：转换前自动用目录联接把加装包映射到短路径再启动（已实测恢复）
 
 **工程**
 - 新依赖全部纯 JS、随包离线：pdfjs-dist（Apache-2.0）、pdf-lib（MIT）、docx-preview（Apache-2.0）、JSZip（MIT）、SheetJS CE（Apache-2.0）
@@ -21,9 +23,13 @@
 - 打包脚本按需复制依赖子集并保持相对路径；pdfjs worker 在绿色版中为真线程加载（`workerFallback: no`）
 - 实测并修复两处坑：pdfjs 会把输入字节转移给 worker（`openPdf` 内置拷贝，调用方可复用同一份字节）；渲染收尾的 destroy 清理异常曾把「已成功导出」误判为失败
 
+**实测记录（LibreOffice 加装包，2026-09-18）**
+- docx → PDF：有正文像素、单页（首次 36.2 s 含初始化配置，后续与内置降级同量级）
+- PDF → Word：产出为合法 OOXML（含 `word/document.xml`），9.4 s
+- 加装包体积：MSI 356 MB → 解压后 1522 MB；已定为「可选、单独分发」
+
 **待办**
-- LibreOffice 加装包到位后实测 soffice 链路（高保真 Office→PDF、PDF→Word）
-- 复杂版式的内置降级效果人工抽测
+- 复杂版式的内置降级效果与真实文档的 LibreOffice 转换，交付后人工抽测 2–3 份
 
 ## v1.0.0（2026-09-18）首次交付
 

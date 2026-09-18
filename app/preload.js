@@ -11,6 +11,8 @@ contextBridge.exposeInMainWorld('desktop', {
     chrome: process.versions.chrome,
     node: process.versions.node
   },
+  // 应用信息（版本号，界面用来确认打开的是哪个版本）
+  appInfo: () => ipcRenderer.invoke('app:info'),
 
   // 文件对话框
   openImages: () => ipcRenderer.invoke('dialog:open-images'),

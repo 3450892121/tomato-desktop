@@ -189,6 +189,46 @@ const PDF_TEST_SCRIPT = `
       return { pages: doc.numPages, page1: p1.width + 'x' + p1.height, hasContent: dark > 20, bytes: res.bytes.length, ms: res.ms };
     });
 
+    // LibreOffice 分支：装了加装包才实际执行（没装记 skipped，不算失败）
+    await step('libreoffice', async () => {
+      const status = await window.desktop.libreofficeStatus();
+      if (!status || !status.found) return { skipped: '未检测到 LibreOffice（加装包未安装）' };
+
+      // ① docx → PDF（走 soffice，高保真通道）
+      const r1 = await window.desktop.libreofficeConvert({ inputPath: samples.docxPath, target: 'pdf' });
+      if (!r1 || !r1.ok) throw new Error('docx→pdf 失败：' + ((r1 && r1.message) || '未知原因'));
+      const doc1 = await pdfjs.openPdf(r1.bytes);
+      const p1 = await pdfjs.renderPageToPixels(doc1, 1, { scale: 1 });
+      let dark = 0;
+      for (let i = 0; i < p1.pixels.length; i += 4) if (p1.pixels[i] < 128 && ++dark > 20) break;
+
+      // ② 先落一份磁盘上的 PDF，再用它做 PDF → Word（docx）
+      const onePage = await build.imagesToPdf([{ bytes: pngBytes, type: 'png' }]);
+      const pdfPath = await window.desktop.saveImageNextTo({
+        sourcePath: samples.docxPath, baseName: 'lo-test-input', ext: '.pdf', bytes: onePage
+      });
+      const r2 = await window.desktop.libreofficeConvert({ inputPath: pdfPath, target: 'docx' });
+      if (!r2 || !r2.ok) throw new Error('pdf→docx 失败：' + ((r2 && r2.message) || '未知原因'));
+
+      // docx 是 zip：检查 PK 头 + 内含 word/document.xml（zip 的文件名在头部是明文）
+      const isZip = r2.bytes[0] === 0x50 && r2.bytes[1] === 0x4b;
+      let hasDocXml = false;
+      const needle = 'word/document.xml';
+      outer: for (let i = 0; i < r2.bytes.length - needle.length; i++) {
+        for (let j = 0; j < needle.length; j++) {
+          if (r2.bytes[i + j] !== needle.charCodeAt(j)) continue outer;
+        }
+        hasDocXml = true;
+        break;
+      }
+
+      return {
+        where: status.where,
+        docxToPdf: { pages: doc1.numPages, hasText: dark > 20, bytes: r1.bytes.length, ms: r1.ms },
+        pdfToDocx: { isZip, hasDocXml, bytes: r2.bytes.length, ms: r2.ms }
+      };
+    });
+
     // 界面接线冒烟：切到 PDF 工具，检查注册、挂载与方向切换；最后切回图片混淆
     await step('ui', async () => {
       const navItem = [...document.querySelectorAll('#toolNav .tool-item')].find((b) => b.dataset.toolId === 'pdf-convert');
@@ -211,7 +251,11 @@ const PDF_TEST_SCRIPT = `
       const backItem = [...document.querySelectorAll('#toolNav .tool-item')].find((b) => b.dataset.toolId === 'obfuscate');
       if (backItem) backItem.click();
       await new Promise((r) => setTimeout(r, 200));
-      return { dirCount, runLabels: labels.join(' | ') };
+      return {
+        dirCount,
+        runLabels: labels.join(' | '),
+        version: document.getElementById('appVersion') ? document.getElementById('appVersion').textContent : ''
+      };
     });
 
     return JSON.stringify(result);

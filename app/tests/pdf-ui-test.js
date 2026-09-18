@@ -18,6 +18,21 @@ const { makeSamples } = require('./pdf-test.js');
 const TEST_DIR = path.join(os.tmpdir(), 'tomato-uitest');
 const RESULT_FILE = path.join(os.tmpdir(), 'tomato-pdf-ui-test.json');
 
+/** 与主进程一致的 LibreOffice 探测（决定本测试走「加装包高保真」还是「内置降级」分支） */
+function detectLibreOffice() {
+  // 与 main.js 的 PORTABLE_DIR 保持一致：打包态看 exe 所在目录，开发态看 app 目录
+  const { app } = require('electron');
+  const base = app.isPackaged ? path.dirname(process.execPath) : path.join(__dirname, '..');
+  const addon = path.join(base, 'addons', 'libreoffice');
+  const candidates = [
+    path.join(addon, 'program', 'soffice.com'),
+    path.join(addon, 'program', 'soffice.exe'),
+    'C:\\Program Files\\LibreOffice\\program\\soffice.com',
+    'C:\\Program Files (x86)\\LibreOffice\\program\\soffice.com'
+  ];
+  return candidates.some((p) => require('fs').existsSync(p));
+}
+
 const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 /** 造一份多页测试 PDF（纯色矩形 + 页码文字），用于读回校验 */
@@ -48,6 +63,7 @@ async function runPdfUiTest(win) {
   const wc = win.webContents;
   const evalJs = (code) => wc.executeJavaScript(code);
   const result = { steps: {}, checks: {}, shots: [] };
+  const loAvailable = detectLibreOffice();
 
   await fs.mkdir(TEST_DIR, { recursive: true });
 
@@ -109,6 +125,16 @@ async function runPdfUiTest(win) {
   };
 
   const status = () => evalJs('document.getElementById("statusText").textContent');
+  /** 轮询状态栏直到满足条件（转换类步骤耗时不定：LibreOffice 首次启动/大文档会慢） */
+  const waitForStatusText = async (predicate, timeoutMs) => {
+    const t0 = Date.now();
+    for (;;) {
+      const text = await status();
+      if (predicate(text)) return text;
+      if (Date.now() - t0 > timeoutMs) return `超时未完成：${text}`;
+      await wait(400);
+    }
+  };
   const click = (id) => evalJs(`document.getElementById(${JSON.stringify(id)}).click()`);
   const setDirection = async (id) => {
     await evalJs(`(() => {
@@ -212,28 +238,33 @@ async function runPdfUiTest(win) {
   await shot('p05-拆分与提取完成');
   result.checks.extractedFile = await pdfInfo(path.join(TEST_DIR, '测试样本_提取.pdf'));
 
-  // 6) Word/Excel → PDF（无加装包 → 内置降级）
+  // 6) Word/Excel → PDF（装了加装包走高保真，否则走内置降级）
   await setDirection('office-to-pdf');
   await click('pdfAddBtn');
   await wait(1500);
   result.steps.officeAdded = await status();
+  result.checks.loAvailable = loAvailable;
   result.checks.loNote = await evalJs('document.getElementById("pdfLoNote") ? document.getElementById("pdfLoNote").textContent : ""');
   await click('pdfRunBtn');
-  await wait(4000);
-  result.steps.officeRun = await status();
+  result.steps.officeRun = await waitForStatusText((t) => t.startsWith('转换完成'), loAvailable ? 120000 : 20000);
   await shot('p06-WordExcel转PDF完成');
   const officeOut = (await fs.readdir(TEST_DIR)).filter((f) => /^内置降级测试.*\.pdf$/.test(f)).sort();
   result.checks.officeOutputs = officeOut;
   result.checks.officeFirst = officeOut.length ? await pdfInfo(path.join(TEST_DIR, officeOut[0])) : null;
 
-  // 7) PDF → Word（无加装包 → 明确提示、不产生文件）
+  // 7) PDF → Word：无加装包应明确提示且不产出；有加装包应成功产出 .docx
   await setDirection('pdf-to-word');
   await click('pdfAddBtn');
   await wait(1000);
   await click('pdfRunBtn');
-  await wait(800);
-  result.steps.pdfToWordGuard = await status();
-  await shot('p07-PDF转Word缺少加装包提示');
+  if (loAvailable) {
+    result.steps.pdfToWordRun = await waitForStatusText((t) => t.startsWith('转换完成') || t.includes('失败'), 120000);
+    await shot('p07-PDF转Word完成');
+  } else {
+    await wait(800);
+    result.steps.pdfToWordGuard = await status();
+    await shot('p07-PDF转Word缺少加装包提示');
+  }
   result.checks.docxOutputFiles = (await fs.readdir(TEST_DIR)).filter((f) => f.endsWith('.docx')).sort();
 
   // 收尾：切回图片混淆，避免影响其他测试
@@ -265,9 +296,12 @@ async function runPdfUiTest(win) {
     result.steps.officeRun.includes('转换完成：成功 2 个') &&
     c.officeOutputs.length === 2 &&
     c.officeFirst && c.officeFirst.ok === true && c.officeFirst.pages >= 1 &&
-    result.steps.pdfToWordGuard.includes('需要 LibreOffice 加装包') &&
-    // 目录里只应存在测试样例 .docx 本身（无加装包时不得产出任何 Word 文件）
-    c.docxOutputFiles.every((f) => f === '内置降级测试.docx');
+    // PDF → Word：无加装包应提示不产出；有加装包应成功产出 .docx（排除测试样例本身）
+    (loAvailable
+      ? String(result.steps.pdfToWordRun || '').startsWith('转换完成：成功') &&
+        c.docxOutputFiles.some((f) => f.startsWith('测试样本'))
+      : result.steps.pdfToWordGuard.includes('需要 LibreOffice 加装包') &&
+        c.docxOutputFiles.every((f) => f === '内置降级测试.docx'));
 
   return result;
 }

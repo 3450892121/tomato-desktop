@@ -146,7 +146,7 @@ function createMainWindow() {
     minWidth: 900,
     minHeight: 640,
     backgroundColor: '#f5f6f8', // 与 theme.css 的 --color-bg 保持一致
-    title: '番茄图片混淆 桌面版',
+    title: `番茄图片混淆 桌面版 v${app.getVersion()}`,
     icon: path.join(__dirname, 'src', 'assets', 'icon.png'),
     autoHideMenuBar: true, // 默认隐藏菜单栏（按 Alt 显示），保持界面清爽
     webPreferences: {
@@ -162,9 +162,17 @@ function createMainWindow() {
   if (smokeTest) {
     mainWindow.webContents.once('did-finish-load', async () => {
       try {
-        const toolCount = await mainWindow.webContents.executeJavaScript(
-          'document.querySelectorAll("#toolNav .tool-item").length'
-        );
+        // 工具列表是异步渲染的，这里等一下（最多 2 秒），避免刚打开时误判为空
+        const toolCount = await mainWindow.webContents.executeJavaScript(`
+          (async () => {
+            for (let i = 0; i < 20; i++) {
+              const n = document.querySelectorAll('#toolNav .tool-item').length;
+              if (n > 0) return n;
+              await new Promise((r) => setTimeout(r, 100));
+            }
+            return document.querySelectorAll('#toolNav .tool-item').length;
+          })()
+        `);
         const optionCount = await mainWindow.webContents.executeJavaScript(
           'document.querySelectorAll("#modeSelect option").length'
         );
@@ -408,6 +416,13 @@ ipcMain.handle('clipboard:write-image', async (_event, bytes) => {
   return true;
 });
 
+// —— 应用信息（界面显示版本号，便于确认打开的是哪个版本） ——
+ipcMain.handle('app:info', async () => ({
+  version: app.getVersion(),
+  name: app.getName(),
+  packaged: app.isPackaged
+}));
+
 // —— PDF 转格式 工具：文件对话框与 LibreOffice 加装包（见 spec/modules/pdf-convert.md） ——
 
 // 打开 PDF 文件对话框（可多选）
@@ -469,6 +484,52 @@ ipcMain.handle('libreoffice:status', async () => {
   return { found: lo.found, where: lo.where };
 });
 
+/**
+ * 为加装包在短路径下建立（或复用）目录联接（junction，无需管理员权限），返回用于启动的 soffice 路径。
+ * 背景：实测发现 LibreOffice 放在较长、含中文的目录（如 release\番茄图片混淆-桌面版-v1.x.x-win64\addons\…）时，
+ *       PDF 导入过滤器会加载失败（报 “source file could not be loaded”），而同一份文件放在短路径下则正常。
+ *       这里统一通过短路径联接启动，用户无需关心软件装在哪儿。
+ */
+function ensureShortAddonLink(addonRoot, sofficePath) {
+  const exeName = path.basename(sofficePath);
+  // 链接根目录：优先系统临时目录；若其路径含非 ASCII 字符（如中文用户名），退回 Public 目录
+  const candidates = [os.tmpdir()];
+  if (process.env.PUBLIC) candidates.push(process.env.PUBLIC);
+  const root = candidates.find((r) => /^[\x20-\x7E]+$/.test(r)) || candidates[0];
+  const linkDir = path.join(root, 'tomato-lo', 'libreoffice');
+  try {
+    const linkSoffice = path.join(linkDir, 'program', exeName);
+    let valid = false;
+    try {
+      const st = fsSync.lstatSync(linkDir);
+      if (st.isSymbolicLink() || st.isDirectory()) {
+        const target = fsSync.readlinkSync(linkDir);
+        valid = path.resolve(target) === path.resolve(addonRoot) && fsSync.existsSync(linkSoffice);
+      }
+    } catch { /* 链接不存在，下面创建 */ }
+    if (!valid) {
+      // 重要：Windows 下不能用 rmSync(recursive) 直接删联接——它会跟随联接把「目标目录的内容」删掉！
+      // 目录联接用非递归 rmdir 删除，只会移除链接本身。
+      try {
+        const st = fsSync.lstatSync(linkDir);
+        if (st.isSymbolicLink()) {
+          fsSync.rmdirSync(linkDir);
+        } else if (st.isDirectory()) {
+          fsSync.rmSync(linkDir, { recursive: true, force: true });
+        } else {
+          fsSync.unlinkSync(linkDir);
+        }
+      } catch { /* 链接不存在等情况忽略 */ }
+      fsSync.mkdirSync(path.dirname(linkDir), { recursive: true });
+      fsSync.symlinkSync(addonRoot, linkDir, 'junction');
+    }
+    if (fsSync.existsSync(linkSoffice)) return { soffice: linkSoffice, viaLink: true };
+  } catch (err) {
+    console.warn('[libreoffice] 短路径联接创建失败，改用原始路径：', err.message);
+  }
+  return { soffice: sofficePath, viaLink: false };
+}
+
 // 转换单个文件（Office→PDF 或 PDF→DOCX）：在临时目录里转换，读完字节即清理，绝不覆盖已有文件
 ipcMain.handle('libreoffice:convert', async (_event, options) => {
   const inputPath = options && options.inputPath;
@@ -485,6 +546,10 @@ ipcMain.handle('libreoffice:convert', async (_event, options) => {
   const profileDir = path.join(USER_DATA_DIR, 'libreoffice-profile');
   await fs.mkdir(profileDir, { recursive: true });
 
+  // 经短路径联接启动（规避长/中文路径下 PDF 导入失败的问题，见 ensureShortAddonLink 注释）
+  const addonRoot = path.dirname(path.dirname(lo.path));
+  const run = ensureShortAddonLink(addonRoot, lo.path);
+
   const args = ['--headless', '--norestore', '--invisible', `-env:UserInstallation=${pathToFileURL(profileDir).href}`];
   // 关键：PDF 转 Word 必须显式走 Writer 的 PDF 导入过滤器，否则 LibreOffice 会走 Draw 通道输出散架文本框
   if (target === 'docx') args.push('--infilter=writer_pdf_import');
@@ -492,7 +557,7 @@ ipcMain.handle('libreoffice:convert', async (_event, options) => {
 
   const t0 = Date.now();
   const res = await new Promise((resolve) => {
-    const child = spawn(lo.path, args, { windowsHide: true });
+    const child = spawn(run.soffice, args, { windowsHide: true });
     let stdout = '';
     let stderr = '';
     let timedOut = false;
