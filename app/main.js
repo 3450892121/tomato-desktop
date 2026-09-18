@@ -530,6 +530,22 @@ function ensureShortAddonLink(addonRoot, sofficePath) {
   return { soffice: sofficePath, viaLink: false };
 }
 
+/**
+ * 超时终止转换进程。
+ * Windows 下 soffice.com 只是启动器，真正干活的是它派生的 soffice.bin；
+ * 只杀启动器会留下 soffice.bin 继续占住 userdata/libreoffice-profile，导致后续转换全部失败。
+ * 因此用 taskkill /T 连同子进程一起杀。
+ */
+function killConvertTree(child) {
+  if (process.platform === 'win32' && child.pid) {
+    try {
+      spawn('taskkill', ['/pid', String(child.pid), '/T', '/F'], { windowsHide: true, stdio: 'ignore' });
+      return;
+    } catch { /* 失败则退回普通 kill */ }
+  }
+  try { child.kill(); } catch { /* 已退出则忽略 */ }
+}
+
 // 转换单个文件（Office→PDF 或 PDF→DOCX）：在临时目录里转换，读完字节即清理，绝不覆盖已有文件
 ipcMain.handle('libreoffice:convert', async (_event, options) => {
   const inputPath = options && options.inputPath;
@@ -550,6 +566,12 @@ ipcMain.handle('libreoffice:convert', async (_event, options) => {
   const addonRoot = path.dirname(path.dirname(lo.path));
   const run = ensureShortAddonLink(addonRoot, lo.path);
 
+  // 超时上限按输入体积动态计算：LibreOffice 导入 PDF 的耗时与体积近似成正比
+  // （实测 12MB 中文教材约 250 秒），原先固定 3 分钟会把大文件误判为失败。
+  // 规则：60 秒/MB，下限 5 分钟，上限 30 分钟。
+  const sizeMb = await fs.stat(inputPath).then((s) => s.size / (1024 * 1024)).catch(() => 0);
+  const timeoutMs = Math.min(30 * 60 * 1000, Math.max(5 * 60 * 1000, Math.round(sizeMb * 60 * 1000)));
+
   const args = ['--headless', '--norestore', '--invisible', `-env:UserInstallation=${pathToFileURL(profileDir).href}`];
   // 关键：PDF 转 Word 必须显式走 Writer 的 PDF 导入过滤器，否则 LibreOffice 会走 Draw 通道输出散架文本框
   if (target === 'docx') args.push('--infilter=writer_pdf_import');
@@ -563,8 +585,8 @@ ipcMain.handle('libreoffice:convert', async (_event, options) => {
     let timedOut = false;
     const timer = setTimeout(() => {
       timedOut = true;
-      try { child.kill(); } catch { /* 已退出则忽略 */ }
-    }, 180000);
+      killConvertTree(child);
+    }, timeoutMs);
     child.stdout.on('data', (d) => { stdout += d; });
     child.stderr.on('data', (d) => { stderr += d; });
     child.on('error', (err) => {
@@ -585,9 +607,15 @@ ipcMain.handle('libreoffice:convert', async (_event, options) => {
     if (wanted) outPath = path.join(workDir, wanted);
   } catch { /* 读不到就按“无输出”处理 */ }
 
-  if (!outPath) {
+  // 超时时即便临时目录里已有半成品文件也不能当成功——那是个被中断的残缺文档
+  if (res.timedOut || !outPath) {
     await fs.rm(workDir, { recursive: true, force: true }).catch(() => {});
-    const detail = res.timedOut ? '超时（超过 3 分钟）' : `LibreOffice 退出码 ${res.code}`;
+    const minutes = Math.max(1, Math.round(timeoutMs / 60000));
+    const detail = res.timedOut
+      ? `超时（超过 ${minutes} 分钟）`
+      : res.code === 0
+        ? '未生成输出文件（源文件可能已加密或格式不受支持）'
+        : `LibreOffice 退出码 ${res.code}`;
     const extra = (res.stderr || '').trim().slice(0, 300);
     return { ok: false, message: `转换失败：${detail}${extra ? `｜${extra}` : ''}` };
   }

@@ -553,7 +553,9 @@ async function runConvert(targetFormat) {
 
   for (let i = 0; i < files.length; i++) {
     const f = files[i];
-    state.ctx.showProgress(`转换 ${i + 1}/${files.length}：${f.name}`, (i / files.length) * 100);
+    // LibreOffice 转换大文件耗时较长（实测 12MB 教材约 4 分钟），提示避免被误当成卡死
+    const slowHint = loFound ? '（大文件可能需数分钟，请勿关闭）' : '';
+    state.ctx.showProgress(`转换 ${i + 1}/${files.length}：${f.name}${slowHint}`, (i / files.length) * 100);
     await nextFrame();
     try {
       let res;
