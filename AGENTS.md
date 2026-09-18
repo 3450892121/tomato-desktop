@@ -15,7 +15,7 @@
   - `src/shell/`：工具箱框架（页面、左侧导航、`registry.js` 工具注册表、设计令牌、通用组件）。
   - `src/tools/<工具名>/`：各工具自包含目录（声明 + 界面 + 逻辑 + 样式）。现有：`obfuscate` 图片混淆、`pdf-convert` PDF 转格式、`compress` 图片压缩、`enhance` 图片变清晰、`img-convert` 图片格式转换、`video-convert` 视频格式转换、`sticker` 动图与视频互转；`_template` 为新工具模板。
   - `src/shared/`：跨工具复用能力（图片读写、ffmpeg 封装与编码参数、文件封装、设置）。
-  - `addons/`：随包加装包（不进 git）：`libreoffice/`（PDF→Word 与高保真 Office→PDF，可选）、`ffmpeg/`（视频/动图工具必需，单文件 83MB，GPL v3，许可见其 LICENSE.txt/说明.txt）。
+  - `addons/`：随包加装包（不进 git）：`libreoffice/`（PDF→Word 与高保真 Office→PDF，可选）、`ffmpeg/`（视频/动图工具必需，单文件 83MB，GPL v3）、`realesrgan/`（「图片变清晰」的 AI 放大，约 50MB，BSD 3-Clause，需 Vulkan 显卡）；许可与来源见各自目录的 LICENSE/说明.txt。
 - `docs/`：开发指南（如《新增工具指南》）。
 - `app/release/`：打包产物（不进 git）。
 - `番茄图片混淆.apk`：参考实现样本（只读，不修改、不覆盖）。

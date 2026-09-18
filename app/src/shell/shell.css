@@ -70,16 +70,53 @@ html, body {
 }
 .tool-item-icon { flex: none; font-size: var(--font-size-lg); }
 
-/* 工具分组小标题（图片 / 视频 / 文档）—— 让同类工具聚在一起，方便找 */
-.tool-group-title {
-  padding: var(--space-2) var(--space-3) 0;
-  font-size: var(--font-size-xs);
-  font-weight: 600;
+/* 工具分组（图片 / 视频 / 文档）—— 同类工具聚在一起，标题可点：收起 / 展开 */
+.tool-group { display: flex; flex-direction: column; }
+.tool-group-head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  width: 100%;
+  padding: var(--space-2) var(--space-3);
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
   color: var(--color-text-secondary);
-  letter-spacing: 0.06em;
+  font-family: inherit;
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-align: left;
+  cursor: pointer;
   user-select: none;
+  transition: background var(--transition-fast), color var(--transition-fast);
 }
-.tool-group-title:first-child { padding-top: var(--space-1); }
+.tool-group-head:hover { background: var(--color-surface-soft); color: var(--color-text); }
+.tool-group-chevron {
+  flex: none;
+  width: 9px;
+  height: 9px;
+  margin-left: 2px;
+  border-right: 1.5px solid currentColor;
+  border-bottom: 1.5px solid currentColor;
+  transform: rotate(45deg) translate(-1px, -1px); /* 展开：向下箭头 */
+  transition: transform var(--transition-fast);
+}
+.tool-group.is-collapsed .tool-group-chevron { transform: rotate(-45deg) translate(-1px, -1px); } /* 收起：向右箭头 */
+.tool-group-icon { flex: none; font-size: var(--font-size-md); }
+.tool-group-name { flex: 1 1 auto; }
+.tool-group-count {
+  flex: none;
+  padding: 0 var(--space-1);
+  border-radius: 999px;
+  background: var(--color-neutral);
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-xs);
+  font-weight: 400;
+}
+.tool-group-items { display: flex; flex-direction: column; gap: var(--space-1); }
+.tool-group-items .tool-item { padding-left: var(--space-5); } /* 略微缩进，体现层级 */
+.tool-group.is-collapsed .tool-group-items { display: none; }
 
 .sidebar-footer {
   display: flex;

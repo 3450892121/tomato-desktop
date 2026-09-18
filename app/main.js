@@ -962,6 +962,100 @@ ipcMain.handle('ffmpeg:transform', async (_event, options) => {
   }
 });
 
+// —— Real-ESRGAN 加装包（「图片变清晰」的 AI 放大 / 超分；见 spec/modules/image-enhance.md） ——
+// 位置约定 = 软件目录/addons/realesrgan/realesrgan-ncnn-vulkan.exe（随包分发，见 pack.js 步骤 5d）。
+// 说明：它是 ncnn+Vulkan 的便携版，需要支持 Vulkan 的显卡（纯 CPU 不可用），失败时界面要给出明确原因。
+const AI_ADDON_DIR = path.join(PORTABLE_DIR, 'addons', 'realesrgan');
+
+function findRealesrgan() {
+  const exe = path.join(AI_ADDON_DIR, 'realesrgan-ncnn-vulkan.exe');
+  if (fsSync.existsSync(exe)) return { found: true, path: exe, modelsDir: path.join(AI_ADDON_DIR, 'models') };
+  return { found: false, path: null, modelsDir: null };
+}
+
+ipcMain.handle('ai:status', async () => {
+  const bin = findRealesrgan();
+  if (!bin.found) return { found: false, models: [] };
+  let models = [];
+  try {
+    models = (await fs.readdir(bin.modelsDir)).filter((n) => n.endsWith('.param')).map((n) => n.replace(/\.param$/, ''));
+  } catch { /* 读不到模型目录时给空列表，界面会显示 0 个 */ }
+  return { found: true, models };
+});
+
+/** 从 PNG 字节里读宽高（IHDR 固定在第 16~23 字节，大端） */
+function parsePngSize(buf) {
+  if (buf && buf.length >= 24 && buf.toString('latin1', 1, 4) === 'PNG') {
+    return { width: buf.readUInt32BE(16), height: buf.readUInt32BE(20) };
+  }
+  return { width: 0, height: 0 };
+}
+
+/**
+ * AI 放大（Real-ESRGAN）：PNG 字节 → 放大后的 PNG 字节。
+ * options: { bytes, scale: 2|3|4, model, tile? }
+ */
+ipcMain.handle('ai:upscale', async (event, options) => {
+  const opt = options || {};
+  if (!opt.bytes) return { ok: false, message: '缺少图片数据' };
+  const bin = findRealesrgan();
+  if (!bin.found) {
+    return { ok: false, message: '未检测到 AI 放大加装包（把 addons/realesrgan 放回软件目录后重开本工具）' };
+  }
+
+  const scale = [2, 3, 4].includes(Number(opt.scale)) ? Number(opt.scale) : 4;
+  const model = typeof opt.model === 'string' && opt.model ? opt.model : 'realesrgan-x4plus';
+  const workDir = path.join(os.tmpdir(), `tomato-ai-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`);
+  await fs.mkdir(workDir, { recursive: true });
+  const inPath = path.join(workDir, 'in.png');
+  const outPath = path.join(workDir, 'out.png');
+
+  try {
+    await fs.writeFile(inPath, Buffer.from(opt.bytes));
+    const args = ['-i', inPath, '-o', outPath, '-s', String(scale), '-n', model, '-f', 'png'];
+    if (opt.tile) args.push('-t', String(opt.tile));
+
+    const t0 = Date.now();
+    const res = await new Promise((resolve) => {
+      const child = spawn(bin.path, args, { windowsHide: true, cwd: AI_ADDON_DIR });
+      let stderr = '';
+      let timedOut = false;
+      const timer = setTimeout(() => { timedOut = true; killConvertTree(child); }, 30 * 60 * 1000);
+      child.stderr.on('data', (d) => {
+        const s = d.toString();
+        stderr += s;
+        if (stderr.length > 200000) stderr = stderr.slice(-100000);
+        // 程序按 "12.34%" 输出进度，转成统一进度事件（界面显示用）
+        const m = /([\d.]+)%/.exec(s);
+        if (m && event.sender && !event.sender.isDestroyed()) {
+          event.sender.send('ai:progress', { percent: Number(m[1]) });
+        }
+      });
+      child.stdout.on('data', () => { /* 忽略标准输出 */ });
+      child.on('error', (err) => { clearTimeout(timer); resolve({ code: -1, stderr: String((err && err.message) || err), timedOut }); });
+      child.on('close', (code) => { clearTimeout(timer); resolve({ code, stderr, timedOut }); });
+    });
+
+    const produced = fsSync.existsSync(outPath) && fsSync.statSync(outPath).size > 0;
+    if (!produced) {
+      const vkFail = /vkCreateInstance|Vulkan|no device|create instance|failed to create/i.test(res.stderr || '');
+      const detail = res.timedOut
+        ? '处理超时（超过 30 分钟）'
+        : vkFail
+          ? '本机显卡不支持 Vulkan（或驱动过旧），AI 放大用不了'
+          : `AI 放大失败（退出码 ${res.code}）`;
+      const tail = (res.stderr || '').trim().split(/\r?\n/).slice(-2).join(' ｜ ').slice(0, 200);
+      return { ok: false, message: `${detail}${tail ? `｜${tail}` : ''}` };
+    }
+
+    const bytes = await fs.readFile(outPath);
+    const size = parsePngSize(bytes);
+    return { ok: true, bytes, ms: Date.now() - t0, scale, model, width: size.width, height: size.height };
+  } finally {
+    await fs.rm(workDir, { recursive: true, force: true }).catch(() => {});
+  }
+});
+
 // —— 内置降级：docx / xlsx → PDF（隐藏窗口渲染 + Chromium printToPDF，不依赖加装包） ——
 
 /** 轮询隐藏窗口里的渲染状态（页内脚本写 window.__officeRenderState） */

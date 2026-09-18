@@ -159,6 +159,17 @@ if (fs.existsSync(path.join(ffmpegAddon, 'ffmpeg.exe'))) {
   log('警告：未发现 app/addons/ffmpeg/ffmpeg.exe —— 产物中视频类工具将不可用（其余工具不受影响）');
 }
 
+// —— 5d) Real-ESRGAN 加装包（「图片变清晰」的 AI 放大 / 超分，随主包分发） ——
+// 说明：ncnn+Vulkan 便携版（exe + 模型，约 50MB），放在 app/addons/realesrgan/（不进 git）。
+//      需要支持 Vulkan 的显卡；缺失时工具会提示「未检测到 AI 放大加装包」，其余功能不受影响。
+const aiAddon = path.join(appRoot, 'addons', 'realesrgan');
+if (fs.existsSync(path.join(aiAddon, 'realesrgan-ncnn-vulkan.exe'))) {
+  log('步骤5d：复制 Real-ESRGAN 加装包（约 50MB）…');
+  copyTree(aiAddon, path.join(outDir, 'addons', 'realesrgan'));
+} else {
+  log('警告：未发现 app/addons/realesrgan —— 产物中「AI 放大」将不可用（其余功能不受影响）');
+}
+
 // —— 6) 设置 exe 图标与版本信息（需要 build/rcedit.exe，缺失则跳过） ——
 log('步骤6：设置 exe 图标与版本信息');
 const rcedit = path.join(appRoot, 'build', 'rcedit.exe');

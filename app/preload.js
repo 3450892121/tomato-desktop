@@ -46,6 +46,15 @@ contextBridge.exposeInMainWorld('desktop', {
     return () => ipcRenderer.removeListener('ffmpeg:progress', handler);
   },
 
+  // Real-ESRGAN 加装包（「图片变清晰」的 AI 放大；见 spec/modules/image-enhance.md）
+  aiStatus: () => ipcRenderer.invoke('ai:status'),
+  aiUpscale: (options) => ipcRenderer.invoke('ai:upscale', options),
+  aiOnProgress: (callback) => {
+    const handler = (_event, data) => callback(data);
+    ipcRenderer.on('ai:progress', handler);
+    return () => ipcRenderer.removeListener('ai:progress', handler);
+  },
+
   // PDF 工具：专用文件对话框与 LibreOffice 加装包
   openPdfs: () => ipcRenderer.invoke('dialog:open-pdfs'),
   openDocuments: () => ipcRenderer.invoke('dialog:open-documents'),

@@ -74,6 +74,10 @@ const ctx = {
   ffmpegTransform: (options) => window.desktop.ffmpegTransform(options),
   ffmpegCancel: (jobId) => window.desktop.ffmpegCancel(jobId),
   ffmpegOnProgress: (callback) => window.desktop.ffmpegOnProgress(callback),
+  // Real-ESRGAN AI 放大加装包（图片变清晰工具用）
+  aiStatus: () => window.desktop.aiStatus(),
+  aiUpscale: (options) => window.desktop.aiUpscale(options),
+  aiOnProgress: (callback) => window.desktop.aiOnProgress(callback),
   // 通用保存（与 saveImageNextTo 同一实现，PDF/文档等输出同样适用）
   saveNextTo: (options) => window.desktop.saveImageNextTo(options),
   // PDF 工具用：专用文件对话框与 LibreOffice 加装包
@@ -115,29 +119,81 @@ function createToolButton(tool) {
   return btn;
 }
 
+// —— 左侧分组折叠（点标题收起/展开，收起状态记到设置里） ——
+
+/** 被收起的分组 id 集合（启动时从设置读入；空 = 全部展开） */
+let collapsedGroups = new Set();
+/** groupId → { wrap, head }，供折叠与自动展开使用 */
+const navGroups = new Map();
+
+function persistCollapsed() {
+  // 记忆折叠状态；写入失败不影响使用（下次启动退回默认全展开）
+  settings.updateSettings({ collapsedGroups: [...collapsedGroups] }).catch(() => {});
+}
+
+function setGroupCollapsed(groupId, collapsed) {
+  if (collapsed) collapsedGroups.add(groupId);
+  else collapsedGroups.delete(groupId);
+  const entry = navGroups.get(groupId);
+  if (entry) {
+    entry.wrap.classList.toggle('is-collapsed', collapsed);
+    entry.head.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
+    entry.head.title = collapsed ? `展开「${entry.head.dataset.groupName}」` : `收起「${entry.head.dataset.groupName}」`;
+  }
+  persistCollapsed();
+}
+
+/** 展开指定分组：切到该组内的工具时调用，避免「当前工具藏在收起的分组里」 */
+function expandGroup(groupId) {
+  if (collapsedGroups.has(groupId)) setGroupCollapsed(groupId, false);
+}
+
 /**
  * 渲染左侧工具列表：按分组显示（图片 / 视频 / 文档），组内按 order 升序。
- * 容错：未声明 group 的工具归入末尾「其它」组，保证以后新增工具时忘记写 group 也能正常显示。
+ * 每个分组标题可点击：点一下收起（只留标题）、再点一下展开；收起状态会记住（settings.collapsedGroups）。
+ * 容错：未声明 group 的工具归入末尾「其它」组，保证以后新增工具忘记写 group 也能正常显示。
  */
 function renderNav() {
   els.nav.innerHTML = '';
+  navGroups.clear();
   const sorted = [...TOOLS].sort((a, b) => (a.order || 0) - (b.order || 0));
   const others = sorted.filter((t) => !GROUPS.some((g) => g.id === t.group));
 
   const renderGroup = (group, tools) => {
     if (tools.length === 0) return; // 空分组不显示
-    const title = document.createElement('div');
-    title.className = 'tool-group-title';
-    title.dataset.groupId = group.id;
-    title.textContent = group.name;
-    els.nav.appendChild(title);
-    for (const tool of tools) els.nav.appendChild(createToolButton(tool));
+    const collapsed = collapsedGroups.has(group.id);
+
+    const wrap = document.createElement('div');
+    wrap.className = 'tool-group' + (collapsed ? ' is-collapsed' : '');
+    wrap.dataset.groupId = group.id;
+
+    const head = document.createElement('button');
+    head.type = 'button';
+    head.className = 'tool-group-head';
+    head.dataset.groupId = group.id;
+    head.dataset.groupName = group.name;
+    head.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
+    head.title = collapsed ? `展开「${group.name}」` : `收起「${group.name}」`;
+    head.innerHTML = '<span class="tool-group-chevron" aria-hidden="true"></span>'
+      + `<span class="tool-group-icon">${group.icon || '📁'}</span>`
+      + `<span class="tool-group-name">${group.name}</span>`
+      + `<span class="tool-group-count">${tools.length}</span>`;
+    head.addEventListener('click', () => setGroupCollapsed(group.id, !collapsedGroups.has(group.id)));
+    wrap.appendChild(head);
+
+    const items = document.createElement('div');
+    items.className = 'tool-group-items';
+    for (const tool of tools) items.appendChild(createToolButton(tool));
+    wrap.appendChild(items);
+
+    els.nav.appendChild(wrap);
+    navGroups.set(group.id, { wrap, head });
   };
 
   for (const group of GROUPS) {
     renderGroup(group, sorted.filter((t) => t.group === group.id));
   }
-  renderGroup({ id: 'other', name: '其它' }, others);
+  renderGroup({ id: 'other', name: '其它', icon: '📁' }, others);
 }
 
 /** 切换到指定工具：先卸载旧工具，再加载样式并挂载新工具 */
@@ -156,6 +212,7 @@ function switchTool(id) {
   els.host.innerHTML = '';
   loadToolStyles(tool.styles);
   activeTool = tool;
+  if (tool.group) expandGroup(tool.group); // 当前工具所在分组必须是展开的
   renderNav();
 
   try {
@@ -352,7 +409,10 @@ function openHelp() {
 }
 
 async function init() {
-  await settings.loadSettings();
+  const loadedSettings = await settings.loadSettings();
+  // 应用上次记住的分组收起状态（设置读取是异步的，这里拿到后重渲染一次列表）
+  collapsedGroups = new Set(Array.isArray(loadedSettings.collapsedGroups) ? loadedSettings.collapsedGroups : []);
+  renderNav();
 
   // 版本号：异步补上即可，绝不能阻塞工具列表渲染（否则窗口刚打开时列表会短暂为空）
   window.desktop.appInfo()

@@ -51,6 +51,28 @@ export const PRESETS = [
     brightness: 0, contrast: 0, saturation: 0, scale: 2,
     hint: '高质量重采样放大 2 倍（只放大不缩小）+ 锐化 80%'
   },
+  // —— AI 放大（超分）：调 addons/realesrgan 的 Real-ESRGAN，需要支持 Vulkan 的显卡 ——
+  {
+    id: 'ai-4x', name: 'AI 放大 4×（照片，推荐）',
+    sharpen: 0, radius: 1.2, threshold: 0, denoise: 0,
+    brightness: 0, contrast: 0, saturation: 0, scale: 1,
+    ai: { scale: 4, model: 'realesrgan-x4plus' },
+    hint: 'AI 超分：按模型重新绘制放大 4 倍，细节远好于普通放大。需支持 Vulkan 的显卡（纯 CPU 不可用），实测 720p 图约 10 秒（核显更慢）'
+  },
+  {
+    id: 'ai-2x', name: 'AI 放大 2×（最快）',
+    sharpen: 0, radius: 1.2, threshold: 0, denoise: 0,
+    brightness: 0, contrast: 0, saturation: 0, scale: 1,
+    ai: { scale: 2, model: 'realesr-animevideov3' },
+    hint: 'AI 快速放大 2 倍（通用轻量模型，速度最快）。需支持 Vulkan 的显卡'
+  },
+  {
+    id: 'ai-anime', name: 'AI 放大 4×（动漫/插画）',
+    sharpen: 0, radius: 1.2, threshold: 0, denoise: 0,
+    brightness: 0, contrast: 0, saturation: 0, scale: 1,
+    ai: { scale: 4, model: 'realesrgan-x4plus-anime' },
+    hint: '适合动漫、插画、二次元截图；真人照片请用「AI 放大 4×（照片）」。需支持 Vulkan 的显卡'
+  },
   {
     id: 'custom', name: '自定义',
     ...CUSTOM_DEFAULT,

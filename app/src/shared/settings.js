@@ -8,7 +8,8 @@ export const DEFAULT_SETTINGS = {
   jpegQuality: 95,           // gilbert 模式保存 JPG 的画质
   defaultDoubleKey: '0.666', // PE1/PE2 输入框默认值（手机版一致）
   outputDir: '',             // 空字符串 = 与原图同目录
-  askSavePath: false         // 保存前是否询问路径（默认否，傻瓜化）
+  askSavePath: false,        // 保存前是否询问路径（默认否，傻瓜化）
+  collapsedGroups: []        // 左侧导航被收起的分组 id 列表（空 = 全部展开，见 spec/modules/toolkit.md）
 };
 
 let current = { ...DEFAULT_SETTINGS };

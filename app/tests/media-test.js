@@ -337,8 +337,33 @@ async function runMediaTest(win) {
     result.checks.sticker = { ok: false, error: '未检测到 ffmpeg' };
   }
 
+  // —— 5) AI 放大（Real-ESRGAN 加装包）：无加装包时按「跳过」如实上报，不算失败 ——
+  try {
+    const out = JSON.parse(await evalJs(`(async () => {
+      const { encodeImageToBytes } = await import('../shared/imageio.js');
+      const st = await window.desktop.aiStatus();
+      if (!st.found) return JSON.stringify({ skipped: true, reason: '未检测到 AI 放大加装包' });
+      const w = 96, h = 64;
+      const px = new Uint8ClampedArray(w * h * 4);
+      for (let i = 0; i < w * h; i++) { px[i * 4] = (i * 7) & 255; px[i * 4 + 1] = (i * 13) & 255; px[i * 4 + 2] = (i * 29) & 255; px[i * 4 + 3] = 255; }
+      const png = await encodeImageToBytes(px, w, h, { format: 'png' });
+      const t0 = performance.now();
+      const r = await window.desktop.aiUpscale({ bytes: png, scale: 2, model: 'realesr-animevideov3' });
+      if (!r.ok) return JSON.stringify({ ok: false, found: true, models: st.models, message: r.message });
+      return JSON.stringify({
+        ok: true, found: true, models: st.models,
+        width: r.width, height: r.height, ms: r.ms, bytes: r.bytes.length,
+        wallMs: Math.round(performance.now() - t0)
+      });
+    })()`));
+    if (out.skipped) result.checks.ai = { ...out, ok: true };
+    else result.checks.ai = { ...out, ok: !!out.ok && out.width === 192 && out.height === 128 };
+  } catch (err) {
+    result.checks.ai = { ok: false, error: err.message };
+  }
+
   // —— 汇总 ——
-  const names = ['compress', 'enhance', 'convert', 'video', 'sticker'];
+  const names = ['compress', 'enhance', 'convert', 'video', 'sticker', 'ai'];
   result.summary = Object.fromEntries(names.map((n) => [n, !!(result.checks[n] && result.checks[n].ok)]));
   result.ok = names.every((n) => result.summary[n]);
   writeResult({ ok: result.ok, at: new Date().toISOString(), result });

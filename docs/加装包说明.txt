@@ -47,3 +47,26 @@ TIFF / GIF / AVIF 输出，都依赖它。
 FFmpeg 6.1.1（GPL v3），构建来自 gyan.dev release-essentials（Windows x64 静态版）。
 许可证全文见 addons\ffmpeg\LICENSE.txt，版本/来源/源码地址见 addons\ffmpeg\说明.txt。
 不需要了：直接删掉 addons\ffmpeg 文件夹即可，不影响其它功能。
+
+==================================================
+Real-ESRGAN 加装包（AI 放大 / AI 超分，已随软件附带）
+==================================================
+
+【用途】
+「图片变清晰」工具里的 AI 放大预设（AI 放大 4×（照片）/ 2×（最快）/ 4×（动漫、插画））。
+它按 AI 模型重新绘制放大，细节明显好于普通插值放大。
+
+【文件与位置】
+软件目录\addons\realesrgan\（约 50 MB）
+  · realesrgan-ncnn-vulkan.exe（命令行程序）、models\（AI 模型）、vcomp140.dll（自带运行库）
+
+【硬件要求（重要）】
+需要支持 Vulkan 的显卡（近几年的独立显卡与 Intel/AMD 核显基本都支持）；**纯 CPU 不可用**。
+实测参考（本机 NVIDIA 显卡）：640×420 放大 4 倍约 5.5 秒、720p 放大 4 倍约 10.4 秒，核显会明显更慢。
+显卡不支持或驱动过旧时，界面会明确提示「本机显卡不支持 Vulkan（或驱动过旧），AI 放大用不了」，
+其它功能（普通锐化、清晰放大 2×）不受影响。
+
+【许可】
+Real-ESRGAN v0.2.5.0（BSD 3-Clause，见 addons\realesrgan\LICENSE.txt），
+其中 ncnn 推理库（腾讯，BSD 3-Clause）以静态库形式编在 exe 内。
+不需要了：直接删掉 addons\realesrgan 文件夹即可。

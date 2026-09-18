@@ -227,11 +227,65 @@ async function runMediaUiTest(win) {
     }
   }
 
+  // —— 侧栏分组自检：大类带图标、点一下收起、再点一下展开 ——
+  result.checks.分组折叠 = JSON.parse(await evalJs(`(async () => {
+    const head = document.querySelector('.tool-group-head[data-group-id="image"]');
+    if (!head) return JSON.stringify({ ok: false, reason: '左侧没有找到「图片」分组标题' });
+    const wrap = head.closest('.tool-group');
+    const items = wrap.querySelector('.tool-group-items');
+    const before = { collapsed: wrap.classList.contains('is-collapsed'), tools: wrap.querySelectorAll('.tool-item').length, display: getComputedStyle(items).display };
+    head.click(); await new Promise((r) => setTimeout(r, 150));
+    const collapsed = { collapsed: wrap.classList.contains('is-collapsed'), display: getComputedStyle(items).display };
+    head.click(); await new Promise((r) => setTimeout(r, 150));
+    const expanded = { collapsed: wrap.classList.contains('is-collapsed'), display: getComputedStyle(items).display };
+    const icons = [...document.querySelectorAll('.tool-group-head')].map((h) => (h.querySelector('.tool-group-icon') || {}).textContent || '');
+    return JSON.stringify({
+      ok: !before.collapsed && before.display !== 'none' && before.tools >= 4
+        && collapsed.collapsed && collapsed.display === 'none'
+        && !expanded.collapsed && expanded.display !== 'none'
+        && icons.length >= 3 && icons.every((t) => t.trim().length > 0),
+      before, collapsed, expanded, icons
+    });
+  })()`));
+
+  // —— AI 放大预设自检：预设存在、选中后出现「加装包状态 + 硬件要求（Vulkan）」提示 ——
+  result.checks.AI预设 = JSON.parse(await evalJs(`(async () => {
+    const btn = [...document.querySelectorAll('#toolNav .tool-item')].find((b) => b.textContent.includes('图片变清晰'));
+    if (!btn) return JSON.stringify({ ok: false, reason: '没有找到图片变清晰工具' });
+    btn.click(); await new Promise((r) => setTimeout(r, 700));
+    const sel = document.querySelector('#enhPreset');
+    if (!sel) return JSON.stringify({ ok: false, reason: '没有找到预设下拉框' });
+    const opts = [...sel.options].map((o) => o.textContent);
+    const aiOpt = [...sel.options].find((o) => /AI 放大/.test(o.textContent));
+    if (!aiOpt) return JSON.stringify({ ok: false, reason: '没有 AI 放大预设', opts });
+    sel.value = aiOpt.value;
+    sel.dispatchEvent(new Event('change'));
+    await new Promise((r) => setTimeout(r, 900));
+    const note = document.querySelector('#enhAiNote');
+    const text = note ? note.textContent : '';
+    // 装了加装包会提示 Vulkan 要求；没装会提示未检测到——两种都算提示到位
+    const shown = !!note && !note.hidden && /Vulkan|未检测到/.test(text);
+    return JSON.stringify({ ok: shown, preset: aiOpt.textContent, note: text.slice(0, 200) });
+  })()`));
+
   // —— 汇总 ——
   result.checks.工具清单 = await evalJs(`[...document.querySelectorAll('#toolNav .tool-item')].map((b) => b.textContent.trim())`);
   const entries = Object.values(result.tools);
-  result.pass = entries.length >= 3 && entries.every((e) => e.ok || e.skipped);
+  result.pass = entries.length >= 3 && entries.every((e) => e.ok || e.skipped)
+    && !!result.checks.分组折叠 && result.checks.分组折叠.ok
+    && !!result.checks.AI预设 && result.checks.AI预设.ok;
   await shot('99-媒体测试结束');
+
+  // —— 收尾清理：删掉本测试的夹具与产物，避免污染图片混淆/PDF 等其它测试的夹具目录 ——
+  // （产物清单与大小已记进 result.tools[*].newFiles，证据不受影响）
+  try {
+    for (const f of await fs.readdir(TEST_DIR)) {
+      if (/^测试视频|^测试动图|^测试原图C/.test(f)) {
+        await fs.rm(path.join(TEST_DIR, f), { recursive: true, force: true });
+      }
+    }
+  } catch { /* 清理失败不影响结论 */ }
+
   return result;
 }
 

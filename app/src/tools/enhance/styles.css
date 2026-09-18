@@ -36,6 +36,11 @@
 }
 .enh-note { font-size: var(--font-size-xs); color: var(--color-text-secondary); }
 
+/* AI 放大提示条：加装包状态 + 硬件要求（只在选中 AI 类预设时出现） */
+.enh-note-ai { padding: var(--space-2) var(--space-3); border-radius: var(--radius-sm); background: var(--color-surface-soft); line-height: 1.6; }
+.enh-note-ai.is-ok { color: var(--color-save); }
+.enh-note-ai.is-warn { color: var(--color-warning); }
+
 /* —— 中部：预览 + 文件列表 —— */
 .enh-main {
   display: flex;

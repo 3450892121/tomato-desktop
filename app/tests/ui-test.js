@@ -31,10 +31,12 @@ async function runUiTest(win) {
   await fs.mkdir(TEST_DIR, { recursive: true });
 
   // 清理上次运行留下的测试图片，保证重复运行结果干净
+  // 注意：要清掉「所有」以 测试原图 开头的文件（不限扩展名）——媒体工具测试会留下 .webp 等，
+  //       它们同样会被「添加图片」选中，导致张数校验失败（踩过一次）。
   const existing = await fs.readdir(TEST_DIR).catch(() => []);
   for (const f of existing) {
-    if (f.startsWith('测试原图') && (f.endsWith('.png') || f.endsWith('.jpg'))) {
-      await fs.rm(path.join(TEST_DIR, f), { force: true });
+    if (f.startsWith('测试原图')) {
+      await fs.rm(path.join(TEST_DIR, f), { recursive: true, force: true });
     }
   }
 

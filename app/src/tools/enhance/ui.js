@@ -29,7 +29,9 @@ const MARKUP = `
         <span class="control-hint" id="enhPresetHint"></span>
       </div>
       <div class="enh-params" id="enhParams" hidden></div>
-      <div class="enh-note">锐化只是让边缘更分明，无法恢复已丢失的细节；「强力锐化」会放大噪点，噪点多的照片请用「照片降噪 + 轻锐化」。</div>
+      <div class="enh-note">锐化只是让边缘更分明，无法恢复已丢失的细节；「强力锐化」会放大噪点，噪点多的照片请用「照片降噪 + 轻锐化」。
+        AI 放大（超分）属另一种路线：按 AI 模型重新绘制放大，效果更好，但需要支持 Vulkan 的显卡。</div>
+      <div class="enh-note enh-note-ai" id="enhAiNote" hidden></div>
     </section>
 
     <main class="enh-main">
@@ -149,6 +151,27 @@ function renderParams() {
   els.presetHint.textContent = preset.hint;
   clearParamListeners();
 
+  // AI 放大：加装包状态 + 硬件要求提示（只在选中 AI 类预设时显示）
+  if (preset.ai) {
+    els.aiNote.hidden = false;
+    const st = state.ai;
+    if (!st) {
+      els.aiNote.className = 'enh-note enh-note-ai';
+      els.aiNote.textContent = '正在检测 AI 放大加装包…';
+    } else if (!st.found) {
+      els.aiNote.className = 'enh-note enh-note-ai is-warn';
+      els.aiNote.textContent = '未检测到 AI 放大加装包：把 addons/realesrgan 放回软件目录后重开本工具。'
+        + '普通锐化与「清晰放大 2×」不受影响。';
+    } else {
+      els.aiNote.className = 'enh-note enh-note-ai is-ok';
+      els.aiNote.textContent = '✓ 已检测到 AI 放大加装包（Real-ESRGAN，模型 ' + st.models.length + ' 个）。'
+        + '硬件要求：需支持 Vulkan 的显卡（近几年核显/独显基本都行，纯 CPU 不可用）；'
+        + '速度参考：720p 图放大 4 倍约 10 秒，核显会更慢，大图请耐心等待。';
+    }
+  } else {
+    els.aiNote.hidden = true;
+  }
+
   if (state.preset !== 'custom') {
     els.params.hidden = true;
     els.params.innerHTML = '';
@@ -245,8 +268,16 @@ async function refreshPreviewResult() {
   const p = state.preview;
   if (!p) return;
   const token = ++state.previewToken;
+  const params = readParams();
+  if (params.ai) {
+    // AI 放大耗时较长（每张几秒起），预览不做 AI 处理：直接显示原图并说明
+    state.preview.result = p.original;
+    state.els.previewSize.textContent = 'AI 放大不做预览（每张都要跑一次 AI，太慢）；点「开始变清晰」后查看结果';
+    if (state.previewMode === 'result') setPreviewMode('original');
+    return;
+  }
   try {
-    const out = await applyEnhance(p.original, p.width, p.height, readParams(), blurPixels);
+    const out = await applyEnhance(p.original, p.width, p.height, params, blurPixels);
     if (!state || token !== state.previewToken || !state.preview) return;
     state.preview.result = out;
     drawPreview();
@@ -418,6 +449,7 @@ async function run() {
   let lastError = '';
   let lastPath = '';
   let scaleSkipped = 0;
+  let aiUsed = 0;
 
   try {
     for (let i = 0; i < state.files.length; i += 1) {
@@ -427,6 +459,44 @@ async function run() {
       await nextFrame();
       try {
         const bytes = await state.ctx.readFile(f.path);
+
+        // —— AI 放大分支：交给 addons/realesrgan 的 Real-ESRGAN 处理 ——
+        // 模型只认 jpg/png/webp，所以统一先解码成 PNG 字节；返回的也是 PNG 字节。
+        if (params.ai) {
+          const img0 = await decodeImageFromBytes(bytes);
+          const png = await encodeImageToBytes(img0.pixels, img0.width, img0.height, { format: 'png' });
+          state.ctx.showProgress(`${f.name}：AI 放大 ${params.ai.scale}×（显卡越弱越慢，请勿关闭）…`, ((i + 0.4) / state.files.length) * 100);
+          await nextFrame();
+          const res = await state.ctx.aiUpscale({ bytes: png, scale: params.ai.scale, model: params.ai.model });
+          if (!res || !res.ok) throw new Error((res && res.message) || 'AI 放大失败');
+          const ext0 = outputExtFor(f.ext);
+          let outBytes = res.bytes;
+          if (ext0 === '.jpg') {
+            // 原图是 JPG：把 AI 产出（PNG）转回 JPG，保持「JPG 进 JPG 出」的习惯
+            const up = await decodeImageFromBytes(res.bytes);
+            outBytes = await encodeImageToBytes(up.pixels, up.width, up.height, { format: 'jpg', quality: 95 });
+          }
+          const outPath = await state.ctx.saveNextTo({
+            sourcePath: f.path,
+            targetDir: outputDir,
+            baseName: `${f.baseName}_AI放大`,
+            ext: ext0,
+            bytes: outBytes
+          });
+          f.result = {
+            ok: true,
+            text: `AI 放大 ${params.ai.scale}× → ${res.width}×${res.height} ｜ ${formatBytes(bytes.byteLength)} → ${formatBytes(outBytes.byteLength)} ｜ 用时 ${(res.ms / 1000).toFixed(1)} 秒`,
+            outPath
+          };
+          f.bytes = null;
+          lastPath = outPath;
+          done += 1;
+          aiUsed += 1;
+          state.ctx.setInfo({ width: res.width, height: res.height, ms: Date.now() - t0 });
+          renderList();
+          continue;
+        }
+
         const img = await decodeImageFromBytes(bytes);
         let pixels = img.pixels;
         let width = img.width;
@@ -490,7 +560,8 @@ async function run() {
 
   if (state !== session) return;
   const skipNote = scaleSkipped > 0 ? `，${scaleSkipped} 张因放大后过大已按原尺寸处理` : '';
-  state.ctx.setStatus(`处理完成：成功 ${done} 个${failed ? `，失败 ${failed} 个（${lastError}）` : ''}${skipNote}`);
+  const aiNote = aiUsed > 0 ? '｜AI 放大' : '';
+  state.ctx.setStatus(`处理完成：成功 ${done} 个${failed ? `，失败 ${failed} 个（${lastError}）` : ''}${skipNote}${aiNote}`);
   state.els.result.textContent = lastPath ? `输出：${lastPath}` : '';
   if (state.preview) await refreshPreviewResult();
 }
@@ -512,7 +583,8 @@ export function mount(container, ctx) {
     previewMode: 'original',
     previewToken: 0,
     previewTimer: null,
-    busy: false
+    busy: false,
+    ai: null // AI 放大加装包状态（挂载后异步探测）
   };
   container.innerHTML = MARKUP;
 
@@ -535,9 +607,19 @@ export function mount(container, ctx) {
     runBtn: container.querySelector('#enhRunBtn'),
     clearBtn: container.querySelector('#enhClearBtn'),
     result: container.querySelector('#enhResult'),
+    aiNote: container.querySelector('#enhAiNote'),
     root: container.querySelector('.enh-tool')
   };
   state.els = els;
+
+  // 异步探测 AI 放大加装包（探测完成后再刷新一次参数区提示）
+  state.ctx.aiStatus()
+    .then((st) => {
+      if (!state) return;
+      state.ai = st;
+      renderParams();
+    })
+    .catch(() => { /* 探测失败按"未检测到"处理，等界面提示 */ });
 
   els.presetSel.innerHTML = '';
   for (const p of PRESETS) {
