@@ -58,9 +58,22 @@ const ctx = {
   // 文件读写（界面进程在沙箱中，统一经主进程）
   readFile: (filePath) => window.desktop.readFile(filePath),
   writeFile: (filePath, bytes) => window.desktop.writeFile(filePath, bytes),
+  removeFile: (filePath) => window.desktop.removeFile(filePath),
   pathInfo: (filePath) => window.desktop.pathInfo(filePath),
   listImages: (dirPath) => window.desktop.listImages(dirPath),
+  listFiles: (dirPath, exts) => window.desktop.listFiles(dirPath, exts),
   saveImageNextTo: (options) => window.desktop.saveImageNextTo(options),
+  // 新工具（图片格式转换 / 视频格式转换 / 动图与视频互转）专用对话框
+  openImageAny: () => window.desktop.openImageAny(),
+  openVideos: () => window.desktop.openVideos(),
+  openMedia: () => window.desktop.openMedia(),
+  // ffmpeg 加装包（视频/动图工具）
+  ffmpegStatus: () => window.desktop.ffmpegStatus(),
+  ffmpegProbe: (filePath) => window.desktop.ffmpegProbe(filePath),
+  ffmpegConvert: (options) => window.desktop.ffmpegConvert(options),
+  ffmpegTransform: (options) => window.desktop.ffmpegTransform(options),
+  ffmpegCancel: (jobId) => window.desktop.ffmpegCancel(jobId),
+  ffmpegOnProgress: (callback) => window.desktop.ffmpegOnProgress(callback),
   // 通用保存（与 saveImageNextTo 同一实现，PDF/文档等输出同样适用）
   saveNextTo: (options) => window.desktop.saveImageNextTo(options),
   // PDF 工具用：专用文件对话框与 LibreOffice 加装包

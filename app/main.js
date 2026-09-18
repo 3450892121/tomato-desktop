@@ -7,7 +7,7 @@ const path = require('path');
 const fs = require('fs/promises');
 const fsSync = require('fs');
 const os = require('os');
-const { spawn } = require('child_process');
+const { spawn, spawnSync } = require('child_process');
 const { pathToFileURL } = require('url');
 
 /** @type {BrowserWindow | null} */
@@ -29,9 +29,30 @@ const pdfUiTest = process.argv.includes('--pdf-ui-test');
 // PDF 工具自检：`electron . --pdf-test` 验证 pdfjs/pdf-lib 加载、页面渲染与图片↔PDF 往返
 const pdfTest = process.argv.includes('--pdf-test');
 
+// 媒体工具自检：`electron . --media-test` 在界面进程里跑 图片压缩/变清晰/格式转换 + 视频/动图链路
+const mediaTest = process.argv.includes('--media-test');
+
+// 媒体工具界面自动测试：`electron . --media-ui-test` 逐个打开新工具、点按钮走流程并截图
+const mediaUiTest = process.argv.includes('--media-ui-test');
+
 // 测试模式下关闭硬件加速：保证截图（capturePage）在任何机器上都能稳定拿到画面
-if (uiTest || pdfUiTest) {
+if (uiTest || pdfUiTest || mediaUiTest) {
   app.disableHardwareAcceleration();
+}
+
+/** 是否处于任一自动测试模式：此时系统对话框一律换成本地测试文件（避免测试卡在弹窗上） */
+const testMode = () => uiTest || pdfUiTest || mediaTest || mediaUiTest;
+
+/** 自动测试模式下：从测试目录取指定扩展名的文件（对话框桩用） */
+async function testDirFiles(exts, { startWith } = {}) {
+  const { TEST_DIR } = require('./tests/ui-test.js');
+  const set = new Set(exts.map((e) => e.toLowerCase()));
+  const entries = await fs.readdir(TEST_DIR, { withFileTypes: true }).catch(() => []);
+  return entries
+    .filter((e) => e.isFile() && set.has(path.extname(e.name).toLowerCase()))
+    .filter((e) => (startWith ? e.name.startsWith(startWith) : true))
+    .map((e) => path.join(TEST_DIR, e.name))
+    .sort();
 }
 
 // 绿色版约定：所有运行期数据（设置等）都放在软件目录内，不写系统 AppData
@@ -255,6 +276,34 @@ function createMainWindow() {
     });
   }
 
+  if (mediaTest) {
+    mainWindow.webContents.once('did-finish-load', async () => {
+      try {
+        const { runMediaTest } = require('./tests/media-test.js');
+        const result = await runMediaTest(mainWindow);
+        console.log(`MEDIA_TEST ${JSON.stringify(result)}`);
+      } catch (err) {
+        console.log(`MEDIA_TEST_FAIL ${err.message}\n${err.stack}`);
+      }
+      app.quit();
+    });
+  }
+
+  if (mediaUiTest) {
+    const { runMediaUiTest, writeResult } = require('./tests/media-ui-test.js');
+    mainWindow.webContents.once('did-finish-load', async () => {
+      try {
+        const result = await runMediaUiTest(mainWindow);
+        console.log(`MEDIA_UI_TEST ${JSON.stringify(result)}`);
+        writeResult({ ok: !!result.pass, at: new Date().toISOString(), result });
+      } catch (err) {
+        console.log(`MEDIA_UI_TEST_FAIL ${err.message}\n${err.stack}`);
+        writeResult({ ok: false, at: new Date().toISOString(), error: err.message, stack: err.stack });
+      }
+      app.quit();
+    });
+  }
+
   if (makeSamplesDir) {
     mainWindow.webContents.once('did-finish-load', async () => {
       try {
@@ -303,7 +352,7 @@ app.on('window-all-closed', () => {
 // 打开图片文件对话框（返回所选路径列表）
 ipcMain.handle('dialog:open-images', async () => {
   // 界面自动测试模式：跳过系统对话框，直接返回测试目录内的图片
-  if (uiTest || pdfUiTest) {
+  if (testMode()) {
     const { TEST_DIR } = require('./tests/ui-test.js');
     const IMAGE_EXTS = new Set(['.png', '.jpg', '.jpeg', '.webp', '.bmp']);
     const entries = await fs.readdir(TEST_DIR, { withFileTypes: true }).catch(() => []);
@@ -323,7 +372,7 @@ ipcMain.handle('dialog:open-images', async () => {
 // 打开文件夹对话框（用于批量导入 / 选择输出目录）
 ipcMain.handle('dialog:open-folder', async () => {
   // 界面自动测试模式：直接返回测试目录
-  if (uiTest || pdfUiTest) {
+  if (testMode()) {
     const { TEST_DIR } = require('./tests/ui-test.js');
     return TEST_DIR;
   }
@@ -351,12 +400,16 @@ ipcMain.handle('fs:read-file', async (_event, filePath) => {
   return fs.readFile(filePath);
 });
 
-// 取路径信息（目录 / 文件名 / 去扩展名的基础名）
+// 取路径信息（目录 / 文件名 / 去扩展名的基础名 / 是否目录）
 ipcMain.handle('fs:path-info', async (_event, filePath) => {
   const dir = path.dirname(filePath);
   const name = path.basename(filePath);
   const ext = path.extname(name);
-  return { dir, name, baseName: ext ? name.slice(0, -ext.length) : name, ext };
+  let isDirectory = false;
+  try {
+    isDirectory = (await fs.stat(filePath)).isDirectory();
+  } catch { /* 路径不存在时按文件处理 */ }
+  return { dir, name, baseName: ext ? name.slice(0, -ext.length) : name, ext, isDirectory };
 });
 
 // 列出文件夹内的图片（用于文件夹拖入 / 批量导入）
@@ -369,9 +422,18 @@ ipcMain.handle('fs:list-images', async (_event, dirPath) => {
     .sort();
 });
 
-// 保存图片（默认存到原图同目录；可指定输出目录；重名自动加序号，绝不覆盖已有文件）
-ipcMain.handle('fs:save-image', async (_event, { sourcePath, targetDir, baseName, ext, bytes }) => {
-  const dir = targetDir || (sourcePath ? path.dirname(sourcePath) : app.getPath('pictures'));
+// 列出文件夹内指定扩展名的文件（图片/视频类工具拖入整个文件夹时用；exts 留空 = 返回全部文件）
+ipcMain.handle('fs:list-files', async (_event, dirPath, exts) => {
+  const set = new Set((exts || []).map((e) => String(e).toLowerCase()));
+  const entries = await fs.readdir(dirPath, { withFileTypes: true });
+  return entries
+    .filter((e) => e.isFile() && (set.size === 0 || set.has(path.extname(e.name).toLowerCase())))
+    .map((e) => path.join(dirPath, e.name))
+    .sort();
+});
+
+/** 在目标目录里挑一个不重名的文件名（原名 → 原名(1) → 原名(2)…），绝不覆盖已有文件 */
+function uniqueTargetPath(dir, baseName, ext) {
   const suffix = ext.startsWith('.') ? ext : `.${ext}`;
   let target = path.join(dir, `${baseName}${suffix}`);
   let i = 1;
@@ -379,6 +441,13 @@ ipcMain.handle('fs:save-image', async (_event, { sourcePath, targetDir, baseName
     target = path.join(dir, `${baseName}(${i})${suffix}`);
     i += 1;
   }
+  return target;
+}
+
+// 保存图片（默认存到原图同目录；可指定输出目录；重名自动加序号，绝不覆盖已有文件）
+ipcMain.handle('fs:save-image', async (_event, { sourcePath, targetDir, baseName, ext, bytes }) => {
+  const dir = targetDir || (sourcePath ? path.dirname(sourcePath) : app.getPath('pictures'));
+  const target = uniqueTargetPath(dir, baseName, ext);
   await fs.mkdir(dir, { recursive: true });
   await fs.writeFile(target, Buffer.from(bytes));
   return target;
@@ -388,6 +457,16 @@ ipcMain.handle('fs:save-image', async (_event, { sourcePath, targetDir, baseName
 ipcMain.handle('fs:write-file', async (_event, filePath, bytes) => {
   await fs.writeFile(filePath, Buffer.from(bytes));
   return filePath;
+});
+
+// 删除文件（仅用于工具内部清理中间产物：如「目标大小」自动降档重试时的上一轮输出）
+ipcMain.handle('fs:remove-file', async (_event, filePath) => {
+  try {
+    await fs.rm(filePath, { force: true });
+    return true;
+  } catch {
+    return false;
+  }
 });
 
 // —— 设置读写（绿色版：存在软件目录的 userdata/settings.json） ——
@@ -428,7 +507,7 @@ ipcMain.handle('app:info', async () => ({
 // 打开 PDF 文件对话框（可多选）
 ipcMain.handle('dialog:open-pdfs', async () => {
   // 界面自动测试模式：跳过系统对话框，直接返回测试目录里的 PDF
-  if (uiTest || pdfUiTest) {
+  if (testMode()) {
     const { TEST_DIR } = require('./tests/ui-test.js');
     const entries = await fs.readdir(TEST_DIR, { withFileTypes: true }).catch(() => []);
     return entries
@@ -446,7 +525,7 @@ ipcMain.handle('dialog:open-pdfs', async () => {
 
 // 打开 Word/Excel 文件对话框（可多选）
 ipcMain.handle('dialog:open-documents', async () => {
-  if (uiTest || pdfUiTest) {
+  if (testMode()) {
     const { TEST_DIR } = require('./tests/ui-test.js');
     const DOC_EXTS = new Set(['.doc', '.docx', '.xls', '.xlsx']);
     const entries = await fs.readdir(TEST_DIR, { withFileTypes: true }).catch(() => []);
@@ -641,6 +720,242 @@ ipcMain.handle('libreoffice:convert', async (_event, options) => {
   }
 
   return { ok: true, bytes: finalBytes, ms: Date.now() - t0, flatten };
+});
+
+// —— 图片/视频/动图 专用文件对话框（图片格式转换、视频格式转换、动图与视频互转 工具用） ——
+
+const IMAGE_ANY_EXTS = ['png', 'jpg', 'jpeg', 'webp', 'gif', 'bmp', 'ico', 'avif', 'svg'];
+const VIDEO_EXTS = ['mp4', 'mov', 'mkv', 'avi', 'webm', 'flv', 'wmv', 'm4v', 'ts', '3gp', 'mpg', 'mpeg', 'vob', 'rmvb', 'ogv'];
+const ANIMATED_EXTS = ['gif', 'webp', 'apng'];
+
+// 图片（含 ICO/AVIF/SVG 等扩展名）
+ipcMain.handle('dialog:open-image-any', async () => {
+  if (testMode()) return testDirFiles(IMAGE_ANY_EXTS, { startWith: '测试原图' });
+  const result = await dialog.showOpenDialog(mainWindow, {
+    title: '选择图片',
+    properties: ['openFile', 'multiSelections'],
+    filters: [{ name: '图片（含 ICO/AVIF/SVG）', extensions: IMAGE_ANY_EXTS }]
+  });
+  return result.canceled ? [] : result.filePaths;
+});
+
+// 视频
+ipcMain.handle('dialog:open-videos', async () => {
+  if (testMode()) return testDirFiles(VIDEO_EXTS, { startWith: '测试视频' });
+  const result = await dialog.showOpenDialog(mainWindow, {
+    title: '选择视频',
+    properties: ['openFile', 'multiSelections'],
+    filters: [{ name: '视频', extensions: VIDEO_EXTS }]
+  });
+  return result.canceled ? [] : result.filePaths;
+});
+
+// 动图与视频（动图与视频互转工具）
+ipcMain.handle('dialog:open-media', async () => {
+  if (testMode()) return testDirFiles([...VIDEO_EXTS, ...ANIMATED_EXTS], { startWith: '测试' });
+  const result = await dialog.showOpenDialog(mainWindow, {
+    title: '选择动图或视频',
+    properties: ['openFile', 'multiSelections'],
+    filters: [{ name: '动图（GIF/WebP/APNG）与视频', extensions: [...ANIMATED_EXTS, ...VIDEO_EXTS] }]
+  });
+  return result.canceled ? [] : result.filePaths;
+});
+
+// —— ffmpeg 加装包（视频格式转换 / 动图与视频互转 工具；见 spec/modules/video-convert.md） ——
+// 位置约定 = 软件目录/addons/ffmpeg/ffmpeg.exe（随包分发，见 pack.js 步骤 5c）；缺失时视频类工具显示放置说明。
+const FFMPEG_ADDON_PATH = path.join(PORTABLE_DIR, 'addons', 'ffmpeg', 'ffmpeg.exe');
+
+function findFfmpeg() {
+  if (fsSync.existsSync(FFMPEG_ADDON_PATH)) return { found: true, path: FFMPEG_ADDON_PATH, where: 'addon' };
+  // 兜底：本机 PATH 里装了 ffmpeg 也能用（开发机常见）
+  try {
+    const r = spawnSync('where', ['ffmpeg'], { windowsHide: true, encoding: 'utf8' });
+    if (r.status === 0) {
+      const first = String(r.stdout || '').split(/\r?\n/).map((s) => s.trim()).filter(Boolean)[0];
+      if (first && fsSync.existsSync(first)) return { found: true, path: first, where: 'system' };
+    }
+  } catch { /* 找不到按未安装处理 */ }
+  return { found: false, path: null, where: null };
+}
+
+let ffmpegStatusCache = null;
+ipcMain.handle('ffmpeg:status', async () => {
+  if (ffmpegStatusCache) return ffmpegStatusCache;
+  const bin = findFfmpeg();
+  if (!bin.found) {
+    ffmpegStatusCache = { found: false, where: null, version: null };
+    return ffmpegStatusCache;
+  }
+  const version = await new Promise((resolve) => {
+    const child = spawn(bin.path, ['-hide_banner', '-version'], { windowsHide: true });
+    let out = '';
+    child.stdout.on('data', (d) => { out += d; });
+    child.on('error', () => resolve(null));
+    child.on('close', () => {
+      const m = /ffmpeg version (\S+)/.exec(out);
+      resolve(m ? m[1] : null);
+    });
+  });
+  ffmpegStatusCache = { found: true, where: bin.where, version };
+  return ffmpegStatusCache;
+});
+
+/** 从 `ffmpeg -i` 的 stderr 里提取时长/分辨率/帧率/音轨等信息（静态包只带 ffmpeg，没有 ffprobe） */
+function parseMediaInfo(stderr) {
+  const info = { durationSec: 0, width: 0, height: 0, fps: 0, hasAudio: false, videoCodec: '', format: '' };
+  const dur = /Duration: (\d+):(\d+):(\d+(?:\.\d+)?)/.exec(stderr);
+  if (dur) info.durationSec = (+dur[1]) * 3600 + (+dur[2]) * 60 + parseFloat(dur[3]);
+  const fmt = /Input #0, ([^,]+),/.exec(stderr);
+  if (fmt) info.format = fmt[1].trim();
+  for (const line of stderr.split(/\r?\n/)) {
+    const v = /Stream #\d+:\d+.*?: Video: (\S+).*?, (\d{2,5})x(\d{2,5})/.exec(line);
+    if (v && !info.width) {
+      info.videoCodec = v[1];
+      info.width = Number(v[2]);
+      info.height = Number(v[3]);
+    }
+    const f = /(\d+(?:\.\d+)?) fps/.exec(line);
+    if (f && !info.fps) info.fps = parseFloat(f[1]);
+    if (/Stream #\d+:\d+.*?: Audio:/.test(line)) info.hasAudio = true;
+  }
+  return info;
+}
+
+ipcMain.handle('ffmpeg:probe', async (_event, filePath) => {
+  const bin = findFfmpeg();
+  if (!bin.found) return { ok: false, message: '未检测到 ffmpeg' };
+  const res = await new Promise((resolve) => {
+    const child = spawn(bin.path, ['-hide_banner', '-i', filePath], { windowsHide: true });
+    let stderr = '';
+    child.stderr.on('data', (d) => { stderr += d; });
+    child.on('error', (err) => resolve({ code: -1, stderr: String((err && err.message) || err) }));
+    child.on('close', (code) => resolve({ code, stderr }));
+  });
+  const info = parseMediaInfo(res.stderr);
+  // 说明：ffmpeg -i 不带输出文件时退出码为 1，属正常；能解析出信息即视为成功
+  if (info.durationSec > 0 || info.width > 0) return { ok: true, ...info };
+  return { ok: false, message: '无法识别该文件（可能不是媒体文件或格式不受支持）' };
+});
+
+/** 正在运行的 ffmpeg 任务（jobId → child），供「取消」使用 */
+const ffmpegJobs = new Map();
+
+function runFfmpeg(args, { jobId, onStdout, timeoutMs } = {}) {
+  return new Promise((resolve) => {
+    const bin = findFfmpeg();
+    if (!bin.found) {
+      resolve({ code: -1, stdout: '', stderr: '未检测到 ffmpeg', notFound: true });
+      return;
+    }
+    const child = spawn(bin.path, args, { windowsHide: true });
+    if (jobId) ffmpegJobs.set(jobId, child);
+    let stdout = '';
+    let stderr = '';
+    let timedOut = false;
+    const timer = timeoutMs ? setTimeout(() => { timedOut = true; killConvertTree(child); }, timeoutMs) : null;
+    const finish = (payload) => {
+      if (timer) clearTimeout(timer);
+      if (jobId) ffmpegJobs.delete(jobId);
+      resolve(payload);
+    };
+    child.stdout.on('data', (d) => {
+      const s = d.toString();
+      stdout += s;
+      if (onStdout) onStdout(s);
+    });
+    child.stderr.on('data', (d) => {
+      stderr += d.toString();
+      if (stderr.length > 200000) stderr = stderr.slice(-100000); // 只留尾部，避免异常时撑爆内存
+    });
+    child.on('error', (err) => finish({ code: -1, stdout, stderr: String((err && err.message) || err), timedOut }));
+    child.on('close', (code) => finish({ code, stdout, stderr, timedOut }));
+  });
+}
+
+// 取消正在处理的 ffmpeg 任务（结束整棵进程树）
+ipcMain.handle('ffmpeg:cancel', async (_event, jobId) => {
+  const child = ffmpegJobs.get(jobId);
+  if (!child) return { ok: false, message: '任务已结束或不存在' };
+  killConvertTree(child);
+  return { ok: true };
+});
+
+/**
+ * 视频转码（文件 → 文件）：ffmpeg 直接写最终文件（避免把 GB 级数据搬进内存/走 IPC）。
+ * options: { inputPath, outputDir?, baseName?, ext, args[], durationMs?, timeoutMs?, jobId }
+ */
+ipcMain.handle('ffmpeg:convert', async (event, options) => {
+  const opt = options || {};
+  const inputPath = opt.inputPath;
+  if (!inputPath) return { ok: false, message: '缺少输入文件' };
+  const bin = findFfmpeg();
+  if (!bin.found) return { ok: false, message: '未检测到 ffmpeg（把加装包解压到软件目录的 addons/ffmpeg 后重开本工具）' };
+
+  const dir = opt.outputDir || path.dirname(inputPath);
+  const ext = String(opt.ext || '.mp4');
+  const base = opt.baseName || path.basename(inputPath, path.extname(inputPath));
+  const target = uniqueTargetPath(dir, base, ext);
+  await fs.mkdir(dir, { recursive: true });
+
+  const durationMs = Number(opt.durationMs) || 0;
+  const limit = opt.timeoutMs || Math.min(6 * 3600 * 1000, Math.max(20 * 60 * 1000, durationMs * 10));
+  const args = ['-hide_banner', '-nostdin', '-y', '-progress', 'pipe:1', '-nostats', ...(opt.inputArgs || []), '-i', inputPath, ...(opt.args || []), target];
+  const t0 = Date.now();
+  const res = await runFfmpeg(args, {
+    jobId: opt.jobId,
+    timeoutMs: limit,
+    onStdout: (chunk) => {
+      if (!event.sender || event.sender.isDestroyed()) return;
+      for (const line of chunk.split(/\r?\n/)) {
+        const t = /^out_time_us=(\d+)/.exec(line);
+        if (t && durationMs > 0) {
+          const percent = Math.max(0, Math.min(99, (Number(t[1]) / 1000 / durationMs) * 100));
+          event.sender.send('ffmpeg:progress', { jobId: opt.jobId, percent, timeMs: Number(t[1]) / 1000 });
+        }
+        const s = /^speed=(.+)$/.exec(line);
+        if (s) event.sender.send('ffmpeg:progress', { jobId: opt.jobId, speed: s[1].trim() });
+      }
+    }
+  });
+
+  const produced = fsSync.existsSync(target) && fsSync.statSync(target).size > 0;
+  if (res.timedOut || res.code !== 0 || !produced) {
+    try { if (fsSync.existsSync(target)) fsSync.rmSync(target, { force: true }); } catch { /* 清理失败不影响结论 */ }
+    const detail = res.notFound ? '未检测到 ffmpeg' : res.timedOut ? '处理超时' : `ffmpeg 退出码 ${res.code}`;
+    const tail = (res.stderr || '').trim().split(/\r?\n/).slice(-3).join(' ｜ ').slice(0, 300);
+    return { ok: false, message: `转换失败：${detail}${tail ? `｜${tail}` : ''}` };
+  }
+  return { ok: true, path: target, size: fsSync.statSync(target).size, ms: Date.now() - t0 };
+});
+
+/**
+ * 图片字节 → 字节（图片格式转换工具的 TIFF/GIF/AVIF 走这里；临时文件在系统临时目录，用完即删）
+ * options: { bytes, ext, args[] }
+ */
+ipcMain.handle('ffmpeg:transform', async (_event, options) => {
+  const opt = options || {};
+  if (!opt.bytes) return { ok: false, message: '缺少图片数据' };
+  const bin = findFfmpeg();
+  if (!bin.found) return { ok: false, message: '未检测到 ffmpeg（把加装包解压到软件目录的 addons/ffmpeg 后重开本工具）' };
+
+  const workDir = path.join(os.tmpdir(), `tomato-ffmpeg-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`);
+  await fs.mkdir(workDir, { recursive: true });
+  const ext = String(opt.ext || '.bin');
+  const inPath = path.join(workDir, 'in.bin');
+  const outPath = path.join(workDir, `out${ext.startsWith('.') ? ext : `.${ext}`}`);
+  try {
+    await fs.writeFile(inPath, Buffer.from(opt.bytes));
+    const res = await runFfmpeg(['-hide_banner', '-nostdin', '-y', '-i', inPath, ...(opt.args || []), outPath], {
+      timeoutMs: 3 * 60 * 1000
+    });
+    if (res.code !== 0 || !fsSync.existsSync(outPath)) {
+      const tail = (res.stderr || '').trim().split(/\r?\n/).slice(-2).join(' ｜ ').slice(0, 240);
+      return { ok: false, message: `转换失败：${tail || 'ffmpeg 未生成输出文件'}` };
+    }
+    return { ok: true, bytes: await fs.readFile(outPath) };
+  } finally {
+    await fs.rm(workDir, { recursive: true, force: true }).catch(() => {});
+  }
 });
 
 // —— 内置降级：docx / xlsx → PDF（隐藏窗口渲染 + Chromium printToPDF，不依赖加装包） ——

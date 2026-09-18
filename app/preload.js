@@ -22,9 +22,29 @@ contextBridge.exposeInMainWorld('desktop', {
   // 文件读写（界面进程处于沙箱中，必须经由主进程）
   readFile: (filePath) => ipcRenderer.invoke('fs:read-file', filePath),
   writeFile: (filePath, bytes) => ipcRenderer.invoke('fs:write-file', filePath, bytes),
+  removeFile: (filePath) => ipcRenderer.invoke('fs:remove-file', filePath),
   pathInfo: (filePath) => ipcRenderer.invoke('fs:path-info', filePath),
   listImages: (dirPath) => ipcRenderer.invoke('fs:list-images', dirPath),
+  listFiles: (dirPath, exts) => ipcRenderer.invoke('fs:list-files', dirPath, exts),
   saveImageNextTo: (options) => ipcRenderer.invoke('fs:save-image', options),
+
+  // 新工具（图片格式转换 / 视频格式转换 / 动图与视频互转）：专用对话框
+  openImageAny: () => ipcRenderer.invoke('dialog:open-image-any'),
+  openVideos: () => ipcRenderer.invoke('dialog:open-videos'),
+  openMedia: () => ipcRenderer.invoke('dialog:open-media'),
+
+  // ffmpeg 加装包（视频/动图工具；见 spec/modules/video-convert.md）
+  ffmpegStatus: () => ipcRenderer.invoke('ffmpeg:status'),
+  ffmpegProbe: (filePath) => ipcRenderer.invoke('ffmpeg:probe', filePath),
+  ffmpegConvert: (options) => ipcRenderer.invoke('ffmpeg:convert', options),
+  ffmpegTransform: (options) => ipcRenderer.invoke('ffmpeg:transform', options),
+  ffmpegCancel: (jobId) => ipcRenderer.invoke('ffmpeg:cancel', jobId),
+  // 进度订阅（返回取消订阅函数，工具 unmount 时必须调用）
+  ffmpegOnProgress: (callback) => {
+    const handler = (_event, data) => callback(data);
+    ipcRenderer.on('ffmpeg:progress', handler);
+    return () => ipcRenderer.removeListener('ffmpeg:progress', handler);
+  },
 
   // PDF 工具：专用文件对话框与 LibreOffice 加装包
   openPdfs: () => ipcRenderer.invoke('dialog:open-pdfs'),

@@ -27,3 +27,23 @@ LibreOffice 加装包（可选）—— 番茄图片混淆 桌面版
 本加装包的文件来自 The Document Foundation 的 LibreOffice（MPL-2.0），
 版权归其所有；许可证与版权信息见：
     addons\libreoffice\LICENSE.html 与 addons\libreoffice\license.txt
+
+==================================================
+ffmpeg 加装包（视频/动图功能必需，已随软件附带）
+==================================================
+
+【用途】
+「视频格式转换」「动图与视频互转」两个工具，以及「图片格式转换」里的
+TIFF / GIF / AVIF 输出，都依赖它。
+文件：软件目录\addons\ffmpeg\ffmpeg.exe（FFmpeg 6.1.1，单文件，约 83 MB）
+不需要安装、不写注册表、完全离线。
+
+【缺失时】
+其它工具（图片混淆、PDF、图片压缩、变清晰、格式转换的 PNG/JPG/WebP/BMP/ICO）
+照常可用；视频类工具会显示「未检测到 ffmpeg」及放置说明。
+把 addons\ffmpeg 文件夹放回软件目录后重开工具即可。
+
+【许可】
+FFmpeg 6.1.1（GPL v3），构建来自 gyan.dev release-essentials（Windows x64 静态版）。
+许可证全文见 addons\ffmpeg\LICENSE.txt，版本/来源/源码地址见 addons\ffmpeg\说明.txt。
+不需要了：直接删掉 addons\ffmpeg 文件夹即可，不影响其它功能。

@@ -76,6 +76,8 @@ fs.mkdirSync(path.join(appTarget, 'tests'), { recursive: true });
 fs.copyFileSync(path.join(appRoot, 'tests', 'ui-test.js'), path.join(appTarget, 'tests', 'ui-test.js'));
 fs.copyFileSync(path.join(appRoot, 'tests', 'pdf-test.js'), path.join(appTarget, 'tests', 'pdf-test.js'));
 fs.copyFileSync(path.join(appRoot, 'tests', 'pdf-ui-test.js'), path.join(appTarget, 'tests', 'pdf-ui-test.js'));
+fs.copyFileSync(path.join(appRoot, 'tests', 'media-test.js'), path.join(appTarget, 'tests', 'media-test.js'));
+fs.copyFileSync(path.join(appRoot, 'tests', 'media-ui-test.js'), path.join(appTarget, 'tests', 'media-ui-test.js'));
 
 // —— 4b) 复制 PDF 工具运行时依赖（纯 JS，界面进程按相对路径直接引用） ——
 // 说明：本项目没有打包器，工具代码里写的是 ../../../../node_modules/pdfjs-dist/... 这样的
@@ -145,6 +147,16 @@ if (fs.existsSync(addonSrc)) {
   }
 } else {
   log('未发现 app/addons/libreoffice：本次不打包加装包（PDF→Word / 高保真转换将提示需加装）');
+}
+
+// —— 5c) ffmpeg 加装包（视频格式转换 / 动图与视频互转 必需，随主包分发） ——
+// 说明：单文件静态构建（约 83MB），放在 app/addons/ffmpeg/（不进 git，见 spec/modules/video-convert.md）。
+const ffmpegAddon = path.join(appRoot, 'addons', 'ffmpeg');
+if (fs.existsSync(path.join(ffmpegAddon, 'ffmpeg.exe'))) {
+  log('步骤5c：复制 ffmpeg 加装包（约 83MB）…');
+  copyTree(ffmpegAddon, path.join(outDir, 'addons', 'ffmpeg'));
+} else {
+  log('警告：未发现 app/addons/ffmpeg/ffmpeg.exe —— 产物中视频类工具将不可用（其余工具不受影响）');
 }
 
 // —— 6) 设置 exe 图标与版本信息（需要 build/rcedit.exe，缺失则跳过） ——

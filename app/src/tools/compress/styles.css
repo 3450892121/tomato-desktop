@@ -1,0 +1,118 @@
+/* 工具：图片压缩 —— 专属样式
+   约定：颜色 / 字号 / 间距一律引用 shell/theme.css 的变量，类名统一 cmp- 前缀 */
+.cmp-tool {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  height: 100%;
+  min-height: 0;
+}
+
+.cmp-controls {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  flex: none;
+  padding: var(--space-3) var(--space-4);
+}
+
+.cmp-w-num { flex: none; width: 92px; }
+.cmp-w-mode { flex: none; width: 152px; }
+
+.cmp-files {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.cmp-drop {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-3);
+  padding: var(--space-6);
+}
+.cmp-drop-hint { font-size: var(--font-size-sm); color: var(--color-text-secondary); }
+
+.cmp-list-wrap { display: flex; flex-direction: column; flex: 1 1 auto; min-height: 0; }
+.cmp-list-head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex: none;
+  padding: var(--space-3) var(--space-4);
+  border-bottom: 1px solid var(--color-border);
+  font-size: var(--font-size-sm);
+  color: var(--color-text-secondary);
+}
+.cmp-spacer { flex: 1 1 auto; }
+
+.cmp-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  flex: 1 1 auto;
+  min-height: 0;
+  margin: 0;
+  padding: var(--space-2);
+  overflow-y: auto;
+  list-style: none;
+}
+
+.cmp-item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-sm);
+}
+.cmp-item:hover { background: var(--color-surface-soft); }
+
+.cmp-item-thumb {
+  flex: none;
+  width: 42px;
+  height: 42px;
+  object-fit: cover;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface-soft);
+}
+
+.cmp-item-main { flex: 1 1 auto; min-width: 0; }
+.cmp-item-name {
+  font-size: var(--font-size-md);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.cmp-item-meta { font-size: var(--font-size-xs); color: var(--color-text-secondary); }
+.cmp-item-result { margin-top: 2px; font-size: var(--font-size-sm); color: var(--color-save); }
+.cmp-item-result.is-error { color: var(--color-danger); }
+
+.cmp-item-actions { flex: none; }
+.cmp-icon-btn {
+  width: 28px;
+  height: 28px;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-lg);
+  cursor: pointer;
+}
+.cmp-icon-btn:hover { background: var(--color-neutral); color: var(--color-danger); }
+
+.cmp-actions { display: flex; align-items: center; gap: var(--space-3); flex: none; }
+.cmp-result {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-size: var(--font-size-xs);
+  color: var(--color-text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}

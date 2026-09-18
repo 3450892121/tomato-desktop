@@ -3,9 +3,11 @@
 // 详见 docs/新增工具指南.md
 import obfuscate from '../tools/obfuscate/index.js';
 import pdfConvert from '../tools/pdf-convert/index.js';
+import compress from '../tools/compress/index.js';
 
 /** 所有工具（按 order 升序显示在左侧列表） */
 export const TOOLS = [
   obfuscate,
-  pdfConvert
+  pdfConvert,
+  compress
 ];

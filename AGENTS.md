@@ -13,8 +13,9 @@
 - `app/`：Electron 应用源码：
   - `main.js` / `preload.js`：主进程与安全桥（窗口、文件对话框等系统能力）。
   - `src/shell/`：工具箱框架（页面、左侧导航、`registry.js` 工具注册表、设计令牌、通用组件）。
-  - `src/tools/<工具名>/`：各工具自包含目录（声明 + 界面 + 逻辑 + 样式），`obfuscate` 为图片混淆工具，`_template` 为新工具模板。
-  - `src/shared/`：跨工具复用能力（图片读写、文件封装、设置）。
+  - `src/tools/<工具名>/`：各工具自包含目录（声明 + 界面 + 逻辑 + 样式）。现有：`obfuscate` 图片混淆、`pdf-convert` PDF 转格式、`compress` 图片压缩、`enhance` 图片变清晰、`img-convert` 图片格式转换、`video-convert` 视频格式转换、`sticker` 动图与视频互转；`_template` 为新工具模板。
+  - `src/shared/`：跨工具复用能力（图片读写、ffmpeg 封装与编码参数、文件封装、设置）。
+  - `addons/`：随包加装包（不进 git）：`libreoffice/`（PDF→Word 与高保真 Office→PDF，可选）、`ffmpeg/`（视频/动图工具必需，单文件 83MB，GPL v3，许可见其 LICENSE.txt/说明.txt）。
 - `docs/`：开发指南（如《新增工具指南》）。
 - `app/release/`：打包产物（不进 git）。
 - `番茄图片混淆.apk`：参考实现样本（只读，不修改、不覆盖）。
@@ -43,12 +44,14 @@
 - 安装依赖：`cd app` → `npm install`（npm registry 用 `https://registry.npmmirror.com`；Electron 二进制需设 `ELECTRON_MIRROR=https://registry.npmmirror.com/-/binary/electron/`）。
 - 启动调试：`cd app` → `npm start`。
 - 算法测试：`cd app` → `npm test`（55 项：MD5 对照、洗牌、Gilbert 覆盖、六模式往返、填充规则、密钥校验）。
-- 冒烟自检：`cd app` → `.\node_modules\electron\dist\electron.exe . --smoke-test`（输出 `SMOKE_TEST_OK tools=2 options=6 …` 与 `SMOKE_UI {...}`，界面元素完整、按钮可点即正常）。
+- 冒烟自检：`cd app` → `.\node_modules\electron\dist\electron.exe . --smoke-test`（输出 `SMOKE_TEST_OK tools=7 options=6 …` 与 `SMOKE_UI {...}`，界面元素完整、按钮可点即正常）。
 - 端到端自检：`cd app` → `.\node_modules\electron\dist\electron.exe . --self-test`（在界面进程里跑「PNG 无损往返 + 算法链路 + JPG 保存 + 方块填充」，输出 `SELF_TEST {...}`）。
 - 界面自动测试：`cd app` → `.\node_modules\electron\dist\electron.exe . --ui-test`（模拟真人点按钮走完整流程：选图→混淆→保存→还原→批量→清空，逐步截图并做像素级校验，输出 `UI_TEST {..., "pass":true}`；截图落在 `%TEMP%\tomato-uitest`）。
 - PDF 工具自检：`cd app` → `.\node_modules\electron\dist\electron.exe . --pdf-test`（pdfjs 渲染 / 图片↔PDF 往返 / 合并拆分提取 / 内置降级 docx·xlsx→PDF / 界面接线；结果写 `%TEMP%\tomato-pdf-test.json`，`ok:true` 为通过）。
 - PDF 工具界面自动测试：`cd app` → `.\node_modules\electron\dist\electron.exe . --pdf-ui-test`（五个方向真人操作 + 截图；结果写 `%TEMP%\tomato-pdf-ui-test.json`，`pass:true` 为通过）。
-- 交付前必须全绿：算法测试 + 冒烟自检 + 端到端自检 + 界面自动测试 + PDF 工具自检 + PDF 工具界面自动测试，且截图人工过目一遍；打包产物需再跑一次冒烟与各界面自测。
+- 媒体工具自检：`cd app` → `.\node_modules\electron\dist\electron.exe . --media-test`（图片压缩/变清晰/格式转换的核心逻辑 + 视频↔动图链路：ffmpeg 造夹具、真实转码、逐个解码校验；结果写 `%TEMP%\tomato-media-test.json`，`ok:true` 为通过）。
+- 媒体工具界面自动测试：`cd app` → `.\node_modules\electron\dist\electron.exe . --media-ui-test`（5 个新工具逐个「切工具→添加→运行」，截图并校验新增产物可被 ffmpeg 完整解码；结果写 `%TEMP%\tomato-media-ui-test.json`，`pass:true` 为通过）。
+- 交付前必须全绿：算法测试 + 冒烟自检 + 端到端自检 + 界面自动测试 + PDF 工具自检 + PDF 工具界面自动测试 + 媒体工具自检 + 媒体工具界面自动测试，且截图人工过目一遍；打包产物需再跑一次冒烟与各界面自测。
 - 生成图标：`cd app` → `npm run icon`（产出 `src/assets/icon.png` 与 `build/icon.ico`）。
 - 打包免安装版：`cd app` → `npm run pack`（产物：`app/release/番茄图片混淆-桌面版-v<版本>-win64/` 免安装文件夹 + 同名 `.zip`；exe 图标与版本信息由 `build/rcedit.exe` 写入，缺失则跳过）。
 - 兼容性样本工具（锁定 variants.js 用）：
