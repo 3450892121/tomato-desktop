@@ -12,7 +12,7 @@ const DIRECTIONS = [
   { id: 'image-to-pdf', label: '图片 → PDF', hint: '多张图片合成一份 PDF（列表顺序即页序，JPG 直嵌不重编码）', run: '合成 PDF' },
   { id: 'page-ops', label: '合并 / 拆分 / 提取页', hint: '多份合并、按页拆分成多个文件、抽取指定页', run: '开始处理' },
   { id: 'office-to-pdf', label: 'Word/Excel → PDF', hint: '需要 LibreOffice 加装包（详见下方状态说明）', run: '开始转换' },
-  { id: 'pdf-to-word', label: 'PDF → Word', hint: '需要 LibreOffice 加装包；单栏文档效果好，复杂版式会有偏差', run: '开始转换' }
+  { id: 'pdf-to-word', label: 'PDF → Word', hint: '需要 LibreOffice 加装包；默认「可编辑文本」模式（Word 秒开），可选「保留版式」', run: '开始转换' }
 ];
 
 const IMAGE_EXTS = new Set(['.png', '.jpg', '.jpeg', '.webp', '.bmp', '.gif']);
@@ -166,8 +166,20 @@ function renderParams() {
     splitMode.addEventListener('change', applySub);
     applySub();
   } else {
-    // office-to-pdf / pdf-to-word：加装包状态
-    host.innerHTML = `<div class="pdf-note" id="pdfLoNote">正在检测 LibreOffice…</div>`;
+    // office-to-pdf / pdf-to-word：加装包状态；PDF→Word 额外提供「输出方式」
+    // 背景：LibreOffice 的 PDF 导入会把每段文字做成绝对定位的浮动文本框，复杂大文档
+    //       能产出上万个浮动对象，Word 打开即卡死；「可编辑文本」模式会压平成普通段落。
+    const modeRow = d === 'pdf-to-word'
+      ? `
+      <div class="pdf-param">
+        <span class="control-label">输出方式</span>
+        <select class="select" id="pdfWordMode">
+          <option value="text">可编辑文本（推荐：Word 秒开，版式简化）</option>
+          <option value="layout">保留版式（仅适合简单/短文档）</option>
+        </select>
+      </div>`
+      : '';
+    host.innerHTML = `${modeRow}<div class="pdf-note" id="pdfLoNote">正在检测 LibreOffice…</div>`;
     refreshLibreOfficeNote();
   }
   updateRunButton();
@@ -195,6 +207,10 @@ function readParams() {
       everyN: q('#pdfSplitMode').value === 'n' ? Math.max(1, parseInt(q('#pdfSplitN').value, 10) || 1) : 1,
       rangeText: q('#pdfExtractRange').value.trim()
     };
+  }
+  if (d === 'pdf-to-word') {
+    const sel = q('#pdfWordMode');
+    return { wordMode: sel ? sel.value : 'text' };
   }
   return {};
 }
@@ -545,11 +561,14 @@ async function runConvert(targetFormat) {
 
   const ext = targetFormat === 'docx' ? '.docx' : '.pdf';
   const outputDir = outDirSetting();
+  // PDF → Word 的输出方式：text=压平成普通段落（Word 可正常打开）/ layout=保留 LibreOffice 原始版式
+  const wordMode = targetFormat === 'docx' ? (readParams().wordMode || 'text') : '';
   let done = 0;
   let failed = 0;
   let builtin = 0;
   let lastPath = '';
   let lastError = '';
+  let flattenWarn = '';
 
   for (let i = 0; i < files.length; i++) {
     const f = files[i];
@@ -560,7 +579,7 @@ async function runConvert(targetFormat) {
     try {
       let res;
       if (loFound) {
-        res = await state.ctx.libreofficeConvert({ inputPath: f.path, target: targetFormat });
+        res = await state.ctx.libreofficeConvert({ inputPath: f.path, target: targetFormat, mode: wordMode });
       } else {
         const fileExt = (f.ext || '').toLowerCase();
         if (fileExt !== '.docx' && fileExt !== '.xlsx') {
@@ -570,6 +589,9 @@ async function runConvert(targetFormat) {
         builtin += 1;
       }
       if (!res || !res.ok) throw new Error((res && res.message) || '转换失败');
+      if (res.flatten && res.flatten.applied === false && res.flatten.error) {
+        flattenWarn = `压平失败，已输出原文件（${res.flatten.error}）`;
+      }
       lastPath = await state.ctx.saveNextTo({
         sourcePath: f.path, targetDir: outputDir, baseName: f.baseName, ext, bytes: res.bytes
       });
@@ -582,7 +604,11 @@ async function runConvert(targetFormat) {
   }
   state.ctx.hideProgress();
   const how = builtin > 0 ? '（内置转换，版式可能有偏差；装加装包可高保真）' : '';
-  state.ctx.setStatus(`转换完成：成功 ${done} 个${failed ? `，失败 ${failed} 个（${lastError}）` : ''}${how}`);
+  const modeNote = targetFormat === 'docx' && done > 0
+    ? (wordMode === 'text' ? '（可编辑文本模式）' : '（保留版式模式）')
+    : '';
+  const warn = flattenWarn ? `｜${flattenWarn}` : '';
+  state.ctx.setStatus(`转换完成：成功 ${done} 个${failed ? `，失败 ${failed} 个（${lastError}）` : ''}${modeNote}${how}${warn}`);
   if (lastPath) state.els.result.textContent = `输出：${lastPath}`;
 }
 

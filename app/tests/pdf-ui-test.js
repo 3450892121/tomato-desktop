@@ -254,6 +254,10 @@ async function runPdfUiTest(win) {
 
   // 7) PDF → Word：无加装包应明确提示且不产出；有加装包应成功产出 .docx
   await setDirection('pdf-to-word');
+  result.checks.wordModeOptions = await evalJs(`(() => {
+    const s = document.getElementById('pdfWordMode');
+    return s ? [...s.options].map((o) => o.value) : [];
+  })()`);
   await click('pdfAddBtn');
   await wait(1000);
   await click('pdfRunBtn');
@@ -297,8 +301,11 @@ async function runPdfUiTest(win) {
     c.officeOutputs.length === 2 &&
     c.officeFirst && c.officeFirst.ok === true && c.officeFirst.pages >= 1 &&
     // PDF → Word：无加装包应提示不产出；有加装包应成功产出 .docx（排除测试样例本身）
+    // 另校验「输出方式」选项存在（默认 text=可编辑文本）且转换结果如实标注了所用模式
+    c.wordModeOptions.length === 2 && c.wordModeOptions[0] === 'text' &&
     (loAvailable
       ? String(result.steps.pdfToWordRun || '').startsWith('转换完成：成功') &&
+        String(result.steps.pdfToWordRun || '').includes('可编辑文本模式') &&
         c.docxOutputFiles.some((f) => f.startsWith('测试样本'))
       : result.steps.pdfToWordGuard.includes('需要 LibreOffice 加装包') &&
         c.docxOutputFiles.every((f) => f === '内置降级测试.docx'));

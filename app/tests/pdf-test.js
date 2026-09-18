@@ -222,10 +222,25 @@ const PDF_TEST_SCRIPT = `
         break;
       }
 
+      // ③ PDF → Word「可编辑文本」模式：用 ① 产出的含文字 PDF，验证浮动对象被压平
+      const textPdfPath = await window.desktop.saveImageNextTo({
+        sourcePath: samples.docxPath, baseName: 'lo-text-input', ext: '.pdf', bytes: r1.bytes
+      });
+      const r3 = await window.desktop.libreofficeConvert({ inputPath: textPdfPath, target: 'docx', mode: 'text' });
+      if (!r3 || !r3.ok) throw new Error('pdf→docx(可编辑文本) 失败：' + ((r3 && r3.message) || '未知原因'));
+      const f3 = r3.flatten || {};
+      if (f3.anchors > 0 && f3.applied !== true) throw new Error('压平未执行：' + (f3.error || '未知原因'));
+      if (f3.anchors > 0 && !(f3.paragraphs > 0)) throw new Error('压平后没有产出文字段落');
+
       return {
         where: status.where,
         docxToPdf: { pages: doc1.numPages, hasText: dark > 20, bytes: r1.bytes.length, ms: r1.ms },
-        pdfToDocx: { isZip, hasDocXml, bytes: r2.bytes.length, ms: r2.ms }
+        pdfToDocx: { isZip, hasDocXml, bytes: r2.bytes.length, ms: r2.ms },
+        pdfToWordText: {
+          anchors: f3.anchors, applied: f3.applied, paragraphs: f3.paragraphs, images: f3.images,
+          docXmlMB: f3.docXmlAfter ? +(f3.docXmlAfter / 1048576).toFixed(2) : null,
+          bytes: r3.bytes.length, ms: r3.ms
+        }
       };
     });
 

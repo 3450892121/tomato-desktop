@@ -547,6 +547,7 @@ function killConvertTree(child) {
 }
 
 // 转换单个文件（Office→PDF 或 PDF→DOCX）：在临时目录里转换，读完字节即清理，绝不覆盖已有文件
+// mode='text'：对 PDF→DOCX 产物做压平后处理（见 core/flatten-docx.cjs），产出 Word 能正常打开的文档
 ipcMain.handle('libreoffice:convert', async (_event, options) => {
   const inputPath = options && options.inputPath;
   const target = options && options.target === 'docx' ? 'docx' : 'pdf';
@@ -622,7 +623,24 @@ ipcMain.handle('libreoffice:convert', async (_event, options) => {
 
   const bytes = await fs.readFile(outPath);
   await fs.rm(workDir, { recursive: true, force: true }).catch(() => {});
-  return { ok: true, bytes, ms: Date.now() - t0 };
+
+  // PDF→Word 的「可编辑文本」模式：把 LibreOffice 产出的大量浮动文本框压平成普通段落
+  let finalBytes = bytes;
+  let flatten = null;
+  if (target === 'docx' && options && options.mode === 'text') {
+    try {
+      // 延迟 require：jszip 只在用到「可编辑文本」模式时才加载
+      const { flattenDocx } = require('./src/tools/pdf-convert/core/flatten-docx.cjs');
+      const r = await flattenDocx(bytes);
+      finalBytes = r.bytes;
+      flatten = r.stats;
+    } catch (err) {
+      // 压平失败不该丢掉已经完成的转换：原样返回，并让界面如实提示
+      flatten = { applied: false, error: String((err && err.message) || err) };
+    }
+  }
+
+  return { ok: true, bytes: finalBytes, ms: Date.now() - t0, flatten };
 });
 
 // —— 内置降级：docx / xlsx → PDF（隐藏窗口渲染 + Chromium printToPDF，不依赖加装包） ——

@@ -217,8 +217,10 @@ if (zipped) log(`压缩包已生成：${zipPath}（${mb(fs.statSync(zipPath).siz
 log('步骤9：清理旧版本产物');
 try {
   let removed = 0;
+  // 注意：必须同时排除本次的文件夹与压缩包——否则会把刚生成的 zip 自己删掉
+  const keep = new Set([folderName, `${folderName}.zip`]);
   for (const entry of fs.readdirSync(releaseRoot, { withFileTypes: true })) {
-    if (entry.name === folderName) continue;
+    if (keep.has(entry.name)) continue;
     const oldFolder = entry.isDirectory() && entry.name.startsWith('番茄图片混淆-桌面版-v') && entry.name.endsWith('-win64');
     const oldZip = entry.isFile() && entry.name.startsWith('番茄图片混淆-桌面版-v') && entry.name.endsWith('-win64.zip');
     if (oldFolder || oldZip) {
