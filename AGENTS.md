@@ -42,8 +42,12 @@
 - 冒烟自检：`cd app` → `.\node_modules\electron\dist\electron.exe . --smoke-test`（输出 `SMOKE_TEST_OK tools=1 options=6 …` 与 `SMOKE_UI {...}`，界面元素完整、按钮可点即正常）。
 - 端到端自检：`cd app` → `.\node_modules\electron\dist\electron.exe . --self-test`（在界面进程里跑「PNG 无损往返 + 算法链路 + JPG 保存 + 方块填充」，输出 `SELF_TEST {...}`）。
 - 界面自动测试：`cd app` → `.\node_modules\electron\dist\electron.exe . --ui-test`（模拟真人点按钮走完整流程：选图→混淆→保存→还原→批量→清空，逐步截图并做像素级校验，输出 `UI_TEST {..., "pass":true}`；截图落在 `%TEMP%\tomato-uitest`）。
-- 交付前必须四套全绿：算法测试 + 冒烟自检 + 端到端自检 + 界面自动测试，且截图人工过目一遍。
-- 打包免安装版：`待定`（打包脚本尚未实现，实现后补全）。
+- 交付前必须四套全绿：算法测试 + 冒烟自检 + 端到端自检 + 界面自动测试，且截图人工过目一遍；打包产物需再跑一次冒烟与界面自测。
+- 生成图标：`cd app` → `npm run icon`（产出 `src/assets/icon.png` 与 `build/icon.ico`）。
+- 打包免安装版：`cd app` → `npm run pack`（产物：`app/release/番茄图片混淆-桌面版-v<版本>-win64/` 免安装文件夹 + 同名 `.zip`；exe 图标与版本信息由 `build/rcedit.exe` 写入，缺失则跳过）。
+- 兼容性样本工具（锁定 variants.js 用）：
+  - 造样本：`electron . --make-samples <目录> --mode <模式> [--key <密钥>]`
+  - 验样本：`electron . --verify-samples <目录> --key <密钥>` → 输出 `verdict`，`meanDiff` 接近 0 即为手机版所用的模式与变体。
 
 ## 改动与提交
 - 每次改动完成后创建对应 git commit，便于追踪和回滚。

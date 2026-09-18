@@ -7,6 +7,7 @@
 const path = require('path');
 const os = require('os');
 const fs = require('fs/promises');
+const { app } = require('electron');
 
 const TEST_DIR = path.join(os.tmpdir(), 'tomato-uitest');
 
@@ -211,7 +212,12 @@ async function runUiTest(win) {
       .filter((s) => !document.querySelector(s))
   }))()`);
 
-  const settingsFile = path.join(__dirname, '..', 'userdata', 'settings.json');
+  // 设置文件位置：开发时在 app/userdata，打包后在 exe 同级的 userdata（绿色版约定）
+  const settingsFile = path.join(
+    app.isPackaged ? path.dirname(process.execPath) : path.join(__dirname, '..'),
+    'userdata',
+    'settings.json'
+  );
   result.steps.settingsSave = await evalJs(`(async () => {
     document.querySelector('#setJpegQuality').value = '90';
     [...document.querySelectorAll('.modal-actions .btn')].find((b) => b.textContent === '保存').click();

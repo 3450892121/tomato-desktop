@@ -10,6 +10,9 @@ app/dist
 # 本机构建工具（Node 便携版等）
 .tools
 
+# 打包用外部小工具（rcedit 等，二进制，按需下载）
+app/build
+
 # 软件运行期用户数据（绿色版配置随文件夹走，不进 git）
 app/userdata
 

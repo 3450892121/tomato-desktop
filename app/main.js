@@ -31,6 +31,16 @@ const USER_DATA_DIR = path.join(PORTABLE_DIR, 'userdata');
 const SETTINGS_FILE = path.join(USER_DATA_DIR, 'settings.json');
 app.setPath('userData', USER_DATA_DIR);
 
+const argValue = (flag) => {
+  const i = process.argv.indexOf(flag);
+  return i >= 0 ? process.argv[i + 1] : null;
+};
+// 生成测试样本 / 校验手机版样本（兼容性锁定用）
+const makeSamplesDir = argValue('--make-samples');
+const verifySamplesDir = argValue('--verify-samples');
+const samplesMode = argValue('--mode');
+const samplesKey = argValue('--key');
+
 async function readSettingsFile() {
   try {
     return JSON.parse(await fs.readFile(SETTINGS_FILE, 'utf8'));
@@ -116,6 +126,7 @@ function createMainWindow() {
     minHeight: 640,
     backgroundColor: '#f5f6f8', // 与 theme.css 的 --color-bg 保持一致
     title: '番茄图片混淆 桌面版',
+    icon: path.join(__dirname, 'src', 'assets', 'icon.png'),
     autoHideMenuBar: true, // 默认隐藏菜单栏（按 Alt 显示），保持界面清爽
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
@@ -182,6 +193,32 @@ function createMainWindow() {
         console.log(`UI_TEST ${JSON.stringify(result)}`);
       } catch (err) {
         console.log(`UI_TEST_FAIL ${err.message}\n${err.stack}`);
+      }
+      app.quit();
+    });
+  }
+
+  if (makeSamplesDir) {
+    mainWindow.webContents.once('did-finish-load', async () => {
+      try {
+        const { runMakeSamples } = require('./tests/make-samples.js');
+        const result = await runMakeSamples(mainWindow, { dir: makeSamplesDir, mode: samplesMode || 'gilbert', key: samplesKey });
+        console.log(`MAKE_SAMPLES ${JSON.stringify(result)}`);
+      } catch (err) {
+        console.log(`MAKE_SAMPLES_FAIL ${err.message}`);
+      }
+      app.quit();
+    });
+  }
+
+  if (verifySamplesDir) {
+    mainWindow.webContents.once('did-finish-load', async () => {
+      try {
+        const { runVerifySamples } = require('./tests/verify-samples.js');
+        const result = await runVerifySamples(mainWindow, verifySamplesDir, samplesKey);
+        console.log(`VERIFY_SAMPLES ${JSON.stringify(result)}`);
+      } catch (err) {
+        console.log(`VERIFY_SAMPLES_FAIL ${err.message}\n${err.stack}`);
       }
       app.quit();
     });

@@ -8,7 +8,9 @@
   "license": "UNLICENSED",
   "scripts": {
     "start": "electron .",
-    "test": "node tests/engine.test.mjs"
+    "test": "node tests/engine.test.mjs",
+    "icon": "node tools/make-icon.js",
+    "pack": "node tools/pack.js"
   },
   "devDependencies": {
     "electron": "^44.4.2"
