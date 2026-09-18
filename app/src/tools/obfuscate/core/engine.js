@@ -9,7 +9,7 @@
 //  2) shuffle.js  —— Fisher-Yates 洗牌生成错位表
 //  3) gilbert.js  —— Gilbert 空间填充曲线 + 固定偏移循环移位
 //  4) logistic.js —— Logistic 混沌序列（3.9999999）排序错位表
-//  5) modes.js(核心实现) —— b/c/c2/pe1/pe2 正向与反向映射（含 PE 链式细节开关）
+//  5) scramble.js —— b/c/c2/pe1/pe2 正向与反向映射（含 PE 链式细节开关）
 //  6) engine.js   —— 统一入口 processPixels()
 
 /**

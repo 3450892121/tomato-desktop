@@ -29,18 +29,21 @@ function createMainWindow() {
     }
   });
 
-  mainWindow.loadFile(path.join(__dirname, 'src', 'ui', 'index.html'));
+  mainWindow.loadFile(path.join(__dirname, 'src', 'shell', 'index.html'));
 
   if (smokeTest) {
     mainWindow.webContents.once('did-finish-load', async () => {
       try {
+        const toolCount = await mainWindow.webContents.executeJavaScript(
+          'document.querySelectorAll("#toolNav .tool-item").length'
+        );
         const optionCount = await mainWindow.webContents.executeJavaScript(
           'document.querySelectorAll("#modeSelect option").length'
         );
         const statusText = await mainWindow.webContents.executeJavaScript(
           'document.getElementById("statusText").textContent'
         );
-        console.log(`SMOKE_TEST_OK options=${optionCount} status="${statusText}"`);
+        console.log(`SMOKE_TEST_OK tools=${toolCount} options=${optionCount} status="${statusText}"`);
       } catch (err) {
         console.log(`SMOKE_TEST_FAIL ${err.message}`);
       }

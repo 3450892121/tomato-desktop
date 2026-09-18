@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta http-equiv="Content-Security-Policy"
+        content="default-src 'self'; img-src 'self' data: blob:; style-src 'self'; script-src 'self'" />
+  <title>番茄工具箱</title>
+  <link rel="stylesheet" href="theme.css" />
+  <link rel="stylesheet" href="shell.css" />
+</head>
+<body>
+  <div class="shell">
+    <!-- 左侧：工具列表（由 registry.js 自动渲染） -->
+    <aside class="sidebar">
+      <div class="sidebar-brand">
+        <span class="sidebar-logo">🍅</span>
+        <span class="sidebar-title">番茄工具箱</span>
+      </div>
+      <nav class="tool-nav" id="toolNav"><!-- 工具项由 shell.js 渲染 --></nav>
+      <div class="sidebar-footer">
+        <button class="side-btn" id="btnSettings">⚙ 设置</button>
+        <button class="side-btn" id="btnHelp">? 帮助</button>
+      </div>
+    </aside>
+
+    <!-- 右侧：当前工具 -->
+    <main class="workspace">
+      <header class="topbar">
+        <div class="topbar-status" id="statusText">欢迎使用</div>
+        <div class="topbar-info" id="infoText">分辨率: --- x --- ｜ 耗时: --- ms</div>
+      </header>
+      <section class="tool-host" id="toolHost"><!-- 工具界面挂载点 --></section>
+    </main>
+
+    <!-- 处理进度（框架级，所有工具共用） -->
+    <div class="progress" id="progressBar" hidden>
+      <div class="progress-track"><div class="progress-fill" id="progressFill"></div></div>
+      <div class="progress-text" id="progressText">处理中…</div>
+    </div>
+  </div>
+
+  <script type="module" src="shell.js"></script>
+</body>
+</html>
