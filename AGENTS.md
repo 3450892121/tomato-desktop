@@ -6,11 +6,22 @@
 ## 仓库结构
 - `AGENTS.md`：本工作守则（动手前必读）。
 - `spec/`：目标规格（00-overview 全局地图 / modules 各模块 / acceptance 验收标准）。
-- `app/`：Electron 应用源码（`main.js` 主进程、`preload.js` 桥接、`src/core` 算法引擎与图片读写、`src/ui` 界面）。
+- `app/`：Electron 应用源码：
+  - `main.js` / `preload.js`：主进程与安全桥（窗口、文件对话框等系统能力）。
+  - `src/shell/`：工具箱框架（页面、左侧导航、`registry.js` 工具注册表、设计令牌、通用组件）。
+  - `src/tools/<工具名>/`：各工具自包含目录（声明 + 界面 + 逻辑 + 样式），`obfuscate` 为图片混淆工具，`_template` 为新工具模板。
+  - `src/shared/`：跨工具复用能力（图片读写、文件封装、设置）。
+- `docs/`：开发指南（如《新增工具指南》）。
 - `app/release/`：打包产物（不进 git）。
 - `番茄图片混淆.apk`：参考实现样本（只读，不修改、不覆盖）。
 - `新项目启动指令（合并版）.md`：项目流程文档（只读，修改须先征得用户同意）。
 - `.tools/`：本机构建工具（Node 便携版等，不进 git）。
+
+## 新增工具约定（工具箱架构）
+- 新功能一律做成 `src/tools/<工具名>/` 下的独立工具，禁止写进既有工具或 shell。
+- 接入步骤：复制 `src/tools/_template/` → 改 `id`/`name`/`order` → 在 `src/shell/registry.js` 加一行；详见 `docs/新增工具指南.md`。
+- 工具之间禁止互相 import；可复用的能力放 `src/shared/`。
+- 工具界面样式只用自己的 `styles.css`，颜色/字号/间距必须引用 `shell/theme.css` 的变量。
 
 ## 执行纪律
 - 严格按用户给定步骤/清单执行，不做清单之外的事。
