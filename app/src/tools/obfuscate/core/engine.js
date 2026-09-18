@@ -1,41 +1,93 @@
-// 算法引擎（骨架 —— 尚未实现）
-// 目标与规则见 spec/modules/engine.md：
-//  - 6 种模式：gilbert / b / c / c2 / pe1 / pe2，与手机版 APK 完全一致
-//  - 纯像素重排（不改像素值），正向=混淆，反向=解混淆
-//  - 输入输出均为 RGBA 缓冲（Uint8ClampedArray），不碰文件系统与界面
-//
-// 计划实现顺序（按 spec）：
-//  1) md5.js      —— MD5(密钥 + i) 取前 7 位十六进制（B/C/C2 洗牌用）
-//  2) shuffle.js  —— Fisher-Yates 洗牌生成错位表
-//  3) gilbert.js  —— Gilbert 空间填充曲线 + 固定偏移循环移位
-//  4) logistic.js —— Logistic 混沌序列（3.9999999）排序错位表
-//  5) scramble.js —— b/c/c2/pe1/pe2 正向与反向映射（含 PE 链式细节开关）
-//  6) engine.js   —— 统一入口 processPixels()
+// 算法引擎：统一入口
+// 目标与规则见 spec/modules/engine.md。纯像素重排：不改像素值，只改位置；正向混淆、反向解混淆。
+import { tomatoScramble } from './tomato.js';
+import { blockScramble, pixelScramble, rowPixelScramble } from './scramble_md5.js';
+import { rowLogistic, rowColumnLogistic } from './scramble_logistic.js';
+import { VARIANTS } from './variants.js';
+
+/** 方块混淆的方块边长（与手机版一致：32×32） */
+export const BLOCK_SIZE = 32;
 
 /**
- * 统一入口（骨架阶段直接抛错，避免被误当成已实现）
+ * 处理像素（混淆 / 解混淆）
  * @param {object} opts
  * @param {string} opts.mode      模式标识：gilbert | b | c | c2 | pe1 | pe2
- * @param {string|number} [opts.key] 密钥（按模式）
+ * @param {string|number} [opts.key] 密钥（gilbert 不需要；b/c/c2 字符串；pe1/pe2 为 0~1 小数）
  * @param {'encrypt'|'decrypt'} opts.direction 方向
  * @param {number} opts.width     宽（像素）
  * @param {number} opts.height    高（像素）
- * @param {Uint8ClampedArray} opts.pixels RGBA 缓冲
+ * @param {Uint8ClampedArray} opts.pixels RGBA 缓冲（长度 = width*height*4）
+ * @param {object} [opts.variants] 兼容性变体（见 variants.js，默认用当前默认值）
  * @returns {{pixels: Uint8ClampedArray, width: number, height: number}}
  */
-export function processPixels(opts) {
-  void opts;
-  throw new Error('算法引擎尚未实现（骨架阶段）');
+export function processPixels({ mode, key, direction, width, height, pixels, variants = VARIANTS }) {
+  if (!pixels || pixels.length !== width * height * 4) {
+    throw new Error('像素缓冲长度与尺寸不匹配');
+  }
+  if (direction !== 'encrypt' && direction !== 'decrypt') {
+    throw new Error(`未知方向：${direction}`);
+  }
+
+  switch (mode) {
+    case 'gilbert':
+      return tomatoScramble({ pixels, width, height, direction, rounding: variants.gilbertRounding });
+    case 'b':
+      return blockScramble({
+        pixels,
+        width,
+        height,
+        key,
+        direction,
+        blockSize: BLOCK_SIZE,
+        variant: variants.blockVariant
+      });
+    case 'c':
+      return pixelScramble({ pixels, width, height, key, direction });
+    case 'c2':
+      return rowPixelScramble({ pixels, width, height, key, direction });
+    case 'pe1':
+      return rowLogistic({ pixels, width, height, key, direction, chaining: variants.pe1Chaining });
+    case 'pe2':
+      return rowColumnLogistic({ pixels, width, height, key, direction });
+    default:
+      throw new Error(`未知模式：${mode}`);
+  }
 }
 
 /**
- * 计算某模式处理后的输出尺寸（方块模式会填充到 32 的倍数）
- * @param {string} mode
- * @param {number} width
- * @param {number} height
+ * 计算处理后的输出尺寸（仅方块模式会填充到 32 的倍数，且不裁剪回原尺寸 —— 与手机版一致）
  * @returns {{width: number, height: number, padded: boolean}}
  */
-export function outputSize(mode, width, height) {
-  void mode;
+export function outputSize(mode, width, height, blockSize = BLOCK_SIZE) {
+  if (mode === 'b') {
+    const w = Math.ceil(width / blockSize) * blockSize;
+    const h = Math.ceil(height / blockSize) * blockSize;
+    return { width: w, height: h, padded: w !== width || h !== height };
+  }
   return { width, height, padded: false };
+}
+
+/**
+ * 校验密钥是否符合该模式要求（规则与手机版一致）
+ * @returns {{ok: boolean, message: string}}
+ */
+export function validateKey(mode, key) {
+  switch (mode) {
+    case 'gilbert':
+      return { ok: true, message: '该模式不需要密钥' };
+    case 'b':
+    case 'c':
+    case 'c2':
+      return { ok: typeof key === 'string', message: '请输入字符串密钥' };
+    case 'pe1':
+    case 'pe2': {
+      const v = Number(key);
+      if (!Number.isFinite(v) || v <= 0 || v >= 1) {
+        return { ok: false, message: '密钥无效或格式错误：请输入 0 到 1 之间的小数' };
+      }
+      return { ok: true, message: '请输入 0 到 1 之间的小数' };
+    }
+    default:
+      return { ok: false, message: `未知处理模式：${mode}` };
+  }
 }

@@ -38,7 +38,8 @@
 - Node 环境：`.tools/node/node.exe`（便携版 v22.20.0，不进 git；命令行里先把 `.tools/node` 加入 PATH）。
 - 安装依赖：`cd app` → `npm install`（npm registry 用 `https://registry.npmmirror.com`；Electron 二进制需设 `ELECTRON_MIRROR=https://registry.npmmirror.com/-/binary/electron/`）。
 - 启动调试：`cd app` → `npm start`。
-- 冒烟自检：`cd app` → `.\node_modules\electron\dist\electron.exe . --smoke-test`（输出 `SMOKE_TEST_OK options=6 …` 即界面框架正常）。
+- 算法测试：`cd app` → `npm test`（55 项：MD5 对照、洗牌、Gilbert 覆盖、六模式往返、填充规则、密钥校验）。
+- 冒烟自检：`cd app` → `.\node_modules\electron\dist\electron.exe . --smoke-test`（输出 `SMOKE_TEST_OK tools=1 options=6 …` 即界面框架正常）。
 - 打包免安装版：`待定`（打包脚本尚未实现，实现后补全）。
 
 ## 改动与提交

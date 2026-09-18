@@ -7,7 +7,8 @@
   "private": true,
   "license": "UNLICENSED",
   "scripts": {
-    "start": "electron ."
+    "start": "electron .",
+    "test": "node tests/engine.test.mjs"
   },
   "devDependencies": {
     "electron": "^44.4.2"
