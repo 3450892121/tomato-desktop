@@ -246,7 +246,12 @@ const PDF_TEST_SCRIPT = `
 
     // 界面接线冒烟：切到 PDF 工具，检查注册、挂载与方向切换；最后切回图片混淆
     await step('ui', async () => {
-      const navItem = [...document.querySelectorAll('#toolNav .tool-item')].find((b) => b.dataset.toolId === 'pdf-convert');
+      // 等工具列表渲染出来再点（窗口刚打开时列表可能还没渲染，避免误报「未出现」）
+      let navItem = null;
+      for (let i = 0; i < 30 && !navItem; i++) {
+        navItem = [...document.querySelectorAll('#toolNav .tool-item')].find((b) => b.dataset.toolId === 'pdf-convert');
+        if (!navItem) await new Promise((r) => setTimeout(r, 100));
+      }
       if (!navItem) throw new Error('左侧未出现「PDF 转格式」');
       navItem.click();
       await new Promise((r) => setTimeout(r, 400));

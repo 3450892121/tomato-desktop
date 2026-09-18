@@ -6,6 +6,7 @@ export default {
   id: 'obfuscate',
   name: '图片混淆',
   icon: '🍅',
+  group: 'image', // 左侧分组：image 图片 / video 视频 / doc 文档（见 shell/registry.js 的 GROUPS）
   order: 10,
   styles: ['../tools/obfuscate/styles.css'], // 相对 src/shell/index.html
   mount,

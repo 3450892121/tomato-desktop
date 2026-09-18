@@ -6,6 +6,7 @@ export default {
   id: 'img-convert',
   name: '图片格式转换',
   icon: '🔄',
+  group: 'image', // 左侧分组：图片
   order: 40,
   styles: ['../tools/convert/styles.css'],
   mount,

@@ -9,7 +9,17 @@ import imgConvert from '../tools/convert/index.js';
 import videoConvert from '../tools/video-convert/index.js';
 import sticker from '../tools/sticker/index.js';
 
-/** 所有工具（按 order 升序显示在左侧列表） */
+/**
+ * 左侧导航分组（按此顺序显示；工具声明里的 group 对应这里的 id）。
+ * 分组的目的：让同类工具聚在一起、更好找（用户要求：图片一类、视频一类）。
+ */
+export const GROUPS = [
+  { id: 'image', name: '图片' },
+  { id: 'video', name: '视频' },
+  { id: 'doc', name: '文档' }
+];
+
+/** 所有工具（左侧按 GROUPS 分组显示，组内按 order 升序） */
 export const TOOLS = [
   obfuscate,
   pdfConvert,

@@ -154,8 +154,15 @@ async function runPdfUiTest(win) {
     await wait(120);
   };
 
-  // 0) 切到 PDF 工具
-  await evalJs(`[...document.querySelectorAll('#toolNav .tool-item')].find((b) => b.dataset.toolId === 'pdf-convert').click()`);
+  // 0) 切到 PDF 工具（等工具列表渲染出来再点，避免窗口刚打开时的渲染竞态）
+  await evalJs(`(async () => {
+    for (let i = 0; i < 30; i++) {
+      const btn = [...document.querySelectorAll('#toolNav .tool-item')].find((b) => b.dataset.toolId === 'pdf-convert');
+      if (btn) { btn.click(); return true; }
+      await new Promise((r) => setTimeout(r, 100));
+    }
+    throw new Error('左侧工具列表里没有找到 PDF 工具');
+  })()`);
   await wait(500);
   await shot('p01-打开PDF工具');
   result.steps.initialStatus = await status();

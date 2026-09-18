@@ -5,7 +5,8 @@ export default {
   id: 'compress',
   name: '图片压缩',
   icon: '🗜️',
-  order: 30, // 图片混淆 10 / PDF 20 / 压缩 30 / 变清晰 35 / 格式转换 40 / 视频 60 / 动图 65
+  group: 'image', // 左侧分组：图片
+  order: 30, // 组内排序：图片压缩 30 / 变清晰 35 / 格式转换 40
   styles: ['../tools/compress/styles.css'],
   mount,
   unmount

@@ -171,7 +171,9 @@ export function videoToApngArgs(o = {}) {
   const fps = o.fps || 15;
   const size = fitSizeByWidth(o.srcW, o.srcH, o.width || 0);
   const vf = size ? `scale=${size.w}:${size.h}:flags=lanczos,fps=${fps}` : `fps=${fps}`;
-  return ['-c:v', 'apng', '-plays', String(o.loop === 1 ? 1 : 0), '-vf', vf];
+  // 注意：APNG 按惯例使用 .png 后缀，必须显式指定 `-f apng`，
+  //      否则 ffmpeg 会按扩展名推断成单帧 image2 输出并失败（实测退出码 -22）。
+  return ['-c:v', 'apng', '-plays', String(o.loop === 1 ? 1 : 0), '-f', 'apng', '-vf', vf];
 }
 
 /** 动图/视频 → 通用视频（GIF 等无音轨输入用；尺寸偶数化 + yuv420p） */

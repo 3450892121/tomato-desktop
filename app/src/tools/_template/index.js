@@ -6,7 +6,8 @@ export default {
   id: 'example',        // ★ 唯一标识：英文小写（如 compress、pdf-convert）
   name: '示例工具',      // ★ 左侧列表显示名（给用户看的中文名）
   icon: '🧩',           // ★ 列表图标（emoji 即可）
-  order: 99,            // ★ 排序：数字小的排前面（图片混淆是 10）
+  group: 'other',       // ★ 左侧分组：image（图片）/ video（视频）/ doc（文档）；未声明会归入「其它」
+  order: 99,            // ★ 组内排序：数字小的排前面（图片混淆是 10）
   styles: ['../tools/example/styles.css'], // ★ 改成你自己的路径；没有样式文件就删掉这行
   mount,
   unmount

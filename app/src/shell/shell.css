@@ -70,6 +70,17 @@ html, body {
 }
 .tool-item-icon { flex: none; font-size: var(--font-size-lg); }
 
+/* 工具分组小标题（图片 / 视频 / 文档）—— 让同类工具聚在一起，方便找 */
+.tool-group-title {
+  padding: var(--space-2) var(--space-3) 0;
+  font-size: var(--font-size-xs);
+  font-weight: 600;
+  color: var(--color-text-secondary);
+  letter-spacing: 0.06em;
+  user-select: none;
+}
+.tool-group-title:first-child { padding-top: var(--space-1); }
+
 .sidebar-footer {
   display: flex;
   flex-direction: column;

@@ -1,5 +1,5 @@
 // 工具箱框架：左侧工具列表渲染、工具挂载/卸载、通用能力上下文（ctx）、设置与帮助弹窗
-import { TOOLS } from './registry.js';
+import { TOOLS, GROUPS } from './registry.js';
 import * as settings from '../shared/settings.js';
 
 const els = {
@@ -105,16 +105,39 @@ function loadToolStyles(paths) {
   }
 }
 
+/** 生成一个工具按钮（左侧列表项） */
+function createToolButton(tool) {
+  const btn = document.createElement('button');
+  btn.className = 'tool-item' + (activeTool && tool.id === activeTool.id ? ' is-active' : '');
+  btn.dataset.toolId = tool.id;
+  btn.innerHTML = `<span class="tool-item-icon">${tool.icon || '🔧'}</span><span>${tool.name}</span>`;
+  btn.addEventListener('click', () => switchTool(tool.id));
+  return btn;
+}
+
+/**
+ * 渲染左侧工具列表：按分组显示（图片 / 视频 / 文档），组内按 order 升序。
+ * 容错：未声明 group 的工具归入末尾「其它」组，保证以后新增工具时忘记写 group 也能正常显示。
+ */
 function renderNav() {
   els.nav.innerHTML = '';
-  for (const tool of TOOLS) {
-    const btn = document.createElement('button');
-    btn.className = 'tool-item' + (activeTool && tool.id === activeTool.id ? ' is-active' : '');
-    btn.dataset.toolId = tool.id;
-    btn.innerHTML = `<span class="tool-item-icon">${tool.icon || '🔧'}</span><span>${tool.name}</span>`;
-    btn.addEventListener('click', () => switchTool(tool.id));
-    els.nav.appendChild(btn);
+  const sorted = [...TOOLS].sort((a, b) => (a.order || 0) - (b.order || 0));
+  const others = sorted.filter((t) => !GROUPS.some((g) => g.id === t.group));
+
+  const renderGroup = (group, tools) => {
+    if (tools.length === 0) return; // 空分组不显示
+    const title = document.createElement('div');
+    title.className = 'tool-group-title';
+    title.dataset.groupId = group.id;
+    title.textContent = group.name;
+    els.nav.appendChild(title);
+    for (const tool of tools) els.nav.appendChild(createToolButton(tool));
+  };
+
+  for (const group of GROUPS) {
+    renderGroup(group, sorted.filter((t) => t.group === group.id));
   }
+  renderGroup({ id: 'other', name: '其它' }, others);
 }
 
 /** 切换到指定工具：先卸载旧工具，再加载样式并挂载新工具 */
@@ -353,4 +376,8 @@ async function init() {
   }
 }
 
+// 先把左侧工具列表渲染出来，再等设置加载后切到第一个工具。
+// 背景：设置读取是异步的，原先要等它回来才渲染列表，窗口刚打开时会有一瞬空白侧栏
+//      （自动化测试也可能在这一瞬点不到工具）。列表渲染不依赖设置，提前渲染即可。
+renderNav();
 init();

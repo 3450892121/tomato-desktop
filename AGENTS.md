@@ -24,7 +24,8 @@
 
 ## 新增工具约定（工具箱架构）
 - 新功能一律做成 `src/tools/<工具名>/` 下的独立工具，禁止写进既有工具或 shell。
-- 接入步骤：复制 `src/tools/_template/` → 改 `id`/`name`/`order` → 在 `src/shell/registry.js` 加一行；详见 `docs/新增工具指南.md`。
+- 接入步骤：复制 `src/tools/_template/` → 改 `id`/`name`/`icon`/`group`/`order` → 在 `src/shell/registry.js` 加一行；详见 `docs/新增工具指南.md`。
+- 左侧导航按分组显示（`group`: image 图片 / video 视频 / doc 文档，定义在 `shell/registry.js` 的 `GROUPS`）：同类工具要放同一组，保证用户好找；未声明 `group` 会归入末尾「其它」。
 - 工具之间禁止互相 import；可复用的能力放 `src/shared/`。
 - 工具界面样式只用自己的 `styles.css`，颜色/字号/间距必须引用 `shell/theme.css` 的变量。
 

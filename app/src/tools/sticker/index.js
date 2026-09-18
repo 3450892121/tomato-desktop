@@ -6,6 +6,7 @@ export default {
   id: 'sticker',
   name: '动图与视频互转',
   icon: '🎞️',
+  group: 'video', // 左侧分组：视频
   order: 65,
   styles: ['../tools/sticker/styles.css'],
   mount,
