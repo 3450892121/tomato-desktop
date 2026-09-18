@@ -69,9 +69,9 @@ async function runMediaUiTest(win) {
 
   await fs.mkdir(TEST_DIR, { recursive: true });
 
-  // —— 清理上次夹具（保留其它测试的照片/pdf，避免互相影响） ——
+  // —— 清理上次夹具（图片夹具也一起清：本测试只认「测试原图C」，历次副本会让列表膨胀） ——
   for (const f of await fs.readdir(TEST_DIR)) {
-    if (/^测试视频|^测试动图|^测试原图C/.test(f)) {
+    if (/^测试视频|^测试动图|^测试原图/.test(f)) {
       await fs.rm(path.join(TEST_DIR, f), { recursive: true, force: true });
     }
   }
@@ -155,7 +155,7 @@ async function runMediaUiTest(win) {
   }
 
   /** 跑一个工具：切过去 → 添加 → 运行 → 校验新增产物 */
-  async function runTool(name, { expectMedia = false, timeoutMs = 180000 } = {}) {
+  async function runTool(name, { expectMedia = false, timeoutMs = 180000, setup = '' } = {}) {
     const entry = { tool: name };
     const before = new Set(await fs.readdir(TEST_DIR));
 
@@ -169,6 +169,10 @@ async function runMediaUiTest(win) {
 
     entry.added = await clickSel('[data-add]');
     await wait(1800); // 等列表加载（含解码/探测）
+    if (setup) {
+      entry.setup = await evalJs(setup);
+      await wait(300);
+    }
     entry.addStatus = await getStatus();
 
     entry.ran = await clickSel('[data-run]');
@@ -202,9 +206,13 @@ async function runMediaUiTest(win) {
   await shot('01-媒体测试起点');
 
   // —— 图片类三个工具（无需 ffmpeg） ——
-  await runTool('图片压缩', { timeoutMs: 120000 });
-  await runTool('图片变清晰', { timeoutMs: 120000 });
-  await runTool('图片格式转换', { timeoutMs: 120000 });
+  // 压缩工具先切成 WebP：默认「保持原格式」在 PNG 上几乎压不动，切 WebP 才能体现压缩效果
+  await runTool('图片压缩', {
+    timeoutMs: 120000,
+    setup: `(() => { const s = document.querySelector('#cmpFormat'); if (!s) return false; s.value = 'webp'; s.dispatchEvent(new Event('change')); return true; })()`
+  });
+  await runTool('图片变清晰', { timeoutMs: 180000 });
+  await runTool('图片格式转换', { timeoutMs: 180000 });
 
   // —— 视频类两个工具（需要 ffmpeg 加装包） ——
   if (ffmpeg) {

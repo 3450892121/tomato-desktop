@@ -1,0 +1,125 @@
+/* ============================================================
+   工具「图片格式转换」的专属样式
+   只使用 shell/theme.css 的令牌；通用组件（按钮/卡片/输入）来自 shell.css
+   ============================================================ */
+
+.conv-tool {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  height: 100%;
+  min-height: 0;
+}
+
+/* —— 顶部：格式与选项 —— */
+.conv-controls {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  flex: none;
+  padding: var(--space-3) var(--space-4);
+}
+.conv-params {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) var(--space-4);
+}
+.conv-param { display: flex; align-items: center; gap: var(--space-2); }
+.conv-param .input, .conv-param .select { min-height: 32px; }
+.conv-w-num { max-width: 96px; }
+.conv-note { font-size: var(--font-size-xs); color: var(--color-text-secondary); }
+.conv-note.is-ok { color: var(--color-success); }
+.conv-note.is-warn { color: var(--color-warning); }
+
+/* —— 中部：文件区 —— */
+.conv-files {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 200px;
+  padding: var(--space-3);
+  overflow: hidden;
+  background: var(--color-surface-soft);
+}
+.conv-drop {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  flex: 1 1 auto;
+}
+.conv-hint { font-size: var(--font-size-xs); color: var(--color-text-secondary); }
+
+.conv-list-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  flex: 1 1 auto;
+  min-height: 0;
+}
+.conv-list-head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex: none;
+  font-size: var(--font-size-xs);
+  color: var(--color-text-secondary);
+}
+.conv-list-head .btn { min-height: 28px; padding: 0 var(--space-3); font-size: var(--font-size-xs); }
+.conv-spacer { flex: 1 1 auto; }
+
+.conv-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  overflow-y: auto;
+}
+.conv-item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-1) var(--space-2);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+}
+.conv-item-main { flex: 1 1 auto; min-width: 0; }
+.conv-item-name {
+  font-size: var(--font-size-sm);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.conv-item-meta { font-size: var(--font-size-xs); color: var(--color-text-secondary); }
+.conv-item-meta.is-error { color: var(--color-danger); }
+.conv-item-actions { display: flex; gap: var(--space-1); flex: none; }
+.conv-icon-btn {
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-xs);
+  cursor: pointer;
+}
+.conv-icon-btn:hover { background: var(--color-surface-soft); }
+
+/* —— 底部：操作与结果 —— */
+.conv-actions { display: flex; align-items: center; gap: var(--space-2); flex: none; }
+.conv-actions .btn-run { min-width: 140px; }
+.conv-result {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-size: var(--font-size-xs);
+  color: var(--color-text-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

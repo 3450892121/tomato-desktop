@@ -43,14 +43,17 @@ if (uiTest || pdfUiTest || mediaUiTest) {
 /** 是否处于任一自动测试模式：此时系统对话框一律换成本地测试文件（避免测试卡在弹窗上） */
 const testMode = () => uiTest || pdfUiTest || mediaTest || mediaUiTest;
 
-/** 自动测试模式下：从测试目录取指定扩展名的文件（对话框桩用） */
-async function testDirFiles(exts, { startWith } = {}) {
+/** 自动测试模式下：从测试目录取指定扩展名的文件（对话框桩用；扩展名带不带点都能匹配） */
+async function testDirFiles(exts, { startWith, exact } = {}) {
   const { TEST_DIR } = require('./tests/ui-test.js');
-  const set = new Set(exts.map((e) => e.toLowerCase()));
+  const norm = (e) => String(e).toLowerCase().replace(/^\./, '');
+  const set = new Set(exts.map(norm));
   const entries = await fs.readdir(TEST_DIR, { withFileTypes: true }).catch(() => []);
   return entries
-    .filter((e) => e.isFile() && set.has(path.extname(e.name).toLowerCase()))
+    .filter((e) => e.isFile() && set.has(norm(path.extname(e.name))))
     .filter((e) => (startWith ? e.name.startsWith(startWith) : true))
+    // exact：去掉扩展名后完全相等（避免把历次测试留下的 (1)(2) 副本也一起选进来）
+    .filter((e) => (exact ? e.name.replace(/\.[^.]+$/, '') === exact : true))
     .map((e) => path.join(TEST_DIR, e.name))
     .sort();
 }
@@ -730,7 +733,8 @@ const ANIMATED_EXTS = ['gif', 'webp', 'apng'];
 
 // 图片（含 ICO/AVIF/SVG 等扩展名）
 ipcMain.handle('dialog:open-image-any', async () => {
-  if (testMode()) return testDirFiles(IMAGE_ANY_EXTS, { startWith: '测试原图' });
+  // 测试模式只返回固定夹具「测试原图C」：避免把历次测试产生的副本/产物一起选进来（曾导致一次载入上千张）
+  if (testMode()) return testDirFiles(IMAGE_ANY_EXTS, { exact: '测试原图C' });
   const result = await dialog.showOpenDialog(mainWindow, {
     title: '选择图片',
     properties: ['openFile', 'multiSelections'],

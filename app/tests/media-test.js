@@ -123,10 +123,10 @@ async function runMediaTest(win) {
       const { unsharpFromBlurred, sharpnessMetric } = await import('../tools/enhance/core/enhance.js');
       const w = 200, h = 150;
       const px = new Uint8ClampedArray(w * h * 4);
-      // 平滑渐变 + 一点细节（模拟「发虚的照片」）
+      // 细密纹理（模拟「发虚的照片」：有细节但对比被平均掉了）
       for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
         const p = (x + y * w) * 4;
-        const g = 128 + Math.round(60 * Math.sin(x / 23) * Math.cos(y / 17));
+        const g = 128 + Math.round(60 * Math.sin(x / 3.1) * Math.cos(y / 2.7));
         px[p] = g; px[p + 1] = g; px[p + 2] = g; px[p + 3] = 255;
       }
       // 用 3x3 均值模拟「模糊版本」（作为 USM 的输入）
@@ -172,7 +172,8 @@ async function runMediaTest(win) {
           window.desktop.writeFile(${JSON.stringify(path.join(TEST_DIR, 'mt-core.bmp'))}, bmp);
         } else out.bmp = { error: 'encodeBmp 未导出' };
         if (typeof enc.encodeIco === 'function') {
-          const ico = enc.encodeIco([{ size: 32, pngBytes: png }, { size: 16, pngBytes: png }]);
+          // 契约：每一项为 { width, height, bytes }（bytes 为该尺寸的 PNG 数据）
+          const ico = enc.encodeIco([{ width: 32, height: 32, bytes: png }, { width: 16, height: 16, bytes: png }]);
           out.ico = { type: ico[2] | (ico[3] << 8), count: ico[4] | (ico[5] << 8), bytes: ico.length };
           window.desktop.writeFile(${JSON.stringify(path.join(TEST_DIR, 'mt-core.ico'))}, ico);
         } else out.ico = { error: 'encodeIco 未导出' };
@@ -301,6 +302,30 @@ async function runMediaTest(win) {
       for (const [label, script] of stickerCases) {
         result.checks.sticker.conversions.push(await convert(label, script));
       }
+
+      // 动图 WebP 的特殊校验：ffmpeg 6.1 自带的 webp 解复用器不认动画块
+      // （实测对有效动画 WebP 报 "skipping unsupported chunk: ANIM"），故改用内核解码 + 容器块检查。
+      const webpEntry = result.checks.sticker.conversions.find((c) => c.label.includes('webp'));
+      if (webpEntry && webpEntry.result && webpEntry.result.ok) {
+        try {
+          const check = JSON.parse(await evalJs(`(async () => {
+            const bytes = await window.desktop.readFile(${JSON.stringify(webpEntry.result.path)});
+            const u8 = new Uint8Array(bytes);
+            const tag = (o) => String.fromCharCode(u8[o], u8[o + 1], u8[o + 2], u8[o + 3]);
+            const head = new TextDecoder('latin1').decode(u8.slice(0, Math.min(u8.length, 8192)));
+            const bmp = await createImageBitmap(new Blob([bytes], { type: 'image/webp' }));
+            const size = [bmp.width, bmp.height];
+            bmp.close();
+            return JSON.stringify({ riff: tag(0) + tag(8), hasAnim: head.includes('ANIM') && head.includes('ANMF'), size });
+          })()`));
+          webpEntry.webpCheck = check;
+          webpEntry.ok = check.riff === 'RIFFWEBP' && check.hasAnim && check.size[0] > 0;
+        } catch (err) {
+          webpEntry.ok = false;
+          webpEntry.webpError = err.message;
+        }
+      }
+
       result.checks.sticker.ok = result.checks.sticker.conversions.length === 4
         && result.checks.sticker.conversions.every((c) => c.ok);
     } else {

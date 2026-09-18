@@ -4,10 +4,18 @@
 import obfuscate from '../tools/obfuscate/index.js';
 import pdfConvert from '../tools/pdf-convert/index.js';
 import compress from '../tools/compress/index.js';
+import enhance from '../tools/enhance/index.js';
+import imgConvert from '../tools/convert/index.js';
+import videoConvert from '../tools/video-convert/index.js';
+import sticker from '../tools/sticker/index.js';
 
 /** 所有工具（按 order 升序显示在左侧列表） */
 export const TOOLS = [
   obfuscate,
   pdfConvert,
-  compress
+  compress,
+  enhance,
+  imgConvert,
+  videoConvert,
+  sticker
 ];

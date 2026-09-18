@@ -1,0 +1,444 @@
+// 工具：图片格式转换 —— 界面与交互
+// 分层：本文件只做界面与流程编排；各格式的编码实现与转换规则在 core/（encoders.js / convert.js），
+//       图片解码复用 shared/imageio.js，TIFF/GIF/AVIF 经 shared/ffmpeg.js 调主进程 ffmpeg。
+import { decodeImageFromBytes, encodeImageToBytes } from '../../shared/imageio.js';
+import { ffmpegStatus, transformImageBytes } from '../../shared/ffmpeg.js';
+import {
+  TARGETS, INPUT_EXTS, UNSUPPORTED_EXTS, DECODE_FAIL_MESSAGE,
+  targetInfo, needsFfmpeg, hasQuality, defaultQuality,
+  fitLongEdge, flattenOnColor, resizePixels, encodeWebp, encodeIcon, encodeBmp, ffmpegArgs, outputBaseName
+} from './core/convert.js';
+
+const MARKUP = `
+  <div class="conv-tool">
+    <section class="card conv-controls">
+      <div class="control-row">
+        <label class="control-label" for="convFormat">输出格式:</label>
+        <select id="convFormat" class="select"></select>
+        <span class="control-hint" id="convFormatHint"></span>
+      </div>
+      <div class="conv-params">
+        <div class="conv-param" id="convQualityWrap">
+          <span class="control-label">画质</span>
+          <input class="input conv-w-num" id="convQuality" type="number" min="1" max="100" step="1" value="90" />
+        </div>
+        <div class="conv-param">
+          <span class="control-label">最长边</span>
+          <input class="input conv-w-num" id="convMaxEdge" type="number" min="1" step="1" placeholder="留空 = 不变" />
+          <span class="control-hint">只缩小不放大</span>
+        </div>
+        <div class="conv-param" id="convBgWrap" hidden>
+          <span class="control-label">透明底色</span>
+          <select class="select" id="convBg">
+            <option value="white">白</option>
+            <option value="black">黑</option>
+          </select>
+          <span class="control-hint">JPG 不支持透明，透明像素会填成该底色</span>
+        </div>
+      </div>
+      <div class="conv-note" id="convFfmpegNote">正在检测 ffmpeg…</div>
+    </section>
+
+    <main class="card conv-files" id="convFiles">
+      <div class="conv-drop" id="convDrop">
+        <button class="btn btn-primary btn-lg" id="convAddBtn" data-add="1">添加图片</button>
+        <div class="conv-hint">也可以把图片或整个文件夹拖进窗口；支持多选（含 ICO / AVIF / SVG）</div>
+      </div>
+      <div class="conv-list-wrap" id="convListWrap" hidden>
+        <div class="conv-list-head">
+          <span id="convListTitle">图片</span>
+          <span class="conv-spacer"></span>
+          <span id="convListCount"></span>
+          <button class="btn btn-ghost" id="convAddMore" type="button">＋ 继续添加</button>
+        </div>
+        <ul class="conv-list" id="convList"></ul>
+      </div>
+    </main>
+
+    <footer class="conv-actions">
+      <button class="btn btn-primary btn-run" id="convRunBtn" data-run="1">开始转换</button>
+      <button class="btn btn-plain" id="convClearBtn" data-clear="1">清空</button>
+      <div class="conv-result" id="convResult"></div>
+    </footer>
+  </div>
+`;
+
+let state = null;
+
+/** 统一收集监听器，unmount 时逐一摘掉 */
+function on(el, type, handler) {
+  el.addEventListener(type, handler);
+  state.listeners.push([el, type, handler]);
+}
+
+const nextFrame = () => new Promise((resolve) => requestAnimationFrame(() => resolve()));
+
+/** 字节数 → 人类可读（如 1.2 MB） */
+function formatBytes(n) {
+  const bytes = Number(n) || 0;
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
+}
+
+/** 体积变化百分比文本（输出比输入小 → 负数） */
+function sizeDeltaText(before, after) {
+  if (!before) return '';
+  const pct = Math.round((1 - after / before) * 100);
+  return `（${pct > 0 ? '-' : pct < 0 ? '+' : '±'}${Math.abs(pct)}%）`;
+}
+
+// —— 参数区 ——
+
+function updateParams() {
+  const { els } = state;
+  const format = els.format.value;
+  const info = targetInfo(format);
+  els.formatHint.textContent = info.label;
+
+  const showQuality = hasQuality(format);
+  els.qualityWrap.hidden = !showQuality;
+  if (showQuality) els.quality.value = String(defaultQuality(format));
+  els.bgWrap.hidden = format !== 'jpg';
+}
+
+function readParams() {
+  const format = state.els.format.value;
+  const raw = parseInt(state.els.quality.value, 10);
+  const quality = hasQuality(format)
+    ? Math.max(1, Math.min(100, Number.isFinite(raw) ? raw : defaultQuality(format)))
+    : defaultQuality(format);
+  const edge = parseInt(state.els.maxEdge.value, 10);
+  return {
+    format,
+    quality,
+    maxEdge: Number.isFinite(edge) && edge > 0 ? edge : 0,
+    bg: state.els.bg.value === 'black' ? { r: 0, g: 0, b: 0 } : { r: 255, g: 255, b: 255 }
+  };
+}
+
+function updateRunButton() {
+  state.els.runBtn.textContent = state.busy ? '处理中…' : '开始转换';
+  state.els.runBtn.disabled = state.busy;
+}
+
+// —— ffmpeg 加装包状态 ——
+
+function renderFfmpegNote() {
+  const note = state.els.ffmpegNote;
+  if (!note) return;
+  const ff = state.ff;
+  if (ff && ff.found) {
+    const where = ff.where === 'addon' ? '加装包' : '系统安装';
+    note.className = 'conv-note is-ok';
+    note.textContent = `✓ 已检测到 ffmpeg${ff.version ? `（${ff.version}）` : ''}，来源：${where} —— TIFF / GIF / AVIF 输出可用`;
+  } else {
+    note.className = 'conv-note is-warn';
+    note.textContent = '未检测到 ffmpeg：TIFF / GIF / AVIF 输出不可用（其余格式不受影响）；需要时把加装包解压到软件目录的 addons/ffmpeg 后重开本工具。';
+  }
+}
+
+// —— 文件列表 ——
+
+function renderList() {
+  const { els } = state;
+  const files = state.files;
+  els.listWrap.hidden = files.length === 0;
+  els.drop.hidden = files.length > 0;
+  els.listCount.textContent = files.length ? `共 ${files.length} 张` : '';
+  els.list.innerHTML = '';
+
+  files.forEach((f, index) => {
+    const li = document.createElement('li');
+    li.className = 'conv-item';
+
+    const main = document.createElement('div');
+    main.className = 'conv-item-main';
+    const name = document.createElement('div');
+    name.className = 'conv-item-name';
+    name.textContent = f.name;
+    name.title = f.path;
+    const meta = document.createElement('div');
+    meta.className = 'conv-item-meta';
+    meta.textContent = f.result ? f.result.text : `${(f.ext || '').replace('.', '').toUpperCase()} · 待转换`;
+    if (f.result && !f.result.ok) meta.classList.add('is-error');
+    main.appendChild(name);
+    main.appendChild(meta);
+    li.appendChild(main);
+
+    const actions = document.createElement('div');
+    actions.className = 'conv-item-actions';
+    const del = document.createElement('button');
+    del.className = 'conv-icon-btn';
+    del.type = 'button';
+    del.textContent = '×';
+    del.title = '移除';
+    on(del, 'click', () => {
+      state.files.splice(index, 1);
+      renderList();
+    });
+    actions.appendChild(del);
+    li.appendChild(actions);
+
+    els.list.appendChild(li);
+  });
+  updateRunButton();
+}
+
+// —— 添加文件（含文件夹拖入，展开一层） ——
+
+async function addOne(path) {
+  const info = await state.ctx.pathInfo(path);
+  const ext = (info.ext || '').toLowerCase();
+  const bare = ext.replace('.', '');
+  if (UNSUPPORTED_EXTS.includes(bare)) throw new Error(DECODE_FAIL_MESSAGE);
+  if (!INPUT_EXTS.includes(bare)) throw new Error('不是支持的图片格式');
+  if (state.files.some((f) => f.path === path)) return false;
+
+  state.files.push({ path, name: info.name, baseName: info.baseName, dir: info.dir, ext, result: null });
+  return true;
+}
+
+async function addFromPaths(paths) {
+  const failures = [];
+  let added = 0;
+
+  for (const p of paths) {
+    try {
+      const info = await state.ctx.pathInfo(p);
+      if (info.isDirectory) {
+        // 文件夹只展开一层（简单为上，避免误扫整个盘）
+        const list = await state.ctx.listFiles(p, INPUT_EXTS);
+        if (list.length === 0) { failures.push(`${info.name}：文件夹里没有支持的图片`); continue; }
+        for (const sub of list) {
+          try {
+            if (await addOne(sub)) added += 1;
+          } catch (err) {
+            failures.push(`${sub.split(/[\\/]/).pop()}：${err.message}`);
+          }
+        }
+      } else if (await addOne(p)) {
+        added += 1;
+      }
+    } catch (err) {
+      failures.push(`${p.split(/[\\/]/).pop()}：${err.message}`);
+    }
+  }
+
+  renderList();
+  if (added > 0) state.ctx.setStatus(`已添加 ${added} 张${failures.length ? `，${failures.length} 张失败` : ''}`);
+  else state.ctx.setStatus(failures.length ? `添加失败：${failures[0]}` : '没有可添加的图片');
+}
+
+async function openDialog() {
+  const paths = await state.ctx.openImageAny();
+  if (paths && paths.length > 0) await addFromPaths(paths);
+}
+
+async function onDrop(event) {
+  event.preventDefault();
+  const dropped = Array.from(event.dataTransfer ? event.dataTransfer.files : []);
+  const paths = [];
+  for (const file of dropped) {
+    const p = state.ctx.getPathForFile(file);
+    if (p) paths.push(p);
+  }
+  if (paths.length > 0) await addFromPaths(paths);
+}
+
+// —— 批量转换 ——
+
+/** 把一张图编码成目标格式（失败时抛出带原因的 Error） */
+async function encodeTo(params, pixels, width, height) {
+  const { format, quality } = params;
+  if (format === 'png') return encodeImageToBytes(pixels, width, height, { format: 'png' });
+  if (format === 'jpg') {
+    const flat = flattenOnColor(pixels, params.bg);
+    return encodeImageToBytes(flat, width, height, { format: 'jpg', quality });
+  }
+  if (format === 'webp') return encodeWebp(pixels, width, height, quality);
+  if (format === 'bmp') return encodeBmp(pixels, width, height);
+  if (format === 'ico') return encodeIcon(pixels, width, height);
+
+  // TIFF / GIF / AVIF：先出 PNG 字节，再交给包内 ffmpeg
+  const pngBytes = await encodeImageToBytes(pixels, width, height, { format: 'png' });
+  const res = await transformImageBytes(pngBytes, targetInfo(format).ext, ffmpegArgs(format, quality));
+  if (!res || !res.ok) throw new Error((res && res.message) || 'ffmpeg 转换失败');
+  return res.bytes;
+}
+
+async function run() {
+  if (state.busy) return;
+  if (state.files.length === 0) {
+    state.ctx.setStatus('请先添加图片');
+    return;
+  }
+  const params = readParams();
+  const info = targetInfo(params.format);
+  if (needsFfmpeg(params.format) && !(state.ff && state.ff.found)) {
+    state.ctx.setStatus(`${info.label} 需要 ffmpeg 加装包（把 addons/ffmpeg 放进软件目录后重开本工具）；也可先换成 PNG / JPG / WebP / BMP / ICO`);
+    return;
+  }
+
+  const outputDir = state.ctx.settings.getSettings().outputDir || undefined;
+  const session = state; // 中途切走工具时 state 会被置空，用它判断本趟任务是否还活着
+  state.busy = true;
+  updateRunButton();
+  const t0 = Date.now();
+  let done = 0;
+  let failed = 0;
+  let lastError = '';
+  let lastPath = '';
+
+  try {
+    for (let i = 0; i < state.files.length; i += 1) {
+      if (state !== session) return;
+      const f = state.files[i];
+      state.ctx.showProgress(`转换 ${i + 1}/${state.files.length}：${f.name}`, (i / state.files.length) * 100);
+      await nextFrame();
+      try {
+        const bytes = await state.ctx.readFile(f.path);
+        let img;
+        try {
+          img = await decodeImageFromBytes(bytes);
+        } catch {
+          throw new Error(DECODE_FAIL_MESSAGE);
+        }
+
+        let pixels = img.pixels;
+        let width = img.width;
+        let height = img.height;
+        const fit = fitLongEdge(width, height, params.maxEdge);
+        if (fit.scaled) {
+          state.ctx.showProgress(`${f.name}：缩放到 ${fit.width} × ${fit.height}…`, ((i + 0.4) / state.files.length) * 100);
+          await nextFrame();
+          pixels = resizePixels(pixels, width, height, fit.width, fit.height);
+          width = fit.width;
+          height = fit.height;
+        }
+
+        state.ctx.showProgress(`${f.name}：正在编码 ${params.format.toUpperCase()}…`, ((i + 0.6) / state.files.length) * 100);
+        await nextFrame();
+        const outBytes = await encodeTo(params, pixels, width, height);
+        const outPath = await state.ctx.saveNextTo({
+          sourcePath: f.path,
+          targetDir: outputDir,
+          baseName: outputBaseName(f.baseName, params.format),
+          ext: info.ext,
+          bytes: outBytes
+        });
+
+        const inSize = bytes.byteLength;
+        const outSize = outBytes.byteLength;
+        const sizeNote = fit.scaled ? `（${img.width}×${img.height} → ${width}×${height}）` : '';
+        f.result = {
+          ok: true,
+          text: `${(f.ext || '').replace('.', '').toUpperCase()} → ${params.format.toUpperCase()} · ${formatBytes(inSize)} → ${formatBytes(outSize)}${sizeDeltaText(inSize, outSize)}${sizeNote}`,
+          outPath
+        };
+        lastPath = outPath;
+        done += 1;
+        state.ctx.setInfo({ width, height, ms: Date.now() - t0 });
+      } catch (err) {
+        failed += 1;
+        lastError = err.message;
+        f.result = { ok: false, text: `失败：${err.message}` };
+        console.error('[img-convert] 转换失败', f.name, err);
+      }
+      renderList();
+    }
+  } finally {
+    if (state === session) {
+      state.ctx.hideProgress();
+      state.busy = false;
+      updateRunButton();
+    }
+  }
+
+  if (state !== session) return;
+  state.ctx.setStatus(`转换完成：成功 ${done} 个${failed ? `，失败 ${failed} 个（${lastError}）` : ''}`);
+  state.els.result.textContent = lastPath ? `输出：${lastPath}` : '';
+}
+
+// —— 生命周期 ——
+
+export function mount(container, ctx) {
+  state = {
+    ctx,
+    container,
+    listeners: [],
+    els: null,
+    files: [],
+    ff: null,
+    busy: false
+  };
+  container.innerHTML = MARKUP;
+
+  const els = {
+    format: container.querySelector('#convFormat'),
+    formatHint: container.querySelector('#convFormatHint'),
+    qualityWrap: container.querySelector('#convQualityWrap'),
+    quality: container.querySelector('#convQuality'),
+    maxEdge: container.querySelector('#convMaxEdge'),
+    bgWrap: container.querySelector('#convBgWrap'),
+    bg: container.querySelector('#convBg'),
+    ffmpegNote: container.querySelector('#convFfmpegNote'),
+    drop: container.querySelector('#convDrop'),
+    addBtn: container.querySelector('#convAddBtn'),
+    addMore: container.querySelector('#convAddMore'),
+    listWrap: container.querySelector('#convListWrap'),
+    list: container.querySelector('#convList'),
+    listCount: container.querySelector('#convListCount'),
+    runBtn: container.querySelector('#convRunBtn'),
+    clearBtn: container.querySelector('#convClearBtn'),
+    result: container.querySelector('#convResult'),
+    root: container.querySelector('.conv-tool')
+  };
+  state.els = els;
+
+  els.format.innerHTML = '';
+  for (const t of TARGETS) {
+    const opt = document.createElement('option');
+    opt.value = t.value;
+    opt.textContent = t.label;
+    els.format.appendChild(opt);
+  }
+
+  on(els.format, 'change', updateParams);
+  on(els.addBtn, 'click', openDialog);
+  on(els.addMore, 'click', openDialog);
+  on(els.runBtn, 'click', run);
+  on(els.clearBtn, 'click', () => {
+    state.files = [];
+    renderList();
+    state.els.result.textContent = '';
+    state.ctx.setStatus('已清空图片列表');
+  });
+  on(els.root, 'dragover', (event) => event.preventDefault());
+  on(els.root, 'drop', onDrop);
+
+  updateParams();
+  renderList();
+  updateRunButton();
+  ctx.setStatus('图片格式转换：添加图片 → 选输出格式 → 点「开始转换」；产物与原文件同目录（重名自动加序号）');
+
+  ffmpegStatus()
+    .then((s) => {
+      if (!state) return;
+      state.ff = s;
+      renderFfmpegNote();
+    })
+    .catch(() => {
+      if (!state) return;
+      state.ff = { found: false };
+      renderFfmpegNote();
+    });
+}
+
+export function unmount() {
+  if (!state) return;
+  for (const [el, type, handler] of state.listeners) {
+    el.removeEventListener(type, handler);
+  }
+  state = null;
+}

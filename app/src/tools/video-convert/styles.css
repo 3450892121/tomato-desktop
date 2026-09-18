@@ -1,0 +1,142 @@
+/* ============================================================
+   工具「视频格式转换」的专属样式
+   只使用 shell/theme.css 的令牌；通用组件（按钮/卡片/输入）来自 shell.css
+   ============================================================ */
+
+.vc-tool {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  height: 100%;
+  min-height: 0;
+}
+
+/* 顶部：参数与 ffmpeg 状态 */
+.vc-controls {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  flex: none;
+  padding: var(--space-3) var(--space-4);
+}
+.vc-params {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) var(--space-4);
+}
+.vc-param { display: flex; align-items: center; gap: var(--space-2); }
+.vc-param .select { min-height: 32px; min-width: 180px; }
+.vc-check {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--font-size-sm);
+  color: var(--color-text-secondary);
+  cursor: pointer;
+}
+.vc-note { font-size: var(--font-size-xs); color: var(--color-text-secondary); }
+.vc-note.is-ok { color: var(--color-success); }
+.vc-note.is-warn { color: var(--color-warning); }
+
+/* 中部：文件区 */
+.vc-files {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 180px;
+  padding: var(--space-3);
+  overflow: hidden;
+  background: var(--color-surface-soft);
+}
+.vc-drop {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  flex: 1 1 auto;
+}
+.vc-drop-hint { font-size: var(--font-size-xs); color: var(--color-text-secondary); }
+
+.vc-list-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  flex: 1 1 auto;
+  min-height: 0;
+}
+.vc-list-head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex: none;
+  font-size: var(--font-size-xs);
+  color: var(--color-text-secondary);
+}
+.vc-list-head .btn { min-height: 28px; padding: 0 var(--space-3); font-size: var(--font-size-xs); }
+.vc-spacer { flex: 1 1 auto; }
+
+.vc-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  overflow-y: auto;
+}
+.vc-item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-1) var(--space-2);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+}
+.vc-item-main { flex: 1 1 auto; min-width: 0; }
+.vc-item-name {
+  font-size: var(--font-size-sm);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.vc-item-meta { font-size: var(--font-size-xs); color: var(--color-text-secondary); }
+.vc-item-result {
+  font-size: var(--font-size-xs);
+  color: var(--color-text-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.vc-item-result.is-ok { color: var(--color-success); }
+.vc-item-result.is-fail { color: var(--color-danger); }
+.vc-item-actions { display: flex; gap: var(--space-1); flex: none; }
+.vc-icon-btn {
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-xs);
+  cursor: pointer;
+}
+.vc-icon-btn:hover { background: var(--color-surface-soft); }
+.vc-icon-btn:disabled { opacity: 0.4; cursor: default; }
+
+/* 底部：操作与结果 */
+.vc-actions { display: flex; align-items: center; gap: var(--space-2); flex: none; }
+.vc-actions .vc-run { min-width: 140px; }
+.vc-result {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-size: var(--font-size-xs);
+  color: var(--color-text-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

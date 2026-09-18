@@ -3,21 +3,27 @@
 把安卓 App「番茄图片混淆」（`番茄图片混淆.apk`）的图片混淆 / 解混淆能力完整搬到 Windows 电脑上：
 **免安装绿色版、纯离线、与手机版互相兼容**，给身边人用的傻瓜化工具。
 
-软件按「工具箱」形态搭建：左侧列出所有工具，右侧是当前工具界面；「图片混淆」是第一个工具，
-后续新功能（图片压缩、PDF、视频提取等）按同一套模板低成本接入（见 `docs/新增工具指南.md`）。
+软件按「工具箱」形态搭建：左侧列出所有工具，右侧是当前工具界面；现有 7 个工具（图片混淆、PDF 转格式、图片压缩、图片变清晰、图片格式转换、视频格式转换、动图与视频互转），
+新功能按同一套模板低成本接入（见 `docs/新增工具指南.md`）。
 
 ---
 
-## 当前状态（v1.1.0）
+## 当前状态（v1.3.0）
 
 | 项 | 状态 |
 |---|---|
 | 六大模式混淆 / 解混淆 | ✅ 可用（逐像素可逆，自动测试 55/55 通过） |
 | 单张 / 批量 / 拖拽 / 剪贴板 / 保存 | ✅ 可用（界面自动测试 `pass: true`） |
 | 设置面板、内置帮助、使用说明 | ✅ 可用 |
-| **PDF 转格式（新）**：PDF↔图片、图片→PDF、合并/拆分/提取页、Word/Excel→PDF（内置降级） | ✅ 可用（自检 + 界面测试均 `pass: true`，含截图） |
+| **PDF 转格式**：PDF↔图片、图片→PDF、合并/拆分/提取页、Word/Excel→PDF（内置降级） | ✅ 可用（自检 + 界面测试均 `pass: true`，含截图） |
 | PDF → Word / 高保真 Office→PDF（LibreOffice 加装包） | ✅ 已实测，**随主包附带、开箱即用**（docx→PDF 有正文、PDF→Word 产出合法 OOXML） |
-| 版本号可见（左上角徽章 / 窗口标题 / 帮助「关于」） | ✅ 可用（v1.1.0 起随包显示） |
+| **图片压缩（新）**：画质/尺寸/目标大小、批量 | ✅ 可用（自检 `ok:true`；实测 18 KB → 7 KB / -61%） |
+| **图片变清晰（新）**：6 档预设 + 自定义、原图对比预览 | ✅ 可用（锐度指标 52.6 → 81.2，+54%） |
+| **图片格式转换（新）**：PNG/JPG/WebP/BMP/ICO/TIFF/GIF/AVIF | ✅ 可用（BMP/ICO 自研编码器，产物经解码校验） |
+| **视频格式转换（新）**：MP4/WebM/MKV/MOV/AVI | ✅ 可用（真实转码 + 逐个解码校验，进度可取消） |
+| **动图与视频互转（新）**：GIF/WebP 动图/APNG ↔ 视频 | ✅ 可用（含聊天表情预设与目标大小自动降档） |
+| ffmpeg 加装包（视频/动图必需） | ✅ **随主包附带**（FFmpeg 6.1.1 单文件，GPL v3，见 `addons/ffmpeg/`） |
+| 版本号可见（左上角徽章 / 窗口标题 / 帮助「关于」） | ✅ 可用（随包显示当前版本） |
 | 免安装打包（含图标 / 版本信息 / 压缩包） | ✅ 已产出 |
 | 与手机版互相兼容（真机样本实测） | ⏳ **待用手机样本锁定**（工具已就绪，见 `docs/兼容性变体说明.md`） |
 
@@ -27,7 +33,7 @@
 
 ### 直接使用（给使用者）
 双击免安装文件夹里的 `番茄图片混淆桌面版.exe` 即可，无需安装。详见 `docs/使用说明.txt`。
-**完整版已内含 LibreOffice 加装包——解压后所有功能（含 PDF→Word、高保真 Word/Excel→PDF）立即可用，无需任何额外安装。**
+**完整版已内含 LibreOffice 与 ffmpeg 加装包——解压后所有功能（含 PDF→Word、高保真 Word/Excel→PDF、视频格式转换、动图与视频互转）立即可用，无需任何额外安装。**
 
 ### 开发调试（给维护者）
 ```powershell
@@ -52,8 +58,11 @@ npm test                                                    # 算法测试 55 �
 .\node_modules\electron\dist\electron.exe . --ui-test        # 图片混淆 界面自动测试（含截图与像素级校验）
 .\node_modules\electron\dist\electron.exe . --pdf-test       # PDF 工具自检（渲染/往返/合并拆分/内置降级）
 .\node_modules\electron\dist\electron.exe . --pdf-ui-test    # PDF 工具界面自动测试（五个方向 + 截图）
+.\node_modules\electron\dist\electron.exe . --media-test     # 媒体工具自检（压缩/变清晰/转换 + 视频↔动图真实转码）
+.\node_modules\electron\dist\electron.exe . --media-ui-test  # 媒体工具界面自动测试（5 个新工具逐个走查 + 截图）
 ```
-> 界面类测试结果同时写入 `%TEMP%\tomato-pdf-test.json` 与 `%TEMP%\tomato-pdf-ui-test.json`，截图在 `%TEMP%\tomato-uitest`。
+> 界面类测试结果同时写入 `%TEMP%\tomato-pdf-test.json`、`%TEMP%\tomato-pdf-ui-test.json`、`%TEMP%\tomato-media-test.json`、`%TEMP%\tomato-media-ui-test.json`，截图在 `%TEMP%\tomato-uitest`。
+> 媒体类自检需要 `app/addons/ffmpeg/ffmpeg.exe`（仓库内已有，不进 git；缺失时视频/动图相关检查会如实标注失败）。
 
 ### 打包免安装版
 ```powershell
