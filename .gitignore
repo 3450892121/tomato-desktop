@@ -1,0 +1,25 @@
+# 依赖与构建产物
+node_modules
+dist
+build
+out
+app/node_modules
+app/release
+app/dist
+
+# 本机构建工具（Node 便携版等）
+.tools
+
+# 软件运行期用户数据（绿色版配置随文件夹走，不进 git）
+app/userdata
+
+# 日志与系统文件
+*.log
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# 环境与本地配置
+.env
+.env.*
+*.local
