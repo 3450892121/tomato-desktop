@@ -493,57 +493,82 @@ async function run() {
   }
 
   state.cancelRequested = false;
+  state.taskIds = [];
   setBusy(true);
   const t0 = performance.now();
+  const ctx = state.ctx;
+  const fileCount = files.length;
+  let composed = null; // 拼接结果（宽高等），供界面收尾显示
 
-  try {
-    const r = await composeStitch({
-      meta: files.map((f) => ({ width: f.width, height: f.height })),
-      loadImage: async (i) => {
-        const bytes = await state.ctx.readFile(files[i].path);
-        return decodeImageFromBytes(bytes);
-      },
-      direction: params.direction,
-      mode: params.mode,
-      targetSize: params.targetSize,
-      gap: params.gap,
-      align: params.align,
-      margin: params.margin,
-      format: params.format,
-      quality: params.quality,
-      onProgress: (done, total) => {
-        state.ctx.showProgress(`拼接中 ${done}/${total} 张：${files[done - 1].name}`, (done / total) * 100);
-      },
-      shouldCancel: () => state.cancelRequested
-    });
+  // 任务归属队列：整批图合成 1 张长图是一次操作，所以算一个任务；切走工具页任务照跑
+  const taskId = ctx.tasks.enqueue({
+    toolId: 'stitch',
+    toolName: '长图拼接',
+    label: `长图拼接（${fileCount} 张）`,
+    lane: 'io',
+    inputPaths: files.map((f) => f.path),
+    run: async ({ report, isCancelled }) => {
+      try {
+        const r = await composeStitch({
+          meta: files.map((f) => ({ width: f.width, height: f.height })),
+          loadImage: async (i) => {
+            const bytes = await ctx.readFile(files[i].path);
+            return decodeImageFromBytes(bytes);
+          },
+          direction: params.direction,
+          mode: params.mode,
+          targetSize: params.targetSize,
+          gap: params.gap,
+          align: params.align,
+          margin: params.margin,
+          format: params.format,
+          quality: params.quality,
+          onProgress: (done, total) => {
+            const text = `拼接中 ${done}/${total} 张：${files[done - 1].name}`;
+            report({ percent: (done / total) * 100, text });
+            if (state && state.ctx.isActive()) state.ctx.showProgress(text, (done / total) * 100);
+          },
+          shouldCancel: isCancelled
+        });
 
-    if (r.cancelled) {
-      state.ctx.hideProgress();
-      state.ctx.setStatus(`已取消拼接（画到第 ${r.drawn} 张，没有保存文件）`);
-      state.els.result.textContent = '已取消，没有保存文件';
-      return;
+        if (r.cancelled) return { canceled: true };
+
+        const outputDir = ctx.settings.getSettings().outputDir || undefined;
+        const ext = params.format === 'jpg' ? '.jpg' : '.png';
+        // 输出名沿用第一张图：多次拼接同一批图时更好认，且与源图放在一起不突兀
+        const baseName = `${baseNameOf(files[0].path)}_拼接`;
+        const saved = await ctx.saveImageNextTo({
+          sourcePath: files[0].path, targetDir: outputDir, baseName, ext, bytes: r.bytes
+        });
+        composed = r;
+        report({ percent: 100, text: `拼接完成 ${r.width} × ${r.height}` });
+        return { ok: true, outputPaths: [saved], outputDir };
+      } catch (err) {
+        return { ok: false, error: err.message };
+      }
     }
+  });
+  state.taskIds = [taskId];
+  const task = await ctx.tasks.waitFor(taskId);
 
-    const outputDir = state.ctx.settings.getSettings().outputDir || undefined;
-    const ext = params.format === 'jpg' ? '.jpg' : '.png';
-    // 输出名沿用第一张图：多次拼接同一批图时更好认，且与源图放在一起不突兀
-    const baseName = `${baseNameOf(files[0].path)}_拼接`;
-    const saved = await state.ctx.saveImageNextTo({
-      sourcePath: files[0].path, targetDir: outputDir, baseName, ext, bytes: r.bytes
-    });
+  if (!state) return; // 工具页已被回收：任务照跑完了，这里只跳过界面收尾
+  state.taskIds = [];
+  ctx.hideProgress();
+  setBusy(false);
 
-    const sizeText = formatSize(r.bytes.length);
+  if (task && task.status === 'done' && composed) {
+    const sizeText = formatSize(composed.bytes.length);
     const ms = Math.round(performance.now() - t0);
-    state.ctx.setInfo({ width: r.width, height: r.height, ms });
-    state.els.result.textContent = `输出：${saved}（${r.width} × ${r.height}，${sizeText}）`;
-    state.ctx.setStatus(`拼接完成：${files.length} 张合成 1 张长图，${r.width} × ${r.height}，约 ${sizeText}，耗时 ${ms} ms`);
-  } catch (err) {
-    state.ctx.setStatus(`拼接失败：${err.message}`);
-    state.els.result.textContent = `失败：${err.message}`;
-    console.error('[stitch] 拼接失败', err);
-  } finally {
-    state.ctx.hideProgress();
-    setBusy(false);
+    state.ctx.setInfo({ width: composed.width, height: composed.height, ms });
+    state.els.result.textContent = `输出：${task.output.paths[0]}（${composed.width} × ${composed.height}，${sizeText}）`;
+    state.ctx.setStatus(`拼接完成：${fileCount} 张合成 1 张长图，${composed.width} × ${composed.height}，约 ${sizeText}，耗时 ${ms} ms`);
+  } else if (task && task.status === 'canceled') {
+    state.ctx.setStatus('已取消拼接（没有保存文件）');
+    state.els.result.textContent = '已取消，没有保存文件';
+  } else {
+    const message = (task && task.error) || '未知错误';
+    state.ctx.setStatus(`拼接失败：${message}`);
+    state.els.result.textContent = `失败：${message}`;
   }
 }
 
@@ -557,6 +582,7 @@ export function mount(container, ctx) {
     files: [],
     busy: false,
     cancelRequested: false,
+    taskIds: [],
     limitExceeded: false,
     autoTarget: 0,
     container
@@ -603,6 +629,7 @@ export function mount(container, ctx) {
   on(els.cancelBtn, 'click', () => {
     if (!state.busy) return;
     state.cancelRequested = true;
+    for (const id of state.taskIds) state.ctx.tasks.cancel(id);
     state.ctx.setStatus('正在取消拼接…');
   });
   on(els.clearBtn, 'click', () => {

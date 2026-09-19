@@ -102,6 +102,8 @@ fs.copyFileSync(path.join(appRoot, 'tests', 'pdf-ocr-test.js'), path.join(appTar
 for (const f of ['pdf-edit-test.js', 'ocr-test.js']) {
   fs.copyFileSync(path.join(appRoot, 'tests', f), path.join(appTarget, 'tests', f));
 }
+// v2.0.0 起：任务中心自检（含「切走工具页后任务继续跑完」核心断言）
+fs.copyFileSync(path.join(appRoot, 'tests', 'queue-ui-test.js'), path.join(appTarget, 'tests', 'queue-ui-test.js'));
 
 // —— 4b) 复制 PDF 工具运行时依赖（纯 JS，界面进程按相对路径直接引用） ——
 // 说明：本项目没有打包器，工具代码里写的是 ../../../../node_modules/pdfjs-dist/... 这样的
@@ -131,13 +133,28 @@ copyIfExists(path.join('jszip', 'dist', 'jszip.min.js'));
 copyIfExists(path.join('jszip', 'LICENSE.markdown'));
 copyIfExists(path.join('xlsx', 'dist', 'xlsx.full.min.js'));
 copyIfExists(path.join('xlsx', 'dist', 'LICENSE'));
-// 4b-2) C 批工具依赖：@cantoo/pdf-lib（加密/隐形文字层）+ @cantoo/fontkit（中文字子集化）
-//   注意：fontkit 必须带 **UMD** 产物——界面进程没有打包器，它的 ESM 产物里是裸模块名
-//   （restructure / brotli / dfa / fflate），浏览器直接 import 会 Failed to resolve module specifier。
-copyIfExists(path.join('@cantoo', 'pdf-lib', 'dist', 'pdf-lib.esm.js'));
-copyIfExists(path.join('@cantoo', 'pdf-lib', 'LICENSE.md'));
-copyIfExists(path.join('@cantoo', 'fontkit', 'dist', 'fontkit.umd.min.js'));
-copyIfExists(path.join('@cantoo', 'fontkit', 'LICENSE'));
+// 4b-2) C 批工具依赖：@cantoo/pdf-lib（加密 / 隐形文字层）+ @cantoo/fontkit（中文字子集化）
+//   **整包复制**而不是只挑单文件——踩过的坑：
+//     · 界面进程用 ESM 产物（pdf-lib.esm.js / fontkit.umd.min.js）；
+//     · 主进程（自检脚本读回断言）走 Node 分支，require 的是 **CJS 产物**
+//       （@cantoo/pdf-lib/dist/pdf-lib.js、@cantoo/fontkit/dist/main.cjs），
+//       只复制 ESM 会导致产物里报 `Cannot find module .../dist/pdf-lib.js`（源码环境有完整
+//       node_modules 所以看不出来，只有打包后才暴露）。
+//     · fontkit 的 Node 分支还会用到它的依赖（brotli / dfa / fflate / restructure）。
+//   体积约 40MB；相比 OCR 那步省下的 220MB 可以接受，「解压即用」优先。
+log('步骤4b-2：复制 C 批依赖（@cantoo/pdf-lib 与 @cantoo/fontkit 整包 + 其依赖）');
+for (const rel of [
+  path.join('@cantoo', 'pdf-lib'),
+  path.join('@cantoo', 'fontkit'),
+  'brotli',
+  'dfa',
+  'fflate',
+  'restructure'
+]) {
+  const from = path.join(nmSrc, rel);
+  if (!fs.existsSync(from)) throw new Error(`缺少 C 批依赖：node_modules/${rel}（请先在 app 目录 npm install）`);
+  copyTree(from, path.join(nmDst, rel));
+}
 // —— 4c) 复制 OCR 引擎运行时依赖（「文字识别」工具；引擎在主进程跑，需完整 Node 依赖树） ——
 // 说明：ppu-paddle-ocr 是 ESM 包 + N-API 原生模块，主进程动态 import 它，因此不能像界面依赖那样
 //      只挑单文件，必须按 npm 的目录结构带过去。

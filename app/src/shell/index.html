@@ -33,6 +33,10 @@
       <header class="topbar">
         <div class="topbar-status" id="statusText">欢迎使用</div>
         <div class="topbar-info" id="infoText">分辨率: --- x --- ｜ 耗时: --- ms</div>
+        <!-- 任务中心入口：显示进行中/排队的数量徽标（0 个时不显示徽标）；面板由 shell.js 持有 -->
+        <button class="topbar-tasks" id="btnTasks" type="button" title="任务中心（在跑的任务、进度、结果）">
+          <span>任务</span><span class="topbar-tasks-badge" id="taskBadge" hidden>0</span>
+        </button>
         <!-- 外观切换：浅色 / 深色 / 跟随系统（三态循环，当前状态在按钮上显示） -->
         <button class="topbar-theme" id="btnTheme" type="button" title="切换外观（浅色 / 深色 / 跟随系统）">
           <span id="themeIcon">🌗</span><span id="themeLabel">跟随系统</span>

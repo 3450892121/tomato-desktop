@@ -113,8 +113,6 @@ function on(el, type, handler) {
   state.listeners.push([el, type, handler]);
 }
 
-const nextFrame = () => new Promise((resolve) => requestAnimationFrame(() => resolve()));
-
 function fmtBytes(n) {
   if (n >= 1024 * 1024) return `${(n / 1024 / 1024).toFixed(2)} MB`;
   if (n >= 1024) return `${Math.round(n / 1024)} KB`;
@@ -468,47 +466,61 @@ async function run() {
 
   state.busy = true;
   state.cancelRequested = false;
+  state.taskIds = [];
   state.els.runBtn.disabled = true;
   state.els.runBtn.textContent = '加水印中…';
   state.els.cancelBtn.hidden = false;
   state.els.cancelBtn.disabled = false;
   state.els.clearBtn.disabled = true;
 
-  const outputDir = state.ctx.settings.getSettings().outputDir || undefined;
+  const ctx = state.ctx;
+  const outputDir = ctx.settings.getSettings().outputDir || undefined;
   const t0 = performance.now();
-  let done = 0;
-  let failed = 0;
-  let lastPath = '';
-  let lastError = '';
 
-  for (let i = 0; i < files.length; i += 1) {
-    if (state.cancelRequested) break;
-    const f = files[i];
-    state.ctx.showProgress(`加水印 ${i + 1}/${files.length}：${f.name}`, (i / files.length) * 100);
-    await nextFrame();
-    try {
-      const source = await loadSource(f.path);
-      const { blob, width, height } = await renderWatermark({ bitmap: source.bitmap, config: params });
-      const bytes = new Uint8Array(await blob.arrayBuffer());
-      lastPath = await state.ctx.saveImageNextTo({
-        sourcePath: f.path, targetDir: outputDir, baseName: `${f.baseName}_水印`, ext: '.png', bytes
-      });
-      f.result = `已保存 ｜ ${width}×${height} ｜ ${fmtBytes(bytes.byteLength)}`;
-      f.error = false;
-      done += 1;
-      state.ctx.setInfo({ width, height, ms: Math.round(performance.now() - t0) });
-    } catch (err) {
-      f.result = `失败：${err.message}`;
-      f.error = true;
-      failed += 1;
-      lastError = err.message;
-      console.error('[watermark] 加水印失败', f.name, err);
+  for (const f of files) { f.result = ''; f.error = false; }
+  renderList();
+
+  // 任务归属队列：图片类走 io 通道（并发 2）；切走工具页（或被回收）任务照跑
+  const jobs = files.map((f, index) => ({
+    label: f.name,
+    inputPaths: [f.path],
+    outputDir,
+    run: async ({ report, isCancelled }) => {
+      if (isCancelled()) return { canceled: true };
+      const step = `加水印 ${index + 1}/${files.length}：${f.name}`;
+      report({ percent: 0, text: step });
+      if (state && state.ctx.isActive()) state.ctx.showProgress(step, (index / files.length) * 100);
+      try {
+        const source = await loadSource(f.path);
+        const { blob, width, height } = await renderWatermark({ bitmap: source.bitmap, config: params });
+        const bytes = new Uint8Array(await blob.arrayBuffer());
+        if (isCancelled()) return { canceled: true };
+        const path = await ctx.saveImageNextTo({
+          sourcePath: f.path, targetDir: outputDir, baseName: `${f.baseName}_水印`, ext: '.png', bytes
+        });
+        f.result = `已保存 ｜ ${width}×${height} ｜ ${fmtBytes(bytes.byteLength)}`;
+        f.error = false;
+        if (state && state.ctx.isActive()) state.ctx.setInfo({ width, height, ms: Math.round(performance.now() - t0) });
+        report({ percent: 100, text: f.result });
+        if (state) renderList();
+        return { ok: true, outputPaths: [path], outputDir };
+      } catch (err) {
+        f.result = `失败：${err.message}`;
+        f.error = true;
+        report({ percent: 100, text: f.result });
+        if (state) renderList();
+        return { ok: false, error: err.message };
+      }
     }
-    renderList();
-  }
+  }));
 
-  const cancelled = state.cancelRequested;
-  state.ctx.hideProgress();
+  const ids = jobs.map((job) => ctx.tasks.enqueue({ toolId: 'watermark', toolName: '加水印', lane: 'io', ...job }));
+  state.taskIds = ids;
+  const settled = await Promise.all(ids.map((id) => ctx.tasks.waitFor(id)));
+
+  if (!state) return; // 工具页已被回收：任务照跑完了，这里只跳过界面收尾
+  state.taskIds = [];
+  ctx.hideProgress();
   state.busy = false;
   state.cancelRequested = false;
   state.els.runBtn.disabled = false;
@@ -516,7 +528,15 @@ async function run() {
   state.els.cancelBtn.hidden = true;
   state.els.clearBtn.disabled = false;
 
-  if (cancelled) {
+  const done = settled.filter((t) => t && t.status === 'done').length;
+  const failed = settled.filter((t) => t && t.status === 'failed').length;
+  const canceledCount = settled.filter((t) => t && t.status === 'canceled').length;
+  const failedTask = settled.find((t) => t && t.status === 'failed');
+  const lastError = (failedTask && failedTask.error) || '';
+  const doneTask = [...settled].reverse().find((t) => t && t.status === 'done' && t.output.paths.length);
+  const lastPath = doneTask ? doneTask.output.paths[0] : '';
+
+  if (canceledCount > 0) {
     state.ctx.setStatus(`已取消：成功 ${done} 张${failed ? `，失败 ${failed} 张` : ''}`);
   } else {
     state.ctx.setStatus(`加水印完成：成功 ${done} 张${failed ? `，失败 ${failed} 张（${lastError}）` : ''}`);
@@ -536,6 +556,7 @@ export function mount(container, ctx) {
     files: [],
     busy: false,
     cancelRequested: false,
+    taskIds: [],
     type: WATERMARK_DEFAULTS.type,
     position: WATERMARK_DEFAULTS.position,
     stamp: null,
@@ -610,7 +631,9 @@ export function mount(container, ctx) {
   on(els.addMore, 'click', openDialog);
   on(els.runBtn, 'click', run);
   on(els.cancelBtn, 'click', () => {
+    // 取消本工具入队的任务（队列会在当前这张处理完后停下后续任务）
     state.cancelRequested = true;
+    for (const id of state.taskIds) state.ctx.tasks.cancel(id);
     state.els.cancelBtn.disabled = true;
     state.ctx.setStatus('正在取消…（当前这张处理完就停）');
   });

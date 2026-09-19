@@ -43,6 +43,7 @@
 | 批量与文件 | `modules/batch.md` | 多文件/文件夹导入、批量处理与保存命名（属「图片混淆」工具） |
 | 参数设置 | `modules/settings.md` | 可调参数与本地持久化，跨工具共享 |
 | 外观主题 | `modules/theme.md` | 浅色/深色/跟随系统；只覆盖主题变量，工具零改动适配 |
+| 跨工具任务队列 | `modules/task-queue.md` | 任务归属队列（不归属工具页）+ 任务中心；切走工具页任务照跑 |
 | 设置导入导出 | `modules/settings-io.md` | 设置备份成 json，换电脑一键带走（只合并已知键） |
 | PDF 转格式 | `modules/pdf-convert.md` | PDF/图片/Office 互转与页面操作（第二个工具；LibreOffice 为可选加装包） |
 | PDF 编辑整理 | `modules/pdf-edit.md` | 压缩瘦身 / 水印 / 页码 / 旋转 / 重排 / 加密解密 |

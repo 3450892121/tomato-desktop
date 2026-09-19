@@ -71,8 +71,6 @@ function on(el, type, handler) {
   state.listeners.push([el, type, handler]);
 }
 
-const nextFrame = () => new Promise((resolve) => requestAnimationFrame(() => resolve()));
-
 /** 字节数 → 人类可读（如 1.2 MB） */
 function formatBytes(n) {
   const bytes = Number(n) || 0;
@@ -280,24 +278,29 @@ async function run() {
     return;
   }
 
-  const outputDir = state.ctx.settings.getSettings().outputDir || undefined;
-  const session = state; // 中途切走工具时 state 会被置空，用它判断本趟任务是否还活着
+  const ctx = state.ctx;
+  const outputDir = ctx.settings.getSettings().outputDir || undefined;
+  const files = state.files;
+  const total = files.length;
   state.busy = true;
   updateRunButton();
   const t0 = Date.now();
-  let done = 0;
-  let failed = 0;
-  let lastError = '';
-  let lastPath = '';
 
-  try {
-    for (let i = 0; i < state.files.length; i += 1) {
-      if (state !== session) return;
-      const f = state.files[i];
-      state.ctx.showProgress(`转换 ${i + 1}/${state.files.length}：${f.name}`, (i / state.files.length) * 100);
-      await nextFrame();
+  for (const f of files) f.result = null;
+  renderList();
+
+  // 任务归属队列：图片类走 io 通道（并发 2）；每张图算一个任务，切走工具页任务照跑
+  const jobs = files.map((f, index) => ({
+    label: f.name,
+    inputPaths: [f.path],
+    outputDir,
+    run: async ({ report, isCancelled }) => {
+      if (isCancelled()) return { canceled: true };
+      const step = `转换 ${index + 1}/${total}：${f.name}`;
+      report({ percent: (index / total) * 100, text: step });
+      if (state && state.ctx.isActive()) state.ctx.showProgress(step, (index / total) * 100);
       try {
-        const bytes = await state.ctx.readFile(f.path);
+        const bytes = await ctx.readFile(f.path);
         let img;
         try {
           img = await decodeImageFromBytes(bytes);
@@ -310,17 +313,19 @@ async function run() {
         let height = img.height;
         const fit = fitLongEdge(width, height, params.maxEdge);
         if (fit.scaled) {
-          state.ctx.showProgress(`${f.name}：缩放到 ${fit.width} × ${fit.height}…`, ((i + 0.4) / state.files.length) * 100);
-          await nextFrame();
+          const scaleStep = `${f.name}：缩放到 ${fit.width} × ${fit.height}…`;
+          report({ percent: ((index + 0.4) / total) * 100, text: scaleStep });
+          if (state && state.ctx.isActive()) state.ctx.showProgress(scaleStep, ((index + 0.4) / total) * 100);
           pixels = resizePixels(pixels, width, height, fit.width, fit.height);
           width = fit.width;
           height = fit.height;
         }
 
-        state.ctx.showProgress(`${f.name}：正在编码 ${params.format.toUpperCase()}…`, ((i + 0.6) / state.files.length) * 100);
-        await nextFrame();
+        const encStep = `${f.name}：正在编码 ${params.format.toUpperCase()}…`;
+        report({ percent: ((index + 0.6) / total) * 100, text: encStep });
+        if (state && state.ctx.isActive()) state.ctx.showProgress(encStep, ((index + 0.6) / total) * 100);
         const outBytes = await encodeTo(params, pixels, width, height);
-        const outPath = await state.ctx.saveNextTo({
+        const outPath = await ctx.saveNextTo({
           sourcePath: f.path,
           targetDir: outputDir,
           baseName: outputBaseName(f.baseName, params.format),
@@ -336,26 +341,33 @@ async function run() {
           text: `${(f.ext || '').replace('.', '').toUpperCase()} → ${params.format.toUpperCase()} · ${formatBytes(inSize)} → ${formatBytes(outSize)}${sizeDeltaText(inSize, outSize)}${sizeNote}`,
           outPath
         };
-        lastPath = outPath;
-        done += 1;
-        state.ctx.setInfo({ width, height, ms: Date.now() - t0 });
+        if (state && state.ctx.isActive()) state.ctx.setInfo({ width, height, ms: Date.now() - t0 });
+        report({ percent: ((index + 1) / total) * 100, text: f.result.text });
+        if (state) renderList();
+        return { ok: true, outputPaths: [outPath], outputDir };
       } catch (err) {
-        failed += 1;
-        lastError = err.message;
         f.result = { ok: false, text: `失败：${err.message}` };
-        console.error('[img-convert] 转换失败', f.name, err);
+        if (state) renderList();
+        return { ok: false, error: err.message };
       }
-      renderList();
     }
-  } finally {
-    if (state === session) {
-      state.ctx.hideProgress();
-      state.busy = false;
-      updateRunButton();
-    }
-  }
+  }));
 
-  if (state !== session) return;
+  const ids = jobs.map((job) => ctx.tasks.enqueue({ toolId: 'img-convert', toolName: '图片格式转换', lane: 'io', ...job }));
+  const settled = await Promise.all(ids.map((id) => ctx.tasks.waitFor(id)));
+
+  if (!state) return; // 工具页已被回收：任务照跑完了，这里只跳过界面收尾
+  ctx.hideProgress();
+  state.busy = false;
+  updateRunButton();
+
+  const done = settled.filter((t) => t && t.status === 'done').length;
+  const failed = settled.filter((t) => t && t.status === 'failed').length;
+  const failedTask = settled.find((t) => t && t.status === 'failed');
+  const lastError = (failedTask && failedTask.error) || '';
+  const doneTask = [...settled].reverse().find((t) => t && t.status === 'done' && t.output.paths.length);
+  const lastPath = doneTask ? doneTask.output.paths[0] : '';
+
   state.ctx.setStatus(`转换完成：成功 ${done} 个${failed ? `，失败 ${failed} 个（${lastError}）` : ''}`);
   state.els.result.textContent = lastPath ? `输出：${lastPath}` : '';
 }

@@ -95,8 +95,6 @@ function clearParamListeners() {
   state.paramListeners = [];
 }
 
-const nextFrame = () => new Promise((resolve) => requestAnimationFrame(() => resolve()));
-
 /** 字节数 → 人类可读（如 1.2 MB） */
 function formatBytes(n) {
   const bytes = Number(n) || 0;
@@ -438,36 +436,44 @@ async function run() {
     return;
   }
   const params = readParams();
-  const outputDir = state.ctx.settings.getSettings().outputDir || undefined;
-  const session = state; // 中途切走工具时 state 会被置空，用它判断本趟任务是否还活着
+  const ctx = state.ctx;
+  const outputDir = ctx.settings.getSettings().outputDir || undefined;
+  const total = state.files.length;
+  const files = state.files;
+  const t0 = Date.now();
 
   state.busy = true;
   updateRunButton();
-  const t0 = Date.now();
-  let done = 0;
-  let failed = 0;
-  let lastError = '';
-  let lastPath = '';
-  let scaleSkipped = 0;
-  let aiUsed = 0;
 
-  try {
-    for (let i = 0; i < state.files.length; i += 1) {
-      if (state !== session) return;
-      const f = state.files[i];
-      state.ctx.showProgress(`处理 ${i + 1}/${state.files.length}：${f.name}`, (i / state.files.length) * 100);
-      await nextFrame();
+  let scaleSkipped = 0; // 放大后像素过大而按原尺寸处理的张数
+  let aiUsed = 0;       // 走了 AI 放大的张数
+
+  for (const f of files) f.result = null;
+  renderList();
+
+  // 任务归属队列：图片类走 io 通道（并发 2）；每张图算一个任务，切走工具页任务照跑
+  const jobs = files.map((f, index) => ({
+    label: f.name,
+    inputPaths: [f.path],
+    outputDir,
+    run: async ({ report, isCancelled }) => {
+      if (isCancelled()) return { canceled: true };
+      const step = `处理 ${index + 1}/${total}：${f.name}`;
+      report({ percent: (index / total) * 100, text: step });
+      if (state && state.ctx.isActive()) state.ctx.showProgress(step, (index / total) * 100);
+
       try {
-        const bytes = await state.ctx.readFile(f.path);
+        const bytes = await ctx.readFile(f.path);
 
         // —— AI 放大分支：交给 addons/realesrgan 的 Real-ESRGAN 处理 ——
         // 模型只认 jpg/png/webp，所以统一先解码成 PNG 字节；返回的也是 PNG 字节。
         if (params.ai) {
           const img0 = await decodeImageFromBytes(bytes);
           const png = await encodeImageToBytes(img0.pixels, img0.width, img0.height, { format: 'png' });
-          state.ctx.showProgress(`${f.name}：AI 放大 ${params.ai.scale}×（显卡越弱越慢，请勿关闭）…`, ((i + 0.4) / state.files.length) * 100);
-          await nextFrame();
-          const res = await state.ctx.aiUpscale({ bytes: png, scale: params.ai.scale, model: params.ai.model });
+          const aiStep = `${f.name}：AI 放大 ${params.ai.scale}×（显卡越弱越慢，请勿关闭）…`;
+          report({ percent: ((index + 0.4) / total) * 100, text: aiStep });
+          if (state && state.ctx.isActive()) state.ctx.showProgress(aiStep, ((index + 0.4) / total) * 100);
+          const res = await ctx.aiUpscale({ bytes: png, scale: params.ai.scale, model: params.ai.model });
           if (!res || !res.ok) throw new Error((res && res.message) || 'AI 放大失败');
           const ext0 = outputExtFor(f.ext);
           let outBytes = res.bytes;
@@ -476,7 +482,7 @@ async function run() {
             const up = await decodeImageFromBytes(res.bytes);
             outBytes = await encodeImageToBytes(up.pixels, up.width, up.height, { format: 'jpg', quality: 95 });
           }
-          const outPath = await state.ctx.saveNextTo({
+          const outPath = await ctx.saveNextTo({
             sourcePath: f.path,
             targetDir: outputDir,
             baseName: `${f.baseName}_AI放大`,
@@ -489,12 +495,11 @@ async function run() {
             outPath
           };
           f.bytes = null;
-          lastPath = outPath;
-          done += 1;
           aiUsed += 1;
-          state.ctx.setInfo({ width: res.width, height: res.height, ms: Date.now() - t0 });
-          renderList();
-          continue;
+          if (state && state.ctx.isActive()) state.ctx.setInfo({ width: res.width, height: res.height, ms: Date.now() - t0 });
+          report({ percent: ((index + 1) / total) * 100, text: f.result.text });
+          if (state) renderList();
+          return { ok: true, outputPaths: [outPath], outputDir };
         }
 
         const img = await decodeImageFromBytes(bytes);
@@ -515,8 +520,9 @@ async function run() {
           }
         }
 
-        state.ctx.showProgress(`${f.name}：正在增强…`, ((i + 0.4) / state.files.length) * 100);
-        await nextFrame();
+        const enhStep = `${f.name}：正在增强…`;
+        report({ percent: ((index + 0.4) / total) * 100, text: enhStep });
+        if (state && state.ctx.isActive()) state.ctx.showProgress(enhStep, ((index + 0.4) / total) * 100);
         const out = await applyEnhance(pixels, width, height, params, blurPixels);
 
         const ext = outputExtFor(f.ext);
@@ -524,7 +530,7 @@ async function run() {
           format: ext === '.jpg' ? 'jpg' : 'png',
           quality: 95
         });
-        const outPath = await state.ctx.saveNextTo({
+        const outPath = await ctx.saveNextTo({
           sourcePath: f.path,
           targetDir: outputDir,
           baseName: `${f.baseName}_清晰`,
@@ -539,26 +545,33 @@ async function run() {
           outPath
         };
         f.bytes = null; // 释放缓存的原始字节（预览需要时会重新读）
-        lastPath = outPath;
-        done += 1;
-        state.ctx.setInfo({ width, height, ms: Date.now() - t0 });
+        if (state && state.ctx.isActive()) state.ctx.setInfo({ width, height, ms: Date.now() - t0 });
+        report({ percent: ((index + 1) / total) * 100, text: f.result.text });
+        if (state) renderList();
+        return { ok: true, outputPaths: [outPath], outputDir };
       } catch (err) {
-        failed += 1;
-        lastError = err.message;
         f.result = { ok: false, text: `失败：${err.message}` };
-        console.error('[enhance] 处理失败', f.name, err);
+        if (state) renderList();
+        return { ok: false, error: err.message };
       }
-      renderList();
     }
-  } finally {
-    if (state === session) {
-      state.ctx.hideProgress();
-      state.busy = false;
-      updateRunButton();
-    }
-  }
+  }));
 
-  if (state !== session) return;
+  const ids = jobs.map((job) => ctx.tasks.enqueue({ toolId: 'enhance', toolName: '图片变清晰', lane: 'io', ...job }));
+  const settled = await Promise.all(ids.map((id) => ctx.tasks.waitFor(id)));
+
+  if (!state) return; // 工具页已被回收：任务照跑完了，这里只跳过界面收尾
+  ctx.hideProgress();
+  state.busy = false;
+  updateRunButton();
+
+  const done = settled.filter((t) => t && t.status === 'done').length;
+  const failed = settled.filter((t) => t && t.status === 'failed').length;
+  const failedTask = settled.find((t) => t && t.status === 'failed');
+  const lastError = (failedTask && failedTask.error) || '';
+  const doneTask = [...settled].reverse().find((t) => t && t.status === 'done' && t.output.paths.length);
+  const lastPath = doneTask ? doneTask.output.paths[0] : '';
+
   const skipNote = scaleSkipped > 0 ? `，${scaleSkipped} 张因放大后过大已按原尺寸处理` : '';
   const aiNote = aiUsed > 0 ? '｜AI 放大' : '';
   state.ctx.setStatus(`处理完成：成功 ${done} 个${failed ? `，失败 ${failed} 个（${lastError}）` : ''}${skipNote}${aiNote}`);

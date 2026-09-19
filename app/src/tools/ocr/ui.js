@@ -540,7 +540,7 @@ function updateRunButton() {
  * @returns {Promise<{cancelled?: boolean, outputs?: Array<{ext:string,bytes:Uint8Array}>, detail?: string,
  *                    missingChars?: number, rotatedPages?: number[]}>}
  */
-async function runOne(st, f, params, fontBytes, report) {
+async function runOne(st, f, params, fontBytes, exec) {
   const ctx = st.ctx;
   const sourceBytes = await ctx.readFile(f.path);
   const isPdf = f.type === 'pdf';
@@ -552,8 +552,8 @@ async function runOne(st, f, params, fontBytes, report) {
     const c = await compressPdf(sourceBytes, {
       preset: params.preset,
       grayscale: params.grayscale,
-      onProgress: (done, total) => report(`瘦身（第 ${done}/${total} 页）`, Math.max(0, done - 1), total),
-      shouldCancel: () => st.cancelRequested || st.disposed
+      onProgress: (done, total) => exec.report(`瘦身（第 ${done}/${total} 页）`, Math.max(0, done - 1), total),
+      shouldCancel: () => exec.isCancelled()
     });
     if (!c || c.cancelled) return { cancelled: true };
     working = c.bytes;
@@ -581,8 +581,8 @@ async function runOne(st, f, params, fontBytes, report) {
   if (isPdf) pdf = await openPdfDoc(working);
   try {
     for (let p = 1; p <= pageCount; p += 1) {
-      if (st.cancelRequested || st.disposed) return { cancelled: true };
-      report(`准备（第 ${p}/${pageCount} 页）`, p - 1, pageCount);
+      if (exec.isCancelled()) return { cancelled: true };
+      exec.report(`准备（第 ${p}/${pageCount} 页）`, p - 1, pageCount);
       await nextFrame();
       const rendered = isPdf
         ? await renderPdfPage(pdf, p, { scale: PDF_SCALE })
@@ -595,7 +595,7 @@ async function runOne(st, f, params, fontBytes, report) {
       const pre = applyPreprocess(work, prePlan);
       const png = await encodeImageToBytes(work.pixels, width, height, { format: 'png' });
 
-      const r = await ctx.ocrRecognize({ bytes: png, jobId: st.currentJobId });
+      const r = await ctx.ocrRecognize({ bytes: png, jobId: exec.jobId() });
       if (!r || !r.ok) {
         if (r && r.cancelled) return { cancelled: true };
         throw new Error(friendlyOcrMessage(r && r.message));
@@ -603,13 +603,13 @@ async function runOne(st, f, params, fontBytes, report) {
       pageLines[p - 1] = r.lines || [];
       pageAngles[p - 1] = pre.angleDeg || 0;
       pageTexts[p - 1] = linesToText(r.lines);
-      report(`识别（第 ${p}/${pageCount} 页）`, p, pageCount);
+      exec.report(`识别（第 ${p}/${pageCount} 页）`, p, pageCount);
     }
   } finally {
     await closeDoc(pdf);
   }
 
-  if (st.disposed) return { cancelled: true };
+  if (exec.isCancelled()) return { cancelled: true };
   f.pageLines = pageLines;
   f.pageAngles = pageAngles;
   f.pageTexts = pageTexts;
@@ -673,76 +673,95 @@ async function run() {
 
   st.busy = true;
   st.cancelRequested = false;
-  st.jobSeq = Date.now();
+  st.taskIds = [];
   if (state === st) updateRunButton();
   for (const f of files) { f.result = null; f.pageLines = null; f.pageAngles = null; f.pageTexts = null; }
   paint();
 
   const units = files.map((f) => Math.max(1, f.pages || 1));
   const unitsTotal = units.reduce((a, b) => a + b, 0);
-  let unitBase = 0;
-  let ok = 0;
-  let failed = 0;
-  let cancelled = 0;
-  let lastError = '';
-  let lastPaths = [];
+  const baseOf = (i) => units.slice(0, i).reduce((a, b) => a + b, 0);
   let missingTotal = 0;
   const rotatedAll = [];
+  let lastPaths = [];
   const outputDir = ctx.settings.getSettings().outputDir || undefined;
 
-  for (let i = 0; i < files.length; i += 1) {
-    const f = files[i];
-    if (st.cancelRequested || st.disposed) { cancelled = files.length - i; break; }
-    st.currentJobId = `ocr-${st.jobSeq}-${i + 1}`;
-    const report = (phase, pageIndex, pageTotal) => {
-      const frac = pageTotal ? pageIndex / pageTotal : 1;
-      const overall = Math.min(99, ((unitBase + frac) / Math.max(1, unitsTotal)) * 100);
-      ctx.showProgress(`${f.name}（${i + 1}/${files.length}）：${phase}`, overall);
+  // 任务归属队列：识别吃满 CPU，走 cpu 通道串行；每个文件算一个任务。
+  // 切走工具页（含 LRU 回收）不再取消任务 —— 只退订 UI，队列照跑完。
+  const jobs = files.map((f, i) => {
+    let jobId = null; // 与 onCancel 共享绑定：取消时才能叫停这一次识别
+    return {
+      label: f.name,
+      inputPaths: [f.path],
+      outputDir,
+      run: async ({ report, isCancelled }) => {
+        const base = baseOf(i);
+        const exec = {
+          isCancelled,
+          setJobId: (id) => { jobId = id; },
+          jobId: () => jobId,
+          report: (phase, pageIndex, pageTotal) => {
+            const frac = pageTotal ? pageIndex / pageTotal : 1;
+            const overall = Math.min(99, ((base + frac) / Math.max(1, unitsTotal)) * 100);
+            const text = `${f.name}（${i + 1}/${files.length}）：${phase}`;
+            report({ percent: overall, text });
+            if (state === st && !st.disposed) st.ctx.showProgress(text, overall);
+          }
+        };
+        try {
+          exec.setJobId(`ocr-${Date.now()}-${i + 1}-${Math.random().toString(36).slice(2, 6)}`);
+          exec.report('准备中', 0, units[i]);
+          await nextFrame();
+          const res = await runOne(st, f, params, fontBytes, exec);
+          if (res.cancelled || isCancelled()) return { canceled: true };
+          const paths = [];
+          for (const out of res.outputs) {
+            // 逐个保存：重名自动加序号，绝不覆盖已有文件
+            const target = await ctx.saveNextTo({
+              sourcePath: f.path, targetDir: outputDir, baseName: f.baseName, ext: out.ext, bytes: out.bytes
+            });
+            paths.push(target);
+          }
+          lastPaths = paths;
+          missingTotal += res.missingChars || 0;
+          if (res.rotatedPages && res.rotatedPages.length) rotatedAll.push(`${f.name} 第 ${res.rotatedPages.join('、')} 页`);
+          f.result = { ok: true, text: `→ ${paths.map(baseNameOf).join(' + ')}${res.detail ? `｜${res.detail}` : ''}`, paths };
+          paint();
+          return { ok: true, outputPaths: paths, outputDir };
+        } catch (err) {
+          if (err && err.name === 'CancelledError') return { canceled: true };
+          f.result = { ok: false, text: `✗ ${err.message}` };
+          paint();
+          return { ok: false, error: err.message };
+        } finally {
+          jobId = null;
+        }
+      },
+      onCancel: () => {
+        // 引擎推理不可中断，取消会在「下一张/下一页开始前」生效
+        if (!jobId || typeof st.ctx.ocrCancel !== 'function') return;
+        try { st.ctx.ocrCancel(jobId); } catch { /* 任务可能刚结束 */ }
+      }
     };
-    report('准备中', 0, units[i]);
-    await nextFrame();
+  });
 
-    try {
-      const res = await runOne(st, f, params, fontBytes, report);
-      if (res.cancelled) {
-        cancelled += 1;
-        f.result = { ok: false, text: '已取消' };
-        break;
-      }
-      const paths = [];
-      for (const out of res.outputs) {
-        // 逐个保存：重名自动加序号，绝不覆盖已有文件
-        const target = await ctx.saveNextTo({
-          sourcePath: f.path, targetDir: outputDir, baseName: f.baseName, ext: out.ext, bytes: out.bytes
-        });
-        paths.push(target);
-      }
-      ok += 1;
-      lastPaths = paths;
-      missingTotal += res.missingChars || 0;
-      if (res.rotatedPages && res.rotatedPages.length) rotatedAll.push(`${f.name} 第 ${res.rotatedPages.join('、')} 页`);
-      f.result = { ok: true, text: `→ ${paths.map(baseNameOf).join(' + ')}${res.detail ? `｜${res.detail}` : ''}`, paths };
-    } catch (err) {
-      if (err && err.name === 'CancelledError') {
-        cancelled += 1;
-        f.result = { ok: false, text: '已取消' };
-        break;
-      }
-      failed += 1;
-      lastError = err.message;
-      f.result = { ok: false, text: `✗ ${err.message}` };
-      console.error('[ocr] 处理失败', f.name, err);
-    } finally {
-      unitBase += units[i];
-      st.currentJobId = null;
-      paint();
-    }
+  const ids = jobs.map((job) => ctx.tasks.enqueue({ toolId: 'ocr', toolName: '文字识别', lane: 'cpu', ...job }));
+  st.taskIds = ids;
+  const settled = await Promise.all(ids.map((id) => ctx.tasks.waitFor(id)));
+
+  const ok = settled.filter((t) => t && t.status === 'done').length;
+  const failed = settled.filter((t) => t && t.status === 'failed').length;
+  const cancelled = settled.filter((t) => t && t.status === 'canceled').length;
+  const failedTask = settled.find((t) => t && t.status === 'failed');
+  const lastError = (failedTask && failedTask.error) || '';
+
+  if (state === st) {
+    st.taskIds = [];
+    st.busy = false;
+    st.cancelRequested = false;
+    updateRunButton();
+    renderPreview();
   }
-
-  st.busy = false;
-  st.cancelRequested = false;
-  st.currentJobId = null;
-  if (state === st) { updateRunButton(); renderPreview(); }
   ctx.hideProgress();
 
   const parts = [`识别完成：成功 ${ok} 个`];
@@ -759,12 +778,10 @@ async function run() {
 async function onRunClick() {
   const st = state;
   if (st.busy) {
+    // 取消本工具入队的任务；引擎推理不可中断，取消会在「下一张/下一页开始前」生效
     st.cancelRequested = true;
+    for (const id of st.taskIds) st.ctx.tasks.cancel(id);
     updateRunButton();
-    // 引擎推理不可中断，取消会在「下一张/下一页开始前」生效
-    if (st.currentJobId && typeof st.ctx.ocrCancel === 'function') {
-      try { await st.ctx.ocrCancel(st.currentJobId); } catch { /* 任务可能刚结束 */ }
-    }
     st.ctx.setStatus('正在取消…');
     return;
   }
@@ -808,8 +825,7 @@ export function mount(container, ctx) {
     files: [],
     busy: false,
     cancelRequested: false,
-    currentJobId: null,
-    jobSeq: 0,
+    taskIds: [],
     status: null,
     statusKnown: false,
     fontBytes: null,
@@ -892,8 +908,8 @@ export function mount(container, ctx) {
 
 export function unmount() {
   if (!state) return;
+  // disposed 只用于「不要再往这一页画界面」；硬契约：切走（含 LRU 回收）**不取消**队列里的任务
   state.disposed = true;
-  state.cancelRequested = true;
   for (const [el, type, handler] of state.listeners) {
     el.removeEventListener(type, handler);
   }

@@ -1,6 +1,8 @@
 // 工具箱框架：左侧工具列表渲染、工具挂载/卸载、通用能力上下文（ctx）、设置与帮助弹窗
 import { TOOLS, GROUPS } from './registry.js';
 import * as settings from '../shared/settings.js';
+import { createQueue } from '../shared/taskqueue.js';
+import { createTaskCenter } from './taskcenter.js';
 
 const els = {
   nav: document.getElementById('toolNav'),
@@ -9,6 +11,8 @@ const els = {
   info: document.getElementById('infoText'),
   btnSettings: document.getElementById('btnSettings'),
   btnHelp: document.getElementById('btnHelp'),
+  btnTasks: document.getElementById('btnTasks'),
+  taskBadge: document.getElementById('taskBadge'),
   progressBar: document.getElementById('progressBar'),
   progressFill: document.getElementById('progressFill'),
   progressText: document.getElementById('progressText'),
@@ -71,6 +75,31 @@ function onSystemThemeChange() {
 // 启动瞬间先按系统偏好上色：设置是异步从主进程读的，等它回来才上色的话，
 // 深色系统下会先闪一下白底（很扎眼）。这里同步按系统偏好先铺上，读回设置后再纠正。
 document.documentElement.dataset.theme = resolveTheme('system');
+
+// —— 跨工具任务队列（框架唯一实例） ——
+// 硬契约：**入队后的任务归属队列，不归属工具页。**
+// 工具 unmount()（LRU 回收）只退订自己的 UI 订阅，不得取消队列里的任务 —— 切走工具任务照跑，
+// 切回来还能看到进度与结果。任务中心的开关同样不影响执行。
+// 队列实例在这里创建、经 ctx.tasks 暴露给所有工具；纯逻辑与单测见 shared/taskqueue.js。
+const taskQueue = createQueue({
+  onChange: () => {
+    refreshTaskBadge();
+    if (taskCenter) taskCenter.refresh();
+  }
+});
+
+/** 任务中心面板（延迟到 init 时创建；面板开关不影响任务执行） */
+let taskCenter = null;
+
+/** 顶栏任务徽标：进行中 + 排队数量（0 个时隐藏） */
+function refreshTaskBadge() {
+  if (!els.btnTasks || !els.taskBadge) return;
+  const s = taskQueue.summary();
+  const active = s.running + s.queued;
+  els.taskBadge.hidden = active === 0;
+  els.taskBadge.textContent = active > 99 ? '99+' : String(active);
+  els.btnTasks.classList.toggle('has-active', active > 0);
+}
 
 // —— 框架通用能力（工具通过 ctx 调用，禁止工具直接操作这些 DOM） ——
 
@@ -160,6 +189,21 @@ const ctx = {
   // 剪贴板
   readClipboardImage: () => window.desktop.readClipboardImage(),
   writeClipboardImage: (bytes) => window.desktop.writeClipboardImage(bytes),
+  // 跨工具任务队列：工具把批量任务交给它执行（**任务归属队列，不归属工具页**）
+  // 工具 unmount() 只退订 UI 订阅，绝不取消这里的任务。
+  tasks: {
+    enqueue: (job) => taskQueue.enqueue(job),
+    runBatch: (batch) => taskQueue.runBatch(batch),
+    cancel: (id) => taskQueue.cancel(id),
+    cancelAll: () => taskQueue.cancelAll(),
+    list: () => taskQueue.list(),
+    get: (id) => taskQueue.get(id),
+    summary: () => taskQueue.summary(),
+    clearFinished: () => taskQueue.clearFinished(),
+    retry: (id) => taskQueue.retry(id),
+    recentFinished: (limit) => taskQueue.recentFinished(limit),
+    waitFor: (id) => taskQueue.waitFor(id)
+  },
   // 通用设置与版本信息
   settings,
   versions: window.desktop.versions,
@@ -753,6 +797,11 @@ async function init() {
 
   els.btnSettings.addEventListener('click', openSettings);
   els.btnHelp.addEventListener('click', openHelp);
+
+  // 任务中心：由 shell 持有；打开/关闭只影响面板，不影响队列里的任务继续跑
+  taskCenter = createTaskCenter({ queue: taskQueue });
+  if (els.btnTasks) els.btnTasks.addEventListener('click', () => taskCenter.toggle());
+  refreshTaskBadge();
 
   const sorted = [...TOOLS].sort((a, b) => (a.order || 0) - (b.order || 0));
   if (sorted.length > 0) {

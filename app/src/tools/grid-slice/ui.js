@@ -116,8 +116,6 @@ function on(el, type, handler) {
   state.listeners.push([el, type, handler]);
 }
 
-const nextFrame = () => new Promise((resolve) => requestAnimationFrame(() => resolve()));
-
 function fillSelect(sel, options) {
   sel.innerHTML = '';
   for (const o of options) {
@@ -528,60 +526,71 @@ async function run() {
 
   state.busy = true;
   state.cancelRequested = false;
+  state.taskIds = [];
   state.els.runBtn.disabled = true;
   state.els.runBtn.textContent = '切图中…';
   state.els.cancelBtn.hidden = false;
   state.els.cancelBtn.disabled = false;
   state.els.clearBtn.disabled = true;
 
-  const outputDir = state.ctx.settings.getSettings().outputDir || undefined;
+  const ctx = state.ctx;
+  const outputDir = ctx.settings.getSettings().outputDir || undefined;
   const ext = params.format === 'jpg' ? '.jpg' : '.png';
   const t0 = performance.now();
-  let done = 0;
-  let failed = 0;
-  let filesOut = 0;
-  let lastPath = '';
-  let lastError = '';
 
-  for (let i = 0; i < files.length; i += 1) {
-    if (state.cancelRequested) break;
-    const f = files[i];
-    state.ctx.showProgress(`切图 ${i + 1}/${files.length}：${f.name}`, (i / files.length) * 100);
-    await nextFrame();
-    try {
-      const bytes = await state.ctx.readFile(f.path);
-      const img = await decodeImageFromBytes(bytes);
-      const precheck = computeCells({ width: img.width, height: img.height, rows: params.rows, cols: params.cols, gap: params.gap, margin: params.margin });
-      if (precheck.warnings.length > 0) throw new Error(precheck.warnings[0]);
-      const names = namingForCells({ baseName: f.baseName, rows: params.rows, cols: params.cols, order: params.order });
-      const { plan, parts } = await sliceImage(img.pixels, img.width, img.height, params);
+  for (const f of files) { f.result = ''; f.error = false; f.fileCount = 0; }
+  renderList();
 
-      let saved = 0;
-      for (const part of parts) {
-        if (state.cancelRequested) break;
-        lastPath = await state.ctx.saveImageNextTo({
-          sourcePath: f.path, targetDir: outputDir, baseName: names[part.index - 1], ext, bytes: part.bytes
-        });
-        saved += 1;
+  // 任务归属队列：图片类走 io 通道（并发 2）；每张图（→ N 个切片文件）算一个任务
+  const jobs = files.map((f, index) => ({
+    label: f.name,
+    inputPaths: [f.path],
+    outputDir,
+    run: async ({ report, isCancelled }) => {
+      if (isCancelled()) return { canceled: true };
+      const step = `切图 ${index + 1}/${files.length}：${f.name}`;
+      report({ percent: 0, text: step });
+      if (state && state.ctx.isActive()) state.ctx.showProgress(step, (index / files.length) * 100);
+      try {
+        const bytes = await ctx.readFile(f.path);
+        const img = await decodeImageFromBytes(bytes);
+        const precheck = computeCells({ width: img.width, height: img.height, rows: params.rows, cols: params.cols, gap: params.gap, margin: params.margin });
+        if (precheck.warnings.length > 0) throw new Error(precheck.warnings[0]);
+        const names = namingForCells({ baseName: f.baseName, rows: params.rows, cols: params.cols, order: params.order });
+        const { plan, parts } = await sliceImage(img.pixels, img.width, img.height, params);
+
+        const outPaths = [];
+        for (const part of parts) {
+          if (isCancelled()) return { canceled: true };
+          const saved = await ctx.saveImageNextTo({
+            sourcePath: f.path, targetDir: outputDir, baseName: names[part.index - 1], ext, bytes: part.bytes
+          });
+          outPaths.push(saved);
+        }
+        f.result = `已切出 ${outPaths.length} 块 ｜ 每块 ${plan.outW} × ${plan.outH}`;
+        f.error = false;
+        f.fileCount = outPaths.length;
+        if (state && state.ctx.isActive()) state.ctx.setInfo({ width: plan.outW, height: plan.outH, ms: Math.round(performance.now() - t0) });
+        report({ percent: 100, text: f.result });
+        if (state) renderList();
+        return { ok: true, outputPaths: outPaths, outputDir };
+      } catch (err) {
+        f.result = `失败：${err.message}`;
+        f.error = true;
+        report({ percent: 100, text: f.result });
+        if (state) renderList();
+        return { ok: false, error: err.message };
       }
-      f.result = `已切出 ${saved} 块 ｜ 每块 ${plan.outW} × ${plan.outH}`;
-      f.error = false;
-      f.fileCount = saved;
-      done += 1;
-      filesOut += saved;
-      state.ctx.setInfo({ width: plan.outW, height: plan.outH, ms: Math.round(performance.now() - t0) });
-    } catch (err) {
-      f.result = `失败：${err.message}`;
-      f.error = true;
-      failed += 1;
-      lastError = err.message;
-      console.error('[grid-slice] 切图失败', f.name, err);
     }
-    renderList();
-  }
+  }));
 
-  const cancelled = state.cancelRequested;
-  state.ctx.hideProgress();
+  const ids = jobs.map((job) => ctx.tasks.enqueue({ toolId: 'grid-slice', toolName: '九宫格切图', lane: 'io', ...job }));
+  state.taskIds = ids;
+  const settled = await Promise.all(ids.map((id) => ctx.tasks.waitFor(id)));
+
+  if (!state) return; // 工具页已被回收：任务照跑完了，这里只跳过界面收尾
+  state.taskIds = [];
+  ctx.hideProgress();
   state.busy = false;
   state.cancelRequested = false;
   state.els.runBtn.textContent = '开始切图';
@@ -589,8 +598,17 @@ async function run() {
   state.els.clearBtn.disabled = false;
   refreshRunState();
 
-  const head = cancelled ? '已取消' : '切图完成';
-  state.ctx.setStatus(`${head}：成功 ${done} 张${failed ? `，失败 ${failed} 张（${lastError}）` : ''}，共输出 ${filesOut} 个文件`);
+  const doneCount = settled.filter((t) => t && t.status === 'done').length;
+  const failedCount = settled.filter((t) => t && t.status === 'failed').length;
+  const canceledCount = settled.filter((t) => t && t.status === 'canceled').length;
+  const failedTask = settled.find((t) => t && t.status === 'failed');
+  const lastError = (failedTask && failedTask.error) || '';
+  const filesOut = settled.reduce((n, t) => n + (t && t.status === 'done' ? t.output.paths.length : 0), 0);
+  const lastDone = [...settled].reverse().find((t) => t && t.status === 'done' && t.output.paths.length);
+  const lastPath = lastDone ? lastDone.output.paths[0] : '';
+
+  const head = canceledCount > 0 ? '已取消' : '切图完成';
+  state.ctx.setStatus(`${head}：成功 ${doneCount} 张${failedCount ? `，失败 ${failedCount} 张（${lastError}）` : ''}，共输出 ${filesOut} 个文件`);
   state.els.result.textContent = lastPath
     ? (outputDir ? `输出到：${outputDir}（每张图 ${params.rows * params.cols} 个文件）` : `输出：${lastPath} 等 ${filesOut} 个文件`)
     : '';
@@ -606,6 +624,7 @@ export function mount(container, ctx) {
     files: [],
     busy: false,
     cancelRequested: false,
+    taskIds: [],
     selectedPath: '',
     preview: null,
     previewToken: 0,
@@ -656,6 +675,7 @@ export function mount(container, ctx) {
   on(els.cancelBtn, 'click', () => {
     if (state.busy) {
       state.cancelRequested = true;
+      for (const id of state.taskIds) state.ctx.tasks.cancel(id);
       state.els.cancelBtn.disabled = true;
       state.ctx.setStatus('正在取消…（当前这张切完就停）');
     }

@@ -99,8 +99,6 @@ function on(el, type, handler) {
   state.listeners.push([el, type, handler]);
 }
 
-const nextFrame = () => new Promise((resolve) => requestAnimationFrame(() => resolve()));
-
 function themeColor(name, fallback) {
   try {
     const v = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
@@ -647,89 +645,113 @@ function endDrag() {
 
 // —— 进度 ——
 
+/**
+ * 正在跑的 ffmpeg 任务 → 对应任务的进度上报入口（含「拼接」这种整体任务）。
+ * 任务跑在队列里（工具页切走/回收也照跑），进度靠这份模块级映射找到对应任务。
+ */
+const jobReports = new Map();
+
 function onProgress(payload) {
-  if (!state || !payload) return;
-  if (!state.currentJobId || payload.jobId !== state.currentJobId) return;
-  if (typeof payload.percent === 'number') state.percent = payload.percent;
-  if (payload.speed) state.lastSpeed = payload.speed;
-
-  const percent = Math.round(state.percent || 0);
-  const speed = state.lastSpeed ? `（${state.lastSpeed}）` : '';
-  if (state.mode === 'concat') {
-    state.ctx.showProgress(`拼接 ${state.files.length} 个文件：${percent}%${speed}`, percent);
-    return;
-  }
-
-  const total = state.total || 1;
-  const index = state.currentIndex || 0;
-  const who = state.files[index];
-  const overall = Math.min(99, ((index + (state.percent || 0) / 100) / total) * 100);
-  state.ctx.showProgress(
-    `${who ? `${who.name}（${index + 1}/${total}）：` : ''}${percent}%${speed}`,
-    overall
-  );
+  if (!payload || !payload.jobId) return;
+  const entry = jobReports.get(payload.jobId);
+  if (!entry) return;
+  const raw = typeof payload.percent === 'number' ? payload.percent : 0;
+  const percent = Math.round(raw);
+  const speed = payload.speed ? `（${payload.speed}）` : '';
+  const overall = entry.concat
+    ? raw
+    : Math.min(100, ((entry.index + raw / 100) / entry.total) * 100);
+  const text = entry.concat
+    ? `拼接 ${entry.total} 个文件：${percent}%${speed}`
+    : `${entry.name}（${entry.index + 1}/${entry.total}）：${percent}%${speed}`;
+  entry.report({ percent: overall, text });
+  if (state && state.ctx.isActive()) state.ctx.showProgress(text, Math.min(99, overall));
 }
 
 // —— 运行 ——
 
+/**
+ * 入队执行（任务归属队列，不归属工具页）：队列按 cpu 通道串行跑（ffmpeg 吃满 CPU）。
+ * 「拼接」是整体一次操作算一个任务；普通剪辑每张音频算一个任务。
+ * 仍 await 全部结束，只是为了保留原有的「跑完汇总 + 按钮变回开始」界面行为。
+ */
 async function run() {
   const { els } = state;
   const files = state.files;
   const params = readParams();
-  const outputDir = state.ctx.settings.getSettings().outputDir || undefined;
-  const stamp = Date.now();
-  let done = 0;
-  let failed = 0;
-  let copied = 0;
-  let lastPath = '';
-  let lastError = '';
-  state.mode = params.concat ? 'concat' : 'single';
+  const ctx = state.ctx;
+  const outputDir = ctx.settings.getSettings().outputDir || undefined;
+  let copied = 0; // 走了「极速截取（不重编码）」的文件数
 
   // —— 拼接：一次把整个列表按顺序合并（截取/滤镜不生效） ——
   if (params.concat) {
     els.result.textContent = '';
     for (const f of files) f.result = null;
     renderList();
-    const jobId = `aedit-concat-${stamp}`;
-    state.total = 1;
-    state.currentIndex = 0;
-    state.percent = 0;
-    state.currentJobId = jobId;
-    state.ctx.showProgress('拼接 0%', 0);
-    await nextFrame();
-    let res;
-    try {
-      const durMs = files.reduce((acc, f) => acc + Math.max(1, Math.round((f.waveDurationMs || (f.durationSec || 0) * 1000) || 0)), 0);
-      const plan = buildEditPlan(files[0], {
-        ...params, concatCount: files.length, segmentDurationsMs: files.map((f) => f.waveDurationMs || (f.durationSec || 0) * 1000), totalDurationMs: durMs
-      });
-      res = await convertMediaMulti({
-        inputPaths: files.map((f) => f.path),
-        outputDir,
-        baseName: `${files[0].baseName}-拼接`,
-        ext: plan.ext,
-        args: plan.args,
-        durationMs: plan.durationMs,
-        jobId
-      });
-    } catch (err) {
-      res = { ok: false, message: err.message };
-    }
-    state.currentJobId = null;
-    state.total = 0;
-    state.mode = 'single';
-    state.ctx.hideProgress();
-    if (state.cancelRequested) {
-      state.ctx.setStatus('已取消拼接');
-    } else if (res && res.ok) {
-      state.ctx.setStatus(`拼接完成：${baseNameOf(res.path)}（${formatSize(res.size)}）`);
-      els.result.textContent = `输出：${res.path}`;
-      for (const f of files) f.result = { ok: true, text: '已并入拼接输出', path: res.path };
+
+    let jobId = null; // 与 onCancel 共享绑定
+    let concatResult = null;
+    let concatSize = 0;
+    const taskId = ctx.tasks.enqueue({
+      toolId: 'audio-edit',
+      toolName: '音频剪辑',
+      label: `拼接 ${files.length} 个文件`,
+      lane: 'cpu',
+      inputPaths: files.map((f) => f.path),
+      outputDir,
+      run: async ({ report }) => {
+        try {
+          const jid = `aedit-concat-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+          jobId = jid;
+          jobReports.set(jid, { report, index: 0, total: 1, name: '', concat: true });
+          const durMs = files.reduce((acc, f) => acc + Math.max(1, Math.round((f.waveDurationMs || (f.durationSec || 0) * 1000) || 0)), 0);
+          const plan = buildEditPlan(files[0], {
+            ...params, concatCount: files.length, segmentDurationsMs: files.map((f) => f.waveDurationMs || (f.durationSec || 0) * 1000), totalDurationMs: durMs
+          });
+          const res = await convertMediaMulti({
+            inputPaths: files.map((f) => f.path),
+            outputDir,
+            baseName: `${files[0].baseName}-拼接`,
+            ext: plan.ext,
+            args: plan.args,
+            durationMs: plan.durationMs,
+            jobId: jid
+          });
+          if (res && res.ok) {
+            concatResult = res.path;
+            concatSize = res.size;
+            return { ok: true, outputPaths: [res.path], outputDir };
+          }
+          return { ok: false, error: (res && res.message) || '拼接失败' };
+        } catch (err) {
+          return { ok: false, error: err.message };
+        } finally {
+          if (jobId) jobReports.delete(jobId);
+          jobId = null;
+        }
+      },
+      onCancel: () => {
+        if (!jobId) return;
+        try { cancelMediaJob(jobId); } catch { /* 任务可能刚结束，忽略 */ }
+      }
+    });
+    state.taskIds = [taskId];
+    const task = await ctx.tasks.waitFor(taskId);
+
+    if (!state) return; // 工具页已被回收：任务照跑完了，这里只跳过界面收尾
+    state.taskIds = [];
+    ctx.hideProgress();
+    if (task && task.status === 'done' && concatResult) {
+      ctx.setStatus(`拼接完成：${baseNameOf(concatResult)}（${formatSize(concatSize)}）`);
+      els.result.textContent = `输出：${concatResult}`;
+      for (const f of files) f.result = { ok: true, text: '已并入拼接输出', path: concatResult };
       renderList();
+    } else if (task && task.status === 'canceled') {
+      ctx.setStatus('已取消拼接');
     } else {
-      lastError = (res && res.message) || '拼接失败';
-      state.ctx.setStatus(`拼接失败：${lastError}`);
-      els.result.textContent = `失败原因：${lastError}`;
+      const message = (task && task.error) || '拼接失败';
+      ctx.setStatus(`拼接失败：${message}`);
+      els.result.textContent = `失败原因：${message}`;
     }
     return;
   }
@@ -739,67 +761,92 @@ async function run() {
   for (const f of files) f.result = null;
   renderList();
 
-  for (let i = 0; i < total; i++) {
-    if (state.cancelRequested) break;
-    const f = files[i];
-    state.currentIndex = i;
-    state.percent = 0;
-    state.lastSpeed = '';
-    const jobId = `aedit-${stamp}-${i + 1}`;
-    state.currentJobId = jobId;
-    state.ctx.showProgress(`${f.name}（${i + 1}/${total}）：0%`, (i / total) * 100);
-    await nextFrame();
+  const jobs = files.map((f, index) => {
+    let jobId = null; // 与 onCancel 共享绑定
+    return {
+      label: f.name,
+      inputPaths: [f.path],
+      outputDir,
+      run: async ({ report, isCancelled }) => {
+        const setJobId = (id) => {
+          if (jobId) jobReports.delete(jobId);
+          jobId = id;
+          if (id) jobReports.set(id, { report, index, total, name: f.name, concat: false });
+        };
+        let res;
+        try {
+          const jid = `aedit-${Date.now()}-${index + 1}-${Math.random().toString(36).slice(2, 6)}`;
+          const durMs = f.waveDurationMs || Math.round((f.durationSec || 0) * 1000);
+          const sel = normalizeSelection({ startMs: f.sel ? f.sel.startMs : 0, endMs: f.sel ? f.sel.endMs : durMs, durationMs: durMs });
+          const plan = buildEditPlan(
+            { ...f, durationMs: durMs },
+            { ...params, startMs: sel.startMs, endMs: sel.endMs, concatCount: 0 }
+          );
+          if (plan.copy) copied += 1;
+          setJobId(jid);
+          res = await convertMedia({
+            inputPath: f.path,
+            outputDir,
+            baseName: f.baseName,
+            ext: plan.ext,
+            inputArgs: plan.inputArgs,
+            args: plan.args,
+            durationMs: plan.durationMs,
+            jobId: jid
+          });
+        } catch (err) {
+          res = { ok: false, message: err.message };
+        } finally {
+          setJobId(null);
+        }
 
-    let res;
-    try {
-      const durMs = f.waveDurationMs || Math.round((f.durationSec || 0) * 1000);
-      const sel = normalizeSelection({ startMs: f.sel ? f.sel.startMs : 0, endMs: f.sel ? f.sel.endMs : durMs, durationMs: durMs });
-      const plan = buildEditPlan(
-        { ...f, durationMs: durMs },
-        { ...params, startMs: sel.startMs, endMs: sel.endMs, concatCount: 0 }
-      );
-      if (plan.copy) copied += 1;
-      res = await convertMedia({
-        inputPath: f.path,
-        outputDir,
-        baseName: f.baseName,
-        ext: plan.ext,
-        inputArgs: plan.inputArgs,
-        args: plan.args,
-        durationMs: plan.durationMs,
-        jobId
-      });
-    } catch (err) {
-      res = { ok: false, message: err.message };
-    }
-    state.currentJobId = null;
+        if (isCancelled()) {
+          f.result = { ok: false, text: '已取消' };
+          if (state) renderList();
+          return { canceled: true };
+        }
+        if (res && res.ok) {
+          f.result = { ok: true, text: `→ ${baseNameOf(res.path)}（${formatSize(res.size)}）`, path: res.path };
+          if (state) renderList();
+          return { ok: true, outputPaths: [res.path], outputDir };
+        }
+        const message = (res && res.message) || '剪辑失败';
+        f.result = { ok: false, text: `✗ ${message}` };
+        if (state) renderList();
+        return { ok: false, error: message };
+      },
+      onCancel: () => {
+        if (!jobId) return;
+        try { cancelMediaJob(jobId); } catch { /* 任务可能刚结束，忽略 */ }
+      }
+    };
+  });
 
-    if (state.cancelRequested) {
-      f.result = { ok: false, text: '已取消' };
-      renderList();
-      break;
-    }
+  const ids = jobs.map((job) => ctx.tasks.enqueue({
+    toolId: 'audio-edit',
+    toolName: '音频剪辑',
+    lane: 'cpu',
+    ...job
+  }));
+  state.taskIds = ids;
+  const settled = await Promise.all(ids.map((id) => ctx.tasks.waitFor(id)));
 
-    if (res && res.ok) {
-      done += 1;
-      lastPath = res.path;
-      f.result = { ok: true, text: `→ ${baseNameOf(res.path)}（${formatSize(res.size)}）`, path: res.path };
-    } else {
-      failed += 1;
-      lastError = (res && res.message) || '剪辑失败';
-      f.result = { ok: false, text: `✗ ${lastError}` };
-    }
-    renderList();
-  }
+  if (!state) return; // 工具页已被回收：任务照跑完了，这里只跳过界面收尾
+  state.taskIds = [];
+  ctx.hideProgress();
+  const done = settled.filter((t) => t && t.status === 'done').length;
+  const failed = settled.filter((t) => t && t.status === 'failed').length;
+  const canceledCount = settled.filter((t) => t && t.status === 'canceled').length;
+  const failedTask = settled.find((t) => t && t.status === 'failed');
+  const lastError = (failedTask && failedTask.error) || '';
+  const doneTask = [...settled].reverse().find((t) => t && t.status === 'done' && t.output.paths.length);
+  const lastPath = doneTask ? doneTask.output.paths[0] : '';
 
-  state.currentJobId = null;
-  state.total = 0;
-  state.ctx.hideProgress();
   const copyNote = copied > 0 ? `，其中 ${copied} 个为极速截取` : '';
-  if (state.cancelRequested) {
-    state.ctx.setStatus(`已取消：成功 ${done} 个，失败 ${failed} 个`);
+  if (canceledCount > 0) {
+    ctx.setStatus(`已取消：成功 ${done} 个，失败 ${failed} 个`);
   } else {
-    state.ctx.setStatus(`剪辑完成：成功 ${done} 个${copyNote}${failed ? `，失败 ${failed} 个（${lastError}）` : ''}`);
+    ctx.setStatus(`剪辑完成：成功 ${done} 个${copyNote}${failed ? `，失败 ${failed} 个（${lastError}）` : ''}`);
   }
   if (lastPath) els.result.textContent = `输出：${lastPath}`;
   else if (failed) els.result.textContent = `失败原因：${lastError}`;
@@ -807,12 +854,9 @@ async function run() {
 
 async function onRunClick() {
   if (state.busy) {
-    // 运行中：点击＝取消（结束 ffmpeg 进程树并停止队列）
+    // 运行中：点击＝取消（取消本工具入队的任务；队列会让 ffmpeg 进程树结束）
     state.cancelRequested = true;
-    const jobId = state.currentJobId;
-    if (jobId) {
-      try { await cancelMediaJob(jobId); } catch { /* 任务可能刚结束，忽略 */ }
-    }
+    for (const id of state.taskIds) state.ctx.tasks.cancel(id);
     state.ctx.setStatus('正在取消…');
     return;
   }
@@ -831,6 +875,7 @@ async function onRunClick() {
 
   state.busy = true;
   state.cancelRequested = false;
+  state.taskIds = [];
   updateRunButton();
   try {
     await run();
@@ -841,7 +886,7 @@ async function onRunClick() {
   } finally {
     state.busy = false;
     state.cancelRequested = false;
-    state.currentJobId = null;
+    state.taskIds = [];
     updateRunButton();
   }
 }
@@ -869,12 +914,7 @@ export function mount(container, ctx) {
     selectedIndex: -1,
     busy: false,
     cancelRequested: false,
-    currentJobId: null,
-    currentIndex: 0,
-    total: 0,
-    percent: 0,
-    lastSpeed: '',
-    mode: 'single',   // 'single' | 'concat'：进度文案与运行分支用
+    taskIds: [],
     ffmpeg: null,
     unsubProgress: null,
     waveToken: 0,
@@ -958,10 +998,7 @@ export function unmount() {
   if (state.unsubProgress) {
     try { state.unsubProgress(); } catch { /* 忽略 */ }
   }
-  // 切走时不遗留后台 ffmpeg 进程
-  if (state.busy && state.currentJobId) {
-    try { cancelMediaJob(state.currentJobId); } catch { /* 忽略 */ }
-  }
+  // 硬契约：任务归属队列，不归属工具页 —— 切走（含 LRU 回收）**不取消**在跑的任务。
   // 波形拖动的 window 监听（进行中才存在）
   if (state.dragCleanup) {
     try { state.dragCleanup(); } catch { /* 忽略 */ }

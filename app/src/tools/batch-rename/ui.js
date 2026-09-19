@@ -345,13 +345,33 @@ async function run() {
   state.ctx.showProgress(`正在重命名 ${plan.renames.length} 个文件…`, 30);
   await nextFrame();
 
+  // 任务归属队列：重命名在主进程里是一次原子操作（两阶段执行，链式改名/互换名不会互相踩），
+  // 所以整批算一个任务；这样切走工具页（或被回收）时改名照常完成，任务中心也能看到。
   let res = { ok: false, done: 0, failed: [] };
-  try {
-    res = await state.ctx.renameBatch(plan.renames);
-  } catch (err) {
-    res = { ok: false, done: 0, failed: [{ from: '', to: '', message: err.message }] };
-  }
+  const ctx = state.ctx;
+  const taskId = ctx.tasks.enqueue({
+    toolId: 'batch-rename',
+    toolName: '批量重命名',
+    label: `批量重命名 ${plan.renames.length} 个文件`,
+    lane: 'cpu',
+    inputPaths: plan.renames.map((r) => r.from),
+    run: async ({ report }) => {
+      report({ percent: 30, text: `正在重命名 ${plan.renames.length} 个文件…` });
+      try {
+        res = await ctx.renameBatch(plan.renames);
+      } catch (err) {
+        res = { ok: false, done: 0, failed: [{ from: '', to: '', message: err.message }] };
+      }
+      report({ percent: 100 });
+      const reasons = [...new Set(res.failed.map((f) => f.message))].slice(0, 3).join('；');
+      return res.failed.length === 0
+        ? { ok: true, outputPaths: plan.renames.map((r) => r.to) }
+        : { ok: false, error: `${res.failed.length} 个失败：${reasons}` };
+    }
+  });
+  await ctx.tasks.waitFor(taskId);
 
+  if (!state) return; // 工具页已被回收：改名已经完成，这里只跳过界面收尾
   state.ctx.hideProgress();
 
   // 成功的从列表里拿掉（活已经干完），失败的留下并写明原因

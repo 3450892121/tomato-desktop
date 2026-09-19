@@ -639,19 +639,6 @@ function updateRunButton() {
   }
 }
 
-/** 造操作的公共钩子：进度折算到全局 + 取消判断 + 换帧避免界面卡死 */
-function makeHooks(st, fileIndex, fileCount, label) {
-  return {
-    onProgress: async (done, total) => {
-      const ratio = total ? done / total : 1;
-      const overall = ((fileIndex + ratio) / fileCount) * 100;
-      st.ctx.showProgress(`${label}（${fileIndex + 1}/${fileCount}）：第 ${done}/${total} 页`, overall);
-      await nextFrame();
-    },
-    shouldCancel: () => st.cancelRequested || st.disposed
-  };
-}
-
 /** 单文件处理：返回 {bytes, detail}（detail 为界面展示用的补充说明） */
 async function runOne(op, bytes, params, f, st, hooks, fontBytes) {
   switch (op) {
@@ -724,63 +711,80 @@ async function run() {
 
   st.busy = true;
   st.cancelRequested = false;
+  st.taskIds = [];
   if (state === st) updateRunButton();
   files.forEach((f) => {
     f.result = null;
   });
   paint();
 
-  let ok = 0;
-  let failed = 0;
-  let cancelled = 0;
-  let lastPath = '';
-  let lastError = '';
   const outputDir = ctx.settings.getSettings().outputDir || undefined;
+  const fileCount = files.length;
 
-  for (let i = 0; i < files.length; i++) {
-    const f = files[i];
-    if (st.cancelRequested || st.disposed) {
-      cancelled = files.length - i;
-      break;
-    }
-    ctx.showProgress(`${op.label}（${i + 1}/${files.length}）：${f.name}`, (i / files.length) * 100);
-    await nextFrame();
-    try {
-      const bytes = await ctx.readFile(f.path);
-      const hooks = { ...makeHooks(st, i, files.length, op.label), fileIndex: i, fileCount: files.length };
-      const res = await runOne(st.op, bytes, params, f, st, hooks, fontBytes);
-      if (res.cancelled) {
-        cancelled += 1;
-        continue;
+  // 任务归属队列：PDF 操作吃满 CPU，走 cpu 通道串行；每个 PDF 算一个任务。
+  // 切走工具页（含 LRU 回收）不再取消任务 —— 这里只退订 UI，队列照跑完。
+  const jobs = files.map((f, i) => ({
+    label: f.name,
+    inputPaths: [f.path],
+    outputDir,
+    run: async ({ report, isCancelled }) => {
+      const hooks = {
+        // 取消只看队列标志（页面是否被回收不再等于取消）
+        shouldCancel: () => isCancelled(),
+        onProgress: async (done, total) => {
+          const ratio = total ? done / total : 1;
+          const overall = ((i + ratio) / fileCount) * 100;
+          const text = `${op.label}（${i + 1}/${fileCount}）：第 ${done}/${total} 页`;
+          report({ percent: overall, text });
+          if (state === st && !st.disposed) st.ctx.showProgress(text, overall);
+          await nextFrame(); // 换帧，避免界面卡死
+        },
+        fileIndex: i,
+        fileCount
+      };
+      try {
+        const bytes = await ctx.readFile(f.path);
+        const res = await runOne(st.op, bytes, params, f, st, hooks, fontBytes);
+        if (res.cancelled || isCancelled()) return { canceled: true };
+        const target = await ctx.saveNextTo({
+          sourcePath: f.path,
+          targetDir: outputDir,
+          // 带上操作后缀（_压缩 / _水印 / _加密 …），避免产出与原文件同名
+          // （同名时 saveNextTo 只能加 (1)(2) 序号，用户分不清哪个文件做了什么处理）
+          baseName: `${f.baseName}_${op.suffix}`,
+          ext: '.pdf',
+          bytes: res.bytes
+        });
+        f.result = { ok: true, text: `${fmtBytes(res.bytes.length)}${res.detail ? `｜${res.detail}` : ''}｜${target}` };
+        paint();
+        return { ok: true, outputPaths: [target], outputDir };
+      } catch (err) {
+        if (err && err.name === 'CancelledError') return { canceled: true };
+        f.result = { ok: false, text: `失败：${err.message}` };
+        paint();
+        return { ok: false, error: err.message };
       }
-      const target = await ctx.saveNextTo({
-        sourcePath: f.path,
-        targetDir: outputDir,
-        // 带上操作后缀（_压缩 / _水印 / _加密 …），避免产出与原文件同名
-        // （同名时 saveNextTo 只能加 (1)(2) 序号，用户分不清哪个文件做了什么处理）
-        baseName: `${f.baseName}_${op.suffix}`,
-        ext: '.pdf',
-        bytes: res.bytes
-      });
-      lastPath = target;
-      ok += 1;
-      f.result = { ok: true, text: `${fmtBytes(res.bytes.length)}${res.detail ? `｜${res.detail}` : ''}｜${target}` };
-    } catch (err) {
-      if (err && err.name === 'CancelledError') {
-        cancelled += 1;
-        continue;
-      }
-      failed += 1;
-      lastError = err.message;
-      f.result = { ok: false, text: `失败：${err.message}` };
-      console.error('[pdf-edit] 处理失败', f.name, err);
-    } finally {
-      paint();
     }
+  }));
+
+  const ids = jobs.map((job) => ctx.tasks.enqueue({ toolId: 'pdf-edit', toolName: 'PDF 编辑整理', lane: 'cpu', ...job }));
+  st.taskIds = ids;
+  const settled = await Promise.all(ids.map((id) => ctx.tasks.waitFor(id)));
+
+  const ok = settled.filter((t) => t && t.status === 'done').length;
+  const failed = settled.filter((t) => t && t.status === 'failed').length;
+  const cancelled = settled.filter((t) => t && t.status === 'canceled').length;
+  const failedTask = settled.find((t) => t && t.status === 'failed');
+  const lastError = (failedTask && failedTask.error) || '';
+  const doneTask = [...settled].reverse().find((t) => t && t.status === 'done' && t.output.paths.length);
+  const lastPath = doneTask ? doneTask.output.paths[0] : '';
+
+  if (state === st) {
+    st.taskIds = [];
+    st.busy = false;
+    st.cancelRequested = false;
+    updateRunButton();
   }
-
-  st.busy = false;
-  if (state === st) updateRunButton();
   ctx.hideProgress();
 
   if (!failed && !cancelled) {
@@ -823,6 +827,7 @@ export function mount(container, ctx) {
     fontPromise: null,
     busy: false,
     cancelRequested: false,
+    taskIds: [],
     disposed: false,
     container
   };
@@ -866,7 +871,9 @@ export function mount(container, ctx) {
   on(els.addMore, 'click', openDialog);
   on(els.runBtn, 'click', () => {
     if (state.busy) {
+      // 取消本工具入队的任务（队列会在当前这个 PDF 处理完后停下后续任务）
       state.cancelRequested = true;
+      for (const id of state.taskIds) state.ctx.tasks.cancel(id);
       updateRunButton();
       state.ctx.setStatus('正在取消，请稍候…');
       return;
@@ -899,8 +906,8 @@ export function mount(container, ctx) {
 
 export function unmount() {
   if (!state) return;
+  // disposed 只用于「不要再往这一页画界面」；硬契约：切走（含 LRU 回收）**不取消**队列里的任务
   state.disposed = true;
-  state.cancelRequested = true;
   for (const [el, type, handler] of state.listeners) {
     el.removeEventListener(type, handler);
   }

@@ -66,13 +66,16 @@ const settingsIoTest = process.argv.includes('--settingsio-test');
 // C 批工具自检：`electron . --pdf-ocr-test` 覆盖「PDF 编辑整理」与「文字识别」（含 OCR 引擎真实识别）
 const pdfOcrTest = process.argv.includes('--pdf-ocr-test');
 
+// 任务中心界面自检：`electron . --queue-ui-test`（含「切走工具页后任务继续跑完」这条核心断言）
+const queueUiTest = process.argv.includes('--queue-ui-test');
+
 // 测试模式下关闭硬件加速：保证截图（capturePage）在任何机器上都能稳定拿到画面
-if (uiTest || pdfUiTest || mediaUiTest || audioUiTest || asrUiTest || themeTest || avTest || imgbatchTest || settingsIoTest || pdfOcrTest) {
+if (uiTest || pdfUiTest || mediaUiTest || audioUiTest || asrUiTest || themeTest || avTest || imgbatchTest || settingsIoTest || pdfOcrTest || queueUiTest) {
   app.disableHardwareAcceleration();
 }
 
 /** 是否处于任一自动测试模式：此时系统对话框一律换成本地测试文件（避免测试卡在弹窗上） */
-const testMode = () => uiTest || pdfUiTest || mediaTest || mediaUiTest || audioTest || audioUiTest || asrTest || asrUiTest || ocrPoc || themeTest || avTest || imgbatchTest || settingsIoTest || pdfOcrTest;
+const testMode = () => uiTest || pdfUiTest || mediaTest || mediaUiTest || audioTest || audioUiTest || asrTest || asrUiTest || ocrPoc || themeTest || avTest || imgbatchTest || settingsIoTest || pdfOcrTest || queueUiTest;
 
 /** 自动测试模式下：从测试目录取指定扩展名的文件（对话框桩用；扩展名带不带点都能匹配） */
 async function testDirFiles(exts, { startWith, exact } = {}) {
@@ -496,6 +499,20 @@ function createMainWindow() {
         console.log(`PDF_OCR_TEST ${JSON.stringify({ ok: result.ok, failures: result.failures })}`);
       } catch (err) {
         console.log(`PDF_OCR_TEST_FAIL ${err.message}\n${err.stack}`);
+      } finally {
+        app.quit();
+      }
+    });
+  }
+
+  if (queueUiTest) {
+    const { runQueueUiTest } = require('./tests/queue-ui-test.js');
+    mainWindow.webContents.once('did-finish-load', async () => {
+      try {
+        const result = await runQueueUiTest(mainWindow);
+        console.log(`QUEUE_UI_TEST ${JSON.stringify({ pass: result.pass, failures: result.failures })}`);
+      } catch (err) {
+        console.log(`QUEUE_UI_TEST_FAIL ${err.message}\n${err.stack}`);
       } finally {
         app.quit();
       }

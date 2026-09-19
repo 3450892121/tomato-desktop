@@ -80,8 +80,6 @@ function on(el, type, handler) {
   state.listeners.push([el, type, handler]);
 }
 
-const nextFrame = () => new Promise((resolve) => requestAnimationFrame(() => resolve()));
-
 function fmtBytes(n) {
   if (n >= 1024 * 1024) return `${(n / 1024 / 1024).toFixed(2)} MB`;
   if (n >= 1024) return `${Math.round(n / 1024)} KB`;
@@ -259,6 +257,34 @@ async function onDrop(event) {
 
 // —— 运行 ——
 
+/** 压缩单张（读字节 → 解码 → 压缩 → 落盘），返回结果与体积统计 */
+async function compressOne(f, params, ctx, outputDir) {
+  const bytes = await ctx.readFile(f.path);
+  const img = await decodeImageFromBytes(bytes);
+  const format = params.format === 'auto' ? autoFormat(f.ext) : params.format;
+  const out = await compressPixels(img.pixels, img.width, img.height, { ...params, format });
+  const ext = format === 'jpg' ? '.jpg' : `.${format}`;
+  const path = await ctx.saveNextTo({
+    sourcePath: f.path, targetDir: outputDir, baseName: f.baseName, ext, bytes: out.bytes
+  });
+  const ratio = bytes.byteLength > 0 ? (1 - out.bytes.length / bytes.byteLength) * 100 : 0;
+  return {
+    ok: true,
+    path,
+    inBytes: bytes.byteLength,
+    outBytes: out.bytes.length,
+    width: out.width,
+    height: out.height,
+    text: `${fmtBytes(bytes.byteLength)} → ${fmtBytes(out.bytes.length)}（${ratio >= 0 ? '-' : '+'}${Math.abs(ratio).toFixed(0)}%）`
+      + ` ｜ ${out.width}×${out.height}`
+      + (out.note ? ` ｜ ${out.note}` : '')
+  };
+}
+
+/**
+ * 把这一批图片入队执行（任务归属队列，不归属工具页）：图片类走 io 通道（并发 2）。
+ * 仍 await 全部结束，只是为了保留原有的「跑完汇总 + 按钮恢复」界面行为。
+ */
 async function run() {
   if (state.busy) return;
   const files = state.files;
@@ -272,54 +298,68 @@ async function run() {
   state.els.runBtn.textContent = '压缩中…';
 
   const params = readParams();
-  const outputDir = state.ctx.settings.getSettings().outputDir || undefined;
+  const ctx = state.ctx;
+  const outputDir = ctx.settings.getSettings().outputDir || undefined;
   const t0 = performance.now();
-  let done = 0;
-  let failed = 0;
   let savedBytes = 0;
   let originalBytes = 0;
-  let lastPath = '';
-  let lastError = '';
 
-  for (let i = 0; i < files.length; i += 1) {
-    const f = files[i];
-    state.ctx.showProgress(`压缩 ${i + 1}/${files.length}：${f.name}`, (i / files.length) * 100);
-    await nextFrame();
-    try {
-      const bytes = await state.ctx.readFile(f.path);
-      const img = await decodeImageFromBytes(bytes);
-      const format = params.format === 'auto' ? autoFormat(f.ext) : params.format;
-      const out = await compressPixels(img.pixels, img.width, img.height, { ...params, format });
-      const ext = format === 'jpg' ? '.jpg' : `.${format}`;
-      lastPath = await state.ctx.saveNextTo({
-        sourcePath: f.path, targetDir: outputDir, baseName: f.baseName, ext, bytes: out.bytes
-      });
-      const ratio = bytes.byteLength > 0 ? (1 - out.bytes.length / bytes.byteLength) * 100 : 0;
-      f.result = `${fmtBytes(bytes.byteLength)} → ${fmtBytes(out.bytes.length)}（${ratio >= 0 ? '-' : '+'}${Math.abs(ratio).toFixed(0)}%）`
-        + ` ｜ ${out.width}×${out.height}`
-        + (out.note ? ` ｜ ${out.note}` : '');
-      f.error = false;
-      done += 1;
-      savedBytes += out.bytes.length;
-      originalBytes += bytes.byteLength;
-      state.ctx.setInfo({ width: out.width, height: out.height, ms: Math.round(performance.now() - t0) });
-    } catch (err) {
-      f.result = `失败：${err.message}`;
-      f.error = true;
-      failed += 1;
-      lastError = err.message;
-      console.error('[compress] 压缩失败', f.name, err);
+  for (const f of files) { f.result = ''; f.error = false; }
+  renderList();
+
+  const jobs = files.map((f, index) => ({
+    label: f.name,
+    inputPaths: [f.path],
+    outputDir,
+    run: async ({ report, isCancelled }) => {
+      if (isCancelled()) return { canceled: true };
+      const step = `压缩 ${index + 1}/${files.length}：${f.name}`;
+      report({ percent: 0, text: step });
+      if (state && state.ctx.isActive()) state.ctx.showProgress(step, (index / files.length) * 100);
+
+      let out;
+      try {
+        out = await compressOne(f, params, ctx, outputDir);
+      } catch (err) {
+        out = { ok: false, error: err.message };
+      }
+      if (isCancelled()) return { canceled: true };
+
+      if (out.ok) {
+        f.result = out.text;
+        f.error = false;
+        savedBytes += out.outBytes;
+        originalBytes += out.inBytes;
+        if (state && state.ctx.isActive()) state.ctx.setInfo({ width: out.width, height: out.height, ms: Math.round(performance.now() - t0) });
+      } else {
+        f.result = `失败：${out.error}`;
+        f.error = true;
+      }
+      report({ percent: 100, text: out.ok ? out.text : `失败：${out.error}` });
+      if (state) renderList();
+      return out.ok
+        ? { ok: true, outputPaths: out.path ? [out.path] : [], outputDir }
+        : { ok: false, error: out.error };
     }
-    renderList();
-  }
+  }));
 
-  state.ctx.hideProgress();
+  const settled = await ctx.tasks.runBatch({ toolId: 'compress', toolName: '图片压缩', lane: 'io', jobs });
+
+  if (!state) return; // 工具页已被回收：任务照跑完了，这里只跳过界面收尾
+  ctx.hideProgress();
   state.busy = false;
   state.els.runBtn.disabled = false;
   state.els.runBtn.textContent = '开始压缩';
 
+  const done = settled.filter((t) => t.status === 'done').length;
+  const failed = settled.filter((t) => t.status === 'failed').length;
+  const failedTask = settled.find((t) => t.status === 'failed');
+  const lastError = (failedTask && failedTask.error) || '';
+  const doneTask = [...settled].reverse().find((t) => t.status === 'done' && t.output.paths.length);
+  const lastPath = doneTask ? doneTask.output.paths[0] : '';
+
   const saved = originalBytes > 0 ? `，总体积减少 ${(((originalBytes - savedBytes) / originalBytes) * 100).toFixed(0)}%（${fmtBytes(originalBytes)} → ${fmtBytes(savedBytes)}）` : '';
-  state.ctx.setStatus(`压缩完成：成功 ${done} 张${failed ? `，失败 ${failed} 张（${lastError}）` : ''}${saved}`);
+  ctx.setStatus(`压缩完成：成功 ${done} 张${failed ? `，失败 ${failed} 张（${lastError}）` : ''}${saved}`);
   if (lastPath) state.els.result.textContent = outputDir ? `输出到：${outputDir}` : `输出：${lastPath}`;
 }
 

@@ -218,3 +218,205 @@ html, body {
 .tool-host { display: flex; flex-direction: column; flex: 1 1 auto; min-height: 0; padding: var(--space-3) var(--space-4) var(--space-4); }
 .tool-page { display: flex; flex-direction: column; flex: 1 1 auto; min-height: 0; overflow-y: auto; }
 .tool-page.is-active { animation: page-in var(--transition-slow) both; }
+
+/* ============================================================
+   任务中心（顶栏入口 + 右侧抽屉）
+   —— 任务归属队列、不归属工具页：面板开关不影响后台任务继续跑。
+   ============================================================ */
+
+/* 顶栏「任务」按钮：与外观切换同一排（外观按钮固定在右上角，这里排在它左边） */
+.topbar-tasks {
+  position: absolute;
+  right: 148px;
+  top: 50%;
+  transform: translateY(-50%);
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  height: 26px;
+  padding: 0 var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  background: var(--color-surface);
+  color: var(--color-text-secondary);
+  font-family: var(--font-family);
+  font-size: var(--font-size-xs);
+  cursor: pointer;
+  transition: background var(--transition-fast), color var(--transition-fast), border-color var(--transition-fast);
+}
+.topbar-tasks:hover {
+  background: var(--color-surface-soft);
+  color: var(--color-text);
+  border-color: var(--color-border-strong);
+}
+.topbar-tasks.has-active { color: var(--color-text); border-color: var(--color-border-strong); }
+/* 未完成数量徽标（0 个时不显示，由 shell.js 控制 hidden） */
+.topbar-tasks-badge {
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: var(--color-primary);
+  color: var(--color-text-inverse);
+  font-size: 11px;
+  line-height: 18px;
+  text-align: center;
+}
+
+/* 抽屉遮罩（点空白处关闭） */
+.task-center-mask {
+  position: fixed;
+  inset: 0;
+  z-index: 90;
+  background: rgba(24, 28, 36, 0.28);
+  animation: overlay-in var(--transition-base) both;
+}
+
+/* 右侧抽屉本体 */
+.task-center {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 91;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  width: min(420px, 92vw);
+  padding: var(--space-4);
+  background: var(--color-surface);
+  border-left: 1px solid var(--color-border);
+  box-shadow: -8px 0 28px rgba(16, 24, 40, 0.14);
+}
+.task-center.is-open { animation: taskcenter-in var(--transition-base) both; }
+@keyframes taskcenter-in {
+  from { opacity: 0; transform: translateX(24px); }
+  to { opacity: 1; transform: none; }
+}
+
+.tc-head { display: flex; align-items: center; justify-content: space-between; }
+.tc-title { font-size: var(--font-size-lg); font-weight: 600; }
+.tc-close {
+  width: 26px;
+  height: 26px;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-lg);
+  line-height: 1;
+  cursor: pointer;
+  transition: background var(--transition-fast), color var(--transition-fast);
+}
+.tc-close:hover { background: var(--color-surface-soft); color: var(--color-text); }
+
+.tc-summary { font-size: var(--font-size-sm); color: var(--color-text-secondary); }
+.tc-overall { display: flex; align-items: center; gap: var(--space-2); }
+.tc-overall-track {
+  flex: 1 1 auto;
+  height: 8px;
+  border-radius: 999px;
+  background: var(--color-neutral);
+  overflow: hidden;
+}
+.tc-overall-fill {
+  width: 0%;
+  height: 100%;
+  border-radius: 999px;
+  background: var(--color-primary);
+  transition: width var(--transition-base);
+}
+.tc-overall-text { flex: none; font-size: var(--font-size-xs); color: var(--color-text-secondary); }
+
+.tc-actions { display: flex; gap: var(--space-2); }
+.tc-body { display: flex; flex-direction: column; gap: var(--space-3); flex: 1 1 auto; min-height: 0; overflow-y: auto; }
+
+.tc-section { display: flex; flex-direction: column; gap: var(--space-2); }
+.tc-section-title { font-size: var(--font-size-sm); font-weight: 600; color: var(--color-text-secondary); }
+.tc-empty-line { font-size: var(--font-size-xs); color: var(--color-text-secondary); }
+
+/* 空态 */
+.tc-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  padding: var(--space-6) var(--space-4);
+  text-align: center;
+}
+.tc-empty-icon { font-size: var(--font-size-xl); }
+.tc-empty-title { font-size: var(--font-size-md); font-weight: 600; }
+.tc-empty-hint { font-size: var(--font-size-xs); color: var(--color-text-secondary); line-height: 1.7; }
+
+/* 单个任务卡片 */
+.tc-task {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-soft);
+}
+.tc-task-head { display: flex; align-items: center; gap: var(--space-2); min-width: 0; }
+.tc-task-tool {
+  flex: none;
+  padding: 0 var(--space-2);
+  border-radius: 999px;
+  background: var(--color-neutral);
+  color: var(--color-neutral-text);
+  font-size: var(--font-size-xs);
+}
+.tc-task-name {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--font-size-sm);
+}
+.tc-task-status { flex: none; font-size: var(--font-size-xs); color: var(--color-text-secondary); }
+.tc-task-status.is-running { color: var(--color-primary); }
+.tc-task-status.is-done { color: var(--color-success); }
+.tc-task-status.is-failed { color: var(--color-danger); }
+.tc-task-status.is-canceled { color: var(--color-text-secondary); }
+
+.tc-bar { height: 6px; border-radius: 999px; background: var(--color-neutral); overflow: hidden; }
+.tc-bar-fill {
+  width: 0%;
+  height: 100%;
+  border-radius: 999px;
+  background: var(--color-primary);
+  transition: width var(--transition-base);
+}
+.tc-task.is-done .tc-bar-fill { background: var(--color-success); }
+.tc-task.is-failed .tc-bar-fill { background: var(--color-danger); }
+.tc-task.is-canceled .tc-bar-fill { background: var(--color-border-strong); }
+
+.tc-task-meta { display: flex; align-items: center; gap: var(--space-2); min-width: 0; }
+.tc-task-note { flex: none; font-size: var(--font-size-xs); color: var(--color-text-secondary); }
+.tc-task-result {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--font-size-xs);
+  color: var(--color-text-secondary);
+}
+.tc-task-result.is-done { color: var(--color-success); }
+.tc-task-result.is-failed { color: var(--color-danger); }
+.tc-task-btn {
+  flex: none;
+  padding: 2px var(--space-2);
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--color-text-secondary);
+  font-family: inherit;
+  font-size: var(--font-size-xs);
+  cursor: pointer;
+  transition: background var(--transition-fast), color var(--transition-fast), border-color var(--transition-fast);
+}
+.tc-task-btn:hover { background: var(--color-surface); color: var(--color-text); border-color: var(--color-text-secondary); }

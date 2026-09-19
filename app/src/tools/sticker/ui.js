@@ -131,8 +131,6 @@ function on(el, type, handler) {
   state.listeners.push([el, type, handler]);
 }
 
-const nextFrame = () => new Promise((resolve) => requestAnimationFrame(() => resolve()));
-
 function fillOptions(select, items) {
   select.innerHTML = '';
   for (const it of items) {
@@ -378,21 +376,23 @@ async function onDrop(event) {
 
 // —— 进度 ——
 
-function onProgress(payload) {
-  if (!state || !payload) return;
-  if (!state.currentJobId || payload.jobId !== state.currentJobId) return;
-  if (typeof payload.percent === 'number') state.percent = payload.percent;
-  if (payload.speed) state.lastSpeed = payload.speed;
+/**
+ * 正在跑的 ffmpeg 任务 → 对应任务的进度上报入口。
+ * 任务跑在队列里（工具页切走/回收也照跑），进度靠这份模块级映射找到对应任务。
+ */
+const jobReports = new Map();
 
-  const total = state.total || 1;
-  const index = state.currentIndex || 0;
-  const who = state.files[index];
-  const percent = Math.round(state.percent || 0);
-  const overall = Math.min(99, ((index + (state.percent || 0) / 100) / total) * 100);
-  state.ctx.showProgress(
-    `${who ? `${who.name}（${index + 1}/${total}）：` : ''}${percent}%${state.lastSpeed ? `（${state.lastSpeed}）` : ''}`,
-    overall
-  );
+function onProgress(payload) {
+  if (!payload || !payload.jobId) return;
+  const entry = jobReports.get(payload.jobId);
+  if (!entry) return;
+  const raw = typeof payload.percent === 'number' ? payload.percent : 0;
+  const percent = Math.round(raw);
+  const speed = payload.speed ? `（${payload.speed}）` : '';
+  const text = `${entry.name}（${entry.index + 1}/${entry.total}）：${percent}%${speed}`;
+  const overall = Math.min(100, ((entry.index + raw / 100) / entry.total) * 100);
+  entry.report({ percent: overall, text });
+  if (state && state.ctx.isActive()) state.ctx.showProgress(text, Math.min(99, overall));
 }
 
 // —— 转码：动图输出（含目标大小降档重试） ——
@@ -412,11 +412,7 @@ function effDurationMs(item, p) {
   return Math.round(dur * 1000);
 }
 
-function outDirSetting() {
-  return state.ctx.settings.getSettings().outputDir || undefined;
-}
-
-async function convertAnim(item, p, stamp, index) {
+async function convertAnim(item, p, ctx, exec) {
   const out = outputOf(p.output);
   const base = {
     fps: p.fps,
@@ -431,13 +427,13 @@ async function convertAnim(item, p, stamp, index) {
   const limitBytes = p.limit * 1024 * 1024;
   const inputArgs = startArgs(p);
   const durationMs = effDurationMs(item, p);
-  const outputDir = outDirSetting();
+  const outputDir = ctx.settings.getSettings().outputDir || undefined;
 
   for (let i = 0; i < rungs.length; i++) {
-    if (state.cancelRequested) return { cancelled: true };
+    if (exec.isCancelled()) return { cancelled: true };
     const rung = rungs[i];
-    const jobId = `st-${stamp}-${index}-${i + 1}`;
-    state.currentJobId = jobId;
+    const jobId = `st-${Date.now()}-${i + 1}-${Math.random().toString(36).slice(2, 6)}`;
+    exec.setJobId(jobId);
     let res;
     try {
       res = await convertMedia({
@@ -453,8 +449,8 @@ async function convertAnim(item, p, stamp, index) {
     } catch (err) {
       res = { ok: false, message: err.message };
     }
-    state.currentJobId = null;
-    if (state.cancelRequested) return { cancelled: true };
+    exec.setJobId(null);
+    if (exec.isCancelled()) return { cancelled: true };
     if (!res || !res.ok) return { ok: false, message: (res && res.message) || '转换失败' };
 
     // 未设上限，或已达到上限 → 收工
@@ -465,7 +461,7 @@ async function convertAnim(item, p, stamp, index) {
     }
     // 仍超限：删掉本轮产物，降档重试；最后一档则保留并如实说明
     if (i < rungs.length - 1) {
-      try { await state.ctx.removeFile(res.path); } catch { /* 删不掉也继续下一档 */ }
+      try { await ctx.removeFile(res.path); } catch { /* 删不掉也继续下一档 */ }
     } else {
       return { ok: true, path: res.path, size: res.size, note: `已尽量压缩，实得 ${formatSize(res.size)}` };
     }
@@ -473,15 +469,15 @@ async function convertAnim(item, p, stamp, index) {
   return { ok: false, message: '压缩失败' };
 }
 
-async function convertVideo(item, p, stamp, index) {
+async function convertVideo(item, p, ctx, exec) {
   const out = outputOf(p.output);
-  const jobId = `st-${stamp}-${index}-1`;
-  state.currentJobId = jobId;
+  const jobId = `st-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+  exec.setJobId(jobId);
   let res;
   try {
     res = await convertMedia({
       inputPath: item.path,
-      outputDir: outDirSetting(),
+      outputDir: ctx.settings.getSettings().outputDir || undefined,
       baseName: `${item.baseName}_视频`,
       ext: out.ext,
       inputArgs: startArgs(p),
@@ -498,70 +494,103 @@ async function convertVideo(item, p, stamp, index) {
   } catch (err) {
     res = { ok: false, message: err.message };
   }
-  state.currentJobId = null;
-  if (state.cancelRequested) return { cancelled: true };
+  exec.setJobId(null);
+  if (exec.isCancelled()) return { cancelled: true };
   if (!res || !res.ok) return { ok: false, message: (res && res.message) || '转换失败' };
   return { ok: true, path: res.path, size: res.size, note: '' };
 }
 
 // —— 运行 ——
 
+/**
+ * 把这一批文件入队执行（任务归属队列，不归属工具页）：队列按 cpu 通道串行跑（ffmpeg 吃满 CPU）。
+ * 仍 await 全部结束，只是为了保留原有的「跑完汇总 + 按钮变回开始」界面行为。
+ */
 async function run() {
   const { els } = state;
   const files = state.files;
   const total = files.length;
   const p = readParams();
-  const stamp = Date.now();
-  let done = 0;
-  let failed = 0;
-  let lastPath = '';
-  let lastError = '';
+  const ctx = state.ctx;
+  const outputDir = ctx.settings.getSettings().outputDir || undefined;
 
-  state.total = total;
   els.result.textContent = '';
   for (const f of files) f.result = null;
   renderList();
 
-  for (let i = 0; i < total; i++) {
-    if (state.cancelRequested) break;
-    const f = files[i];
-    state.currentIndex = i;
-    state.percent = 0;
-    state.lastSpeed = '';
-    state.ctx.showProgress(`${f.name}（${i + 1}/${total}）：0%`, (i / total) * 100);
-    await nextFrame();
+  const jobs = files.map((f, index) => {
+    let jobId = null; // 与 onCancel 共享绑定：取消时才能杀掉这条任务对应的 ffmpeg 进程
+    return {
+      label: f.name,
+      inputPaths: [f.path],
+      outputDir,
+      run: async ({ report, isCancelled }) => {
+        const exec = {
+          isCancelled,
+          setJobId: (id) => {
+            if (jobId) jobReports.delete(jobId);
+            jobId = id;
+            if (id) jobReports.set(id, { report, index, total, name: f.name });
+          }
+        };
+        let res;
+        try {
+          res = isAnimOutput(p.output)
+            ? await convertAnim(f, p, ctx, exec)
+            : await convertVideo(f, p, ctx, exec);
+        } catch (err) {
+          res = { ok: false, message: err.message };
+        } finally {
+          exec.setJobId(null);
+        }
 
-    const res = isAnimOutput(p.output)
-      ? await convertAnim(f, p, stamp, i + 1)
-      : await convertVideo(f, p, stamp, i + 1);
-    state.currentJobId = null;
+        if (res.cancelled || isCancelled()) {
+          f.result = { ok: false, text: '已取消' };
+          if (state) renderList();
+          return { canceled: true };
+        }
+        if (res.ok) {
+          const note = res.note ? `｜${res.note}` : '';
+          f.result = { ok: true, text: `→ ${baseNameOf(res.path)}（${formatSize(res.size)}）${note}`, path: res.path };
+          if (state) renderList();
+          return { ok: true, outputPaths: [res.path], outputDir };
+        }
+        const message = res.message || '转换失败';
+        f.result = { ok: false, text: `✗ ${message}` };
+        if (state) renderList();
+        return { ok: false, error: message };
+      },
+      onCancel: () => {
+        if (!jobId) return;
+        try { cancelMediaJob(jobId); } catch { /* 任务可能刚结束，忽略 */ }
+      }
+    };
+  });
 
-    if (res.cancelled || state.cancelRequested) {
-      f.result = { ok: false, text: '已取消' };
-      renderList();
-      break;
-    }
+  const ids = jobs.map((job) => ctx.tasks.enqueue({
+    toolId: 'sticker',
+    toolName: '动图与视频互转',
+    lane: 'cpu',
+    ...job
+  }));
+  state.taskIds = ids;
+  const settled = await Promise.all(ids.map((id) => ctx.tasks.waitFor(id)));
 
-    if (res.ok) {
-      done += 1;
-      lastPath = res.path;
-      const note = res.note ? `｜${res.note}` : '';
-      f.result = { ok: true, text: `→ ${baseNameOf(res.path)}（${formatSize(res.size)}）${note}`, path: res.path };
-    } else {
-      failed += 1;
-      lastError = res.message || '转换失败';
-      f.result = { ok: false, text: `✗ ${lastError}` };
-    }
-    renderList();
-  }
+  if (!state) return; // 工具页已被回收：任务照跑完了，这里只跳过界面收尾
+  state.taskIds = [];
+  ctx.hideProgress();
+  const done = settled.filter((t) => t && t.status === 'done').length;
+  const failed = settled.filter((t) => t && t.status === 'failed').length;
+  const canceledCount = settled.filter((t) => t && t.status === 'canceled').length;
+  const failedTask = settled.find((t) => t && t.status === 'failed');
+  const lastError = (failedTask && failedTask.error) || '';
+  const doneTask = [...settled].reverse().find((t) => t && t.status === 'done' && t.output.paths.length);
+  const lastPath = doneTask ? doneTask.output.paths[0] : '';
 
-  state.currentJobId = null;
-  state.total = 0;
-  state.ctx.hideProgress();
-  if (state.cancelRequested) {
-    state.ctx.setStatus(`已取消：成功 ${done} 个，失败 ${failed} 个`);
+  if (canceledCount > 0) {
+    ctx.setStatus(`已取消：成功 ${done} 个，失败 ${failed} 个`);
   } else {
-    state.ctx.setStatus(`转换完成：成功 ${done} 个${failed ? `，失败 ${failed} 个（${lastError}）` : ''}`);
+    ctx.setStatus(`转换完成：成功 ${done} 个${failed ? `，失败 ${failed} 个（${lastError}）` : ''}`);
   }
   if (lastPath) els.result.textContent = `输出：${lastPath}`;
   else if (failed) els.result.textContent = `失败原因：${lastError}`;
@@ -569,12 +598,9 @@ async function run() {
 
 async function onRunClick() {
   if (state.busy) {
-    // 运行中：点击＝取消（结束 ffmpeg 进程树并停止队列）
+    // 运行中：点击＝取消（取消本工具入队的任务；队列会让 ffmpeg 进程树结束）
     state.cancelRequested = true;
-    const jobId = state.currentJobId;
-    if (jobId) {
-      try { await cancelMediaJob(jobId); } catch { /* 任务可能刚结束，忽略 */ }
-    }
+    for (const id of state.taskIds) state.ctx.tasks.cancel(id);
     state.ctx.setStatus('正在取消…');
     return;
   }
@@ -589,6 +615,7 @@ async function onRunClick() {
 
   state.busy = true;
   state.cancelRequested = false;
+  state.taskIds = [];
   updateRunButton();
   try {
     await run();
@@ -599,7 +626,7 @@ async function onRunClick() {
   } finally {
     state.busy = false;
     state.cancelRequested = false;
-    state.currentJobId = null;
+    state.taskIds = [];
     updateRunButton();
   }
 }
@@ -623,11 +650,7 @@ export function mount(container, ctx) {
     files: [],
     busy: false,
     cancelRequested: false,
-    currentJobId: null,
-    currentIndex: 0,
-    total: 0,
-    percent: 0,
-    lastSpeed: '',
+    taskIds: [],
     ffmpeg: null,
     unsubProgress: null
   };
@@ -703,10 +726,7 @@ export function unmount() {
   if (state.unsubProgress) {
     try { state.unsubProgress(); } catch { /* 忽略 */ }
   }
-  // 切走时不遗留后台 ffmpeg 进程
-  if (state.busy && state.currentJobId) {
-    try { cancelMediaJob(state.currentJobId); } catch { /* 忽略 */ }
-  }
+  // 硬契约：任务归属队列，不归属工具页 —— 切走（含 LRU 回收）**不取消**在跑的任务。
   for (const [el, type, handler] of state.listeners) {
     el.removeEventListener(type, handler);
   }
