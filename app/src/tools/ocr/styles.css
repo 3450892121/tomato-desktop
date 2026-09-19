@@ -104,10 +104,16 @@
   border: 1px solid var(--color-border);
   border-radius: var(--radius-sm);
   cursor: pointer;
-  transition: border-color var(--transition-fast), background var(--transition-fast);
+  transition: border-color var(--transition-fast), background var(--transition-fast),
+              box-shadow var(--transition-base);
 }
 .ocr-item:hover { border-color: var(--color-border-strong); }
-.ocr-item.is-active { border-color: var(--color-primary); }
+/* 当前图（v2.1.0 强化）：原来只换了个边框色，现在染色块 + 描边 + 外发光环 */
+.ocr-item.is-active {
+  border-color: var(--color-select-border);
+  background: var(--color-select-bg);
+  box-shadow: var(--shadow-select);
+}
 .ocr-item-main { flex: 1 1 auto; min-width: 0; }
 .ocr-item-name {
   font-size: var(--font-size-sm);

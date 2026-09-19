@@ -170,6 +170,71 @@ async function runUiTest(win) {
   })()`));
   await shot('02b-切走再切回');
 
+  // 2.6) 左侧导航在切换工具时「不重建、不闪」：用户反馈过「子项先折叠再打开 + 闪烁」
+  //     断言：切换前后是同一批 DOM（没重建）、所在分组一次都没被收起、items 没被写内联 max-height
+  result.checks.navStable = JSON.parse(await evalJs(`(async () => {
+    const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+    const nav = (id) => [...document.querySelectorAll('#toolNav .tool-item')].find((b) => b.dataset.toolId === id);
+    const btn = nav('obfuscate');
+    const group = btn.closest('.tool-group');
+    const items = group.querySelector('.tool-group-items');
+    const events = [];
+    const obs = new MutationObserver((records) => {
+      for (const r of records) {
+        if (r.type === 'childList' && r.removedNodes.length) events.push('removed:' + r.removedNodes.length);
+        if (r.type === 'attributes' && r.target === group && group.classList.contains('is-collapsed')) events.push('collapsed');
+        if (r.type === 'attributes' && r.target === items && r.target.style.maxHeight) events.push('maxHeight:' + r.target.style.maxHeight);
+      }
+    });
+    obs.observe(group, { attributes: true, attributeFilter: ['class', 'style'], subtree: true, childList: true });
+    nav('compress').click();
+    await wait(500);
+    const alive = btn.isConnected;                                  // 旧按钮还在文档里 => 导航没被重建
+    const activeNow = (document.querySelector('.tool-item.is-active') || { dataset: {} }).dataset.toolId;
+    nav('obfuscate').click();
+    await wait(500);
+    obs.disconnect();
+    return JSON.stringify({ ok: alive && events.length === 0 && activeNow === 'compress', alive, activeNow, events });
+  })()`));
+
+  // 2.7) 侧栏不能把工具条目藏起来（用户反馈「有些地方被挡住了」）：
+  //     四个分组全展开时列表必须能滚动，且底部「设置/帮助」不能压住最后一个工具
+  // 先把四个分组全部展开，留一张截图（人工过目：条目没被底部按钮压住、滚得动）
+  await evalJs(`(async () => {
+    const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+    for (const h of document.querySelectorAll('.tool-group-head')) {
+      if (h.closest('.tool-group').classList.contains('is-collapsed')) { h.click(); await wait(340); }
+    }
+    return true;
+  })()`);
+  await shot('02c-侧栏全展开');
+  result.checks.navScrollable = JSON.parse(await evalJs(`(async () => {
+    const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+    const nav = document.getElementById('toolNav');
+    const footer = document.querySelector('.sidebar-footer');
+    const navRect = nav.getBoundingClientRect();
+    const footRect = footer.getBoundingClientRect();
+    const overlap = Math.max(0, navRect.bottom - footRect.top); // 列表与底部按钮的重叠高度
+    const items = [...document.querySelectorAll('#toolNav .tool-item')];
+    const last = items[items.length - 1];
+    last.scrollIntoView({ block: 'nearest' });
+    await wait(150);
+    const lastRect = last.getBoundingClientRect();
+    const reachable = lastRect.top >= navRect.top - 1 && lastRect.bottom <= navRect.bottom + 1;
+    const info = {
+      overflowY: getComputedStyle(nav).overflowY,
+      overlapPx: Math.round(overlap),
+      items: items.length,
+      scrollable: nav.scrollHeight > nav.clientHeight,
+      reachable
+    };
+    // 收尾：把分组点回收起（回到「默认全收起」，不给后面的步骤留满屏列表）
+    for (const h of document.querySelectorAll('.tool-group-head')) {
+      if (!h.closest('.tool-group').classList.contains('is-collapsed')) { h.click(); await wait(340); }
+    }
+    return JSON.stringify({ ok: info.overflowY === 'auto' && overlap < 2 && items.length >= 17 && reachable, ...info });
+  })()`));
+
   // 3) 切换到「像素混淆 (C)」并设置字符串密钥
   await evalJs(`(() => {
     const sel = document.getElementById('modeSelect');
@@ -347,7 +412,14 @@ async function runUiTest(win) {
   result.steps.batchObfuscate20 = await evalJs('document.getElementById("statusText").textContent');
   await shot('11-批量20张');
   await evalJs(`document.querySelector('[data-action="batch-save"]').click()`);
-  await wait(3000);
+  // 等真正收工再数产物：20 张批量保存在慢一点的机器上会超过固定等待，
+  // 固定 sleep 会偶发「文件还没落完」的假失败（断言不变，只是不再抢跑）。
+  for (let i = 0; i < 40; i++) {
+    const st = await evalJs('document.getElementById("statusText").textContent');
+    if (st.includes('保存完成') || st.includes('保存失败')) break;
+    await wait(400);
+  }
+  await wait(300);
   result.steps.batchSave20 = await evalJs('document.getElementById("statusText").textContent');
   result.steps.batchSavedFiles = (await fs.readdir(TEST_DIR)).filter((f) => f.includes('_混淆')).length;
 
@@ -399,6 +471,8 @@ async function runUiTest(win) {
     c.afterAddVisibility.progress === false &&
     c.afterAddVisibility.thumbs === true &&
     c.stateKeep.ok === true &&
+    c.navStable.ok === true &&
+    c.navScrollable.ok === true &&
     c.obfuscatedDiffers === true &&
     c.revertEqualsOriginal === true &&
     result.steps.filesAfterSave.length >= 1 &&

@@ -8,13 +8,17 @@
    加载顺序：theme.css → components.css → shell.css（工具样式最后挂载，可覆盖细节）。
    ============================================================ */
 
-/* —— 卡片 —— */
+/* —— 卡片（磨砂玻璃面）——
+   组成：半透明玻璃底（--color-surface）+ 背景模糊（--glass-blur）+ 内高光（玻璃的「厚度」）。
+   注意：backdrop-filter 会给元素建一个包含块，卡片内部别再放 position: fixed 的东西。 */
 .card {
   background: var(--color-surface);
-  border: 1px solid var(--color-border);
+  background-image: var(--glass-sheen); /* 左上斜向高光：玻璃的「反光面」 */
+  border: 1px solid var(--glass-border);
   border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-card);
-  transition: box-shadow var(--transition-base), border-color var(--transition-base);
+  box-shadow: var(--shadow-card), var(--glass-inner-highlight);
+  backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
+  transition: box-shadow var(--transition-base), border-color var(--transition-base), transform var(--transition-base);
 }
 
 /* —— 行内控件（标签 + 输入 + 提示） —— */
@@ -90,7 +94,7 @@
 .btn-plain { background: var(--color-neutral); color: var(--color-neutral-text); }
 .btn-ghost {
   flex: none;
-  background: transparent;
+  background: var(--glass-bg-soft); /* 轻玻璃底：在玻璃卡片上也有「一层玻璃」的层次 */
   border-color: var(--color-border-strong);
   color: var(--color-text-secondary);
 }
@@ -109,7 +113,8 @@
 .help-section p { padding-left: 0; }
 
 /* —— 弹窗（设置 / 帮助共用） ——
-   打开：遮罩淡入 + 卡片轻微放大上浮；关闭：快速淡出后移除（动效由 shell.js 控制节奏）。 */
+   打开：背景整体虚化 + 遮罩淡入 + 卡片放大上浮；关闭：快速淡出后移除（动效由 shell.js 控制节奏）。
+   背景整体虚化是「苹果式浮层」的关键：弹窗后面的一切都柔化掉，视线自然落到弹窗上。 */
 .modal-backdrop {
   position: fixed;
   inset: 0;
@@ -117,6 +122,7 @@
   align-items: center;
   justify-content: center;
   background: rgba(24, 28, 36, 0.28);
+  backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
   z-index: 100;
   animation: overlay-in var(--transition-base) both;
 }
@@ -127,9 +133,12 @@
   width: min(560px, 92vw);
   max-height: 86vh;
   padding: var(--space-5);
-  background: var(--color-surface);
+  background: var(--glass-bg-strong);
+  background-image: var(--glass-sheen);
+  border: 1px solid var(--glass-border);
   border-radius: var(--radius-lg);
-  box-shadow: 0 12px 40px rgba(16, 24, 40, 0.18);
+  box-shadow: 0 18px 60px rgba(16, 24, 40, 0.24), var(--glass-inner-highlight);
+  backdrop-filter: blur(var(--glass-blur-strong)) saturate(var(--glass-saturate));
   animation: modal-in var(--transition-slow) both;
 }
 .modal-backdrop.is-closing { animation: overlay-out var(--transition-fast) both; }
@@ -147,8 +156,9 @@
   align-items: center;
   justify-content: center;
   gap: var(--space-3);
-  background: rgba(255, 255, 255, 0.72);
-  backdrop-filter: blur(2px);
+  background: var(--glass-bg-strong); /* 玻璃遮罩：处理中把界面虚化，视线集中到进度条 */
+  /* 处理中省 GPU：整窗盖满时用浅模糊，别让遮罩把批量任务拖慢（--glass-blur-overlay 的注释同理） */
+  backdrop-filter: blur(var(--glass-blur-overlay));
   animation: overlay-in var(--transition-base) both;
 }
 .progress-track {
@@ -167,21 +177,32 @@
 }
 .progress-text { font-size: var(--font-size-sm); color: var(--color-text-secondary); }
 
-/* —— 组件库动效（页面切换 / 弹窗）—— */
+/* —— 组件库动效（页面切换 / 弹窗 / 选中）——
+   v2.1.0：幅度与时长的都调强了一档（用户反馈「看不出来发生了什么」）。 */
 @keyframes overlay-in { from { opacity: 0; } to { opacity: 1; } }
 @keyframes overlay-out { from { opacity: 1; } to { opacity: 0; } }
 @keyframes modal-in {
-  from { opacity: 0; transform: translateY(10px) scale(0.97); }
+  from { opacity: 0; transform: translateY(18px) scale(0.94); }
   to { opacity: 1; transform: none; }
 }
 @keyframes modal-out {
   from { opacity: 1; transform: none; }
-  to { opacity: 0; transform: translateY(6px) scale(0.98); }
+  to { opacity: 0; transform: translateY(10px) scale(0.96); }
 }
 @keyframes page-in {
-  from { opacity: 0; transform: translateY(8px); }
+  from { opacity: 0; transform: translateY(14px) scale(0.985); }
   to { opacity: 1; transform: none; }
 }
+/* 选中「弹一下」：工具 / 外壳的选中项加 .is-selected / .is-active 时引用，
+   配合 --transition-spring 就有回弹手感（关键帧是全局的，工具里直接用即可）。 */
+@keyframes select-pop {
+  from { transform: scale(0.9); }
+  to { transform: scale(1); }
+}
+
+/* —— 选中反馈（全软件统一，令牌在 theme.css）——
+   选中态一律这三行：染色块 + 主色描边环 + 投影，一眼能看出「选中的是哪个」。
+     background: var(--color-select-bg); border-color: var(--color-select-border); box-shadow: var(--shadow-select); */
 
 /* —— 无障碍：系统要求「减少动态效果」时，全部动效降为瞬时 —— */
 @media (prefers-reduced-motion: reduce) {

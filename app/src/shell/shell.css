@@ -13,11 +13,24 @@
 html, body {
   margin: 0;
   height: 100%;
-  background: var(--color-bg);
+  background-color: var(--color-bg); /* 窗口底色：必须与 main.js 的 windowBackgroundColor 一致，否则启动闪白 */
   color: var(--color-text);
   font-family: var(--font-family);
   font-size: var(--font-size-md);
   -webkit-font-smoothing: antialiased;
+}
+
+/* 背景光晕（v2.1.0）：磨砂玻璃要有东西可「糊」才看得出效果。
+   强度控制在 ≤0.35（见 theme.css 的 --bg-aurora-*），不影响看图配色与文字对比度；
+   深浅色各一套色值。 */
+body {
+  background-image:
+    var(--bg-grain), /* 最底层细颗粒：玻璃后面被糊掉的正是它，磨砂感的关键 */
+    /* 光斑刻意做得「紧」一点：太大会摊平成一层浅色，玻璃的模糊就看不出差别了 */
+    radial-gradient(58% 40% at 14% -6%, var(--bg-aurora-warm), transparent 68%),
+    radial-gradient(52% 38% at 86% -10%, var(--bg-aurora-cool), transparent 66%),
+    radial-gradient(46% 40% at 30% 112%, var(--bg-aurora-violet), transparent 68%),
+    radial-gradient(40% 34% at 96% 104%, var(--bg-aurora-cool), transparent 70%);
 }
 
 .shell { display: flex; height: 100%; }
@@ -28,8 +41,12 @@ html, body {
   flex-direction: column;
   flex: none;
   width: var(--sidebar-width);
+  /* 磨砂玻璃侧栏：半透明底 + 背景模糊 + 顶部内高光 + 左上斜向高光（玻璃的「厚度」与「反光面」） */
   background: var(--color-sidebar-bg);
+  background-image: var(--glass-sheen);
   border-right: 1px solid var(--color-border);
+  box-shadow: var(--glass-inner-highlight), 1px 0 0 var(--glass-border), var(--shadow-float);
+  backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
 }
 .sidebar-brand {
   display: flex;
@@ -47,7 +64,23 @@ html, body {
   white-space: nowrap;
 }
 
-.tool-nav { display: flex; flex-direction: column; gap: var(--space-1); flex: 1 1 auto; padding: var(--space-1) var(--space-2); }
+/* 工具列表：分组全展开时条目会变多（17 个工具 + 4 个分组标题），
+   必须自己可滚动 —— 否则底部「设置 / 帮助」会压在最后几个工具上（用户反馈「有些地方被挡住了」）。
+   min-height: 0 是关键：flex 子项默认不肯收缩到内容以下，会直接撑破侧栏。 */
+.tool-nav {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  padding: var(--space-1) var(--space-2);
+}
+/* 细滚动条：不抢视觉，深浅色都看得见 */
+.tool-nav::-webkit-scrollbar { width: 8px; }
+.tool-nav::-webkit-scrollbar-track { background: transparent; }
+.tool-nav::-webkit-scrollbar-thumb { background: var(--color-border-strong); border-radius: 999px; }
+.tool-nav::-webkit-scrollbar-thumb:hover { background: var(--color-text-secondary); }
 .tool-item {
   position: relative;
   display: flex;
@@ -62,31 +95,36 @@ html, body {
   font-size: var(--font-size-md);
   text-align: left;
   cursor: pointer;
-  transition: background var(--transition-fast), color var(--transition-fast);
+  transition: background var(--transition-fast), color var(--transition-fast),
+              transform var(--transition-base), box-shadow var(--transition-base);
 }
-.tool-item:hover { background: var(--color-surface-soft); }
+.tool-item:hover { background: var(--color-surface-soft); transform: translateX(2px); }
+/* 当前工具（v2.1.0 强化）：染色块 + 主色描边环 + 投影，切换时弹簧式弹一下。
+   用户反馈原来「淡红底 + 红字」太淡，看不出选中的是哪个，所以这里给足对比。 */
 .tool-item.is-active {
-  background: var(--color-sidebar-active-bg);
+  background: var(--color-select-bg);
   color: var(--color-sidebar-active-text);
   font-weight: 600;
+  box-shadow: var(--shadow-select);
+  animation: select-pop var(--transition-spring);
 }
-/* 当前工具的左侧标记：切换时从中间「长出来」，比整块背景变化更柔和 */
+/* 当前工具的左侧标记：切换时从中间「长出来」，比整块背景变化更柔和（加粗加长，一眼能看到） */
 .tool-item::before {
   content: '';
   position: absolute;
   left: 0;
   top: 50%;
-  width: 3px;
-  height: 58%;
+  width: 4px;
+  height: 64%;
   border-radius: 999px;
   background: currentColor;
   transform: translateY(-50%) scaleY(0);
   opacity: 0;
   transition: transform var(--transition-base), opacity var(--transition-base);
 }
-.tool-item.is-active::before { transform: translateY(-50%) scaleY(1); opacity: 0.9; }
-.tool-item-icon { flex: none; font-size: var(--font-size-lg); transition: transform var(--transition-base); }
-.tool-item:hover .tool-item-icon { transform: scale(1.08); }
+.tool-item.is-active::before { transform: translateY(-50%) scaleY(1); opacity: 1; }
+.tool-item-icon { flex: none; font-size: var(--font-size-lg); transition: transform var(--transition-spring); }
+.tool-item:hover .tool-item-icon { transform: scale(1.12); }
 
 /* 工具分组（图片 / 视频 / 文档）—— 同类工具聚在一起，标题可点：收起 / 展开 */
 .tool-group { display: flex; flex-direction: column; }
@@ -181,6 +219,10 @@ html, body {
   min-height: var(--topbar-height);
   padding: var(--space-2) var(--space-4) 0;
   text-align: center;
+  /* 玻璃顶栏（v2.1.0）：轻玻璃底 + 背景模糊 + 底部发丝线，与侧栏同为玻璃家族 */
+  background: var(--glass-bg-soft);
+  border-bottom: 1px solid var(--glass-border);
+  backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
 }
 .topbar-status { font-size: var(--font-size-md); }
 .topbar-info { font-size: var(--font-size-xs); color: var(--color-text-secondary); }
@@ -203,12 +245,14 @@ html, body {
   font-family: var(--font-family);
   font-size: var(--font-size-xs);
   cursor: pointer;
-  transition: background var(--transition-fast), color var(--transition-fast), border-color var(--transition-fast);
+  transition: background var(--transition-fast), color var(--transition-fast),
+              border-color var(--transition-fast), transform var(--transition-spring);
 }
 .topbar-theme:hover {
-  background: var(--color-surface-soft);
+  background: var(--glass-bg-strong);
   color: var(--color-text);
   border-color: var(--color-border-strong);
+  transform: translateY(-50%) scale(1.06); /* 保留居中的 translateY，再轻微放大 */
 }
 
 /* —— 工具页容器 ——
@@ -242,12 +286,14 @@ html, body {
   font-family: var(--font-family);
   font-size: var(--font-size-xs);
   cursor: pointer;
-  transition: background var(--transition-fast), color var(--transition-fast), border-color var(--transition-fast);
+  transition: background var(--transition-fast), color var(--transition-fast),
+              border-color var(--transition-fast), transform var(--transition-spring);
 }
 .topbar-tasks:hover {
-  background: var(--color-surface-soft);
+  background: var(--glass-bg-strong);
   color: var(--color-text);
   border-color: var(--color-border-strong);
+  transform: translateY(-50%) scale(1.06); /* 与外观按钮同款悬停手感 */
 }
 .topbar-tasks.has-active { color: var(--color-text); border-color: var(--color-border-strong); }
 /* 未完成数量徽标（0 个时不显示，由 shell.js 控制 hidden） */
@@ -269,6 +315,7 @@ html, body {
   inset: 0;
   z-index: 90;
   background: rgba(24, 28, 36, 0.28);
+  backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate)); /* 拉开抽屉时背景整体虚化 */
   animation: overlay-in var(--transition-base) both;
 }
 
@@ -284,13 +331,16 @@ html, body {
   gap: var(--space-3);
   width: min(420px, 92vw);
   padding: var(--space-4);
-  background: var(--color-surface);
-  border-left: 1px solid var(--color-border);
-  box-shadow: -8px 0 28px rgba(16, 24, 40, 0.14);
+  /* 磨砂玻璃抽屉：更实的玻璃 + 更强的模糊，浮在虚化的界面之上 */
+  background: var(--glass-bg-strong);
+  background-image: var(--glass-sheen);
+  border-left: 1px solid var(--glass-border);
+  box-shadow: -12px 0 40px rgba(16, 24, 40, 0.18), var(--glass-inner-highlight);
+  backdrop-filter: blur(var(--glass-blur-strong)) saturate(var(--glass-saturate));
 }
-.task-center.is-open { animation: taskcenter-in var(--transition-base) both; }
+.task-center.is-open { animation: taskcenter-in var(--transition-slow) var(--ease-spring) both; }
 @keyframes taskcenter-in {
-  from { opacity: 0; transform: translateX(24px); }
+  from { opacity: 0; transform: translateX(40px) scale(0.99); }
   to { opacity: 1; transform: none; }
 }
 

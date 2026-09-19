@@ -383,26 +383,57 @@ function setGroupCollapsed(groupId, collapsed) {
   persistCollapsed();
 }
 
-/** 只改外观（带平滑过渡），不动偏好设置——自动展开与用户点击共用 */
-function applyGroupVisual(groupId, collapsed) {
-  const entry = navGroups.get(groupId);
-  if (!entry) return;
-  const { wrap, head, items } = entry;
-  animateCollapse(items, collapsed);
-  wrap.classList.toggle('is-collapsed', collapsed);
+/** 更新分组标题的展开/收起提示（瞬时与带动画两条路径共用） */
+function syncGroupHead(head, collapsed) {
   head.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
   head.title = collapsed ? `展开「${head.dataset.groupName}」` : `收起「${head.dataset.groupName}」`;
 }
 
 /**
- * 展开指定分组：切到该组内的工具时调用，避免「当前工具藏在收起的分组里」。
- * 只改当前这次显示（不写设置、也不改用户偏好）——列表下次重渲染时仍按用户的偏好来，
- * 所以「用户明明收起了这一类」不会被悄悄改成永久展开。
+ * 只改外观，不动偏好设置——自动展开与用户点击共用。
+ * instant=true：不播收起/展开动画（用于「切工具时自动展开所在分组」，
+ * 否则每次切工具都会看到分组先折叠再打开、整列闪一下）。
  */
-function expandGroup(groupId) {
+function applyGroupVisual(groupId, collapsed, instant = false) {
   const entry = navGroups.get(groupId);
+  if (!entry) return;
+  const { wrap, head, items } = entry;
+
+  if (instant) {
+    items.style.transition = 'none'; // 这一次的 max-height / opacity / visibility 全部瞬时生效
+    items.style.maxHeight = '';      // 清掉上次动画残留的内联高度，交还给样式表
+    wrap.classList.toggle('is-collapsed', collapsed);
+    syncGroupHead(head, collapsed);
+    void items.offsetHeight;         // 让瞬时状态先落定
+    items.style.transition = '';     // 恢复过渡能力，之后用户手动点标题仍有平滑动画
+    return;
+  }
+
+  animateCollapse(items, collapsed);
+  wrap.classList.toggle('is-collapsed', collapsed);
+  syncGroupHead(head, collapsed);
+}
+
+/**
+ * 保证指定分组是展开的：切到该组内的工具时调用，避免「当前工具藏在收起的分组里」。
+ * 瞬时展开（不播动画）；只改当前这次显示（不写设置、也不改用户偏好）——
+ * 列表下次重渲染时仍按用户的偏好来，所以「用户明明收起了这一类」不会被悄悄改成永久展开。
+ */
+function ensureGroupExpanded(groupId) {
+  const entry = groupId ? navGroups.get(groupId) : null;
   if (!entry || !entry.wrap.classList.contains('is-collapsed')) return;
-  applyGroupVisual(groupId, false);
+  applyGroupVisual(groupId, false, true);
+}
+
+/**
+ * 只更新「当前工具」的高亮，不重建导航。
+ * 用户反馈：以前每切一次工具都整列重建，重建瞬间按偏好渲染成收起、紧接着又展开，
+ * 看起来就是「先折叠再打开 + 闪一下」。改成复用同一批 DOM，只挪 is-active。
+ */
+function updateActiveNav(toolId) {
+  for (const btn of els.nav.querySelectorAll('.tool-item')) {
+    btn.classList.toggle('is-active', btn.dataset.toolId === toolId);
+  }
 }
 
 /**
@@ -452,6 +483,9 @@ function renderNav() {
     renderGroup(group, sorted.filter((t) => t.group === group.id));
   }
   renderGroup({ id: 'other', name: '其它', icon: '📁' }, others);
+
+  // 重建后当前工具所在的分组必须仍是展开的（瞬时展开，不播动画）
+  ensureGroupExpanded(activeTool && activeTool.group);
 }
 
 /**
@@ -485,8 +519,9 @@ function switchTool(id) {
   const page = pageFor(tool);
   loadToolStyles(tool.styles);
   activeTool = tool;
-  renderNav();
-  if (tool.group) expandGroup(tool.group); // 当前工具所在分组必须是展开的（渲染后再展开，带平滑动画）
+  // 只挪高亮 + 瞬时展开所在分组：绝不重建导航（重建会让分组先折叠再打开、整列闪一下）
+  ensureGroupExpanded(tool.group);
+  updateActiveNav(tool.id);
 
   try {
     if (!page.mounted) {

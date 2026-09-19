@@ -219,6 +219,34 @@ async function runMediaUiTest(win) {
 
   await shot('01-媒体测试起点');
 
+  // —— 启动默认态：没设置过偏好 = 全收起，只有「当前工具所在分组」自动展开（v2.1.0 起为瞬时展开） ——
+  // 注意：必须在任何一次切工具之前测——自 v2.1.0 起切换工具不再重建导航，
+  // 被自动展开过的分组会一直保持展开（这正是「先折叠再打开 + 闪烁」的修复代价），
+  // 所以「默认全收起」只能在启动瞬间断言。
+  result.checks.启动默认收起 = JSON.parse(await evalJs(`(() => {
+    const prefs = ${JSON.stringify(result.steps.settingsAtStart)};
+    const heads = [...document.querySelectorAll('.tool-group-head')];
+    const active = document.querySelector('.tool-item.is-active');
+    const activeGroup = active ? active.closest('.tool-group').dataset.groupId : '';
+    const states = heads.map((h) => {
+      const wrap = h.closest('.tool-group');
+      const items = wrap.querySelector('.tool-group-items');
+      return {
+        id: wrap.dataset.groupId,
+        collapsed: wrap.classList.contains('is-collapsed'),
+        visible: getComputedStyle(items).visibility !== 'hidden' && items.getBoundingClientRect().height > 1,
+        inlineMaxHeight: items.style.maxHeight || ''
+      };
+    });
+    return JSON.stringify({
+      ok: heads.length >= 4
+        && states.every((s) => s.collapsed === (s.id === activeGroup ? false : (prefs ? prefs.includes(s.id) : true)))
+        && states.every((s) => s.visible === !s.collapsed)
+        && states.every((s) => s.inlineMaxHeight === ''), // 瞬时展开不留内联 max-height 残渣
+      activeGroup, states
+    });
+  })()`));
+
   // —— 图片类三个工具（无需 ffmpeg） ——
   // 压缩工具先切成 WebP：默认「保持原格式」在 PNG 上几乎压不动，切 WebP 才能体现压缩效果
   await runTool('图片压缩', {
@@ -268,11 +296,13 @@ async function runMediaUiTest(win) {
       };
     };
 
-    // 1) 默认态：没设置过偏好 = 全收起；当前工具所在分组例外（自动展开）
+    // 1) 状态自洽 + 当前工具所在分组必须是展开的（否则「当前工具看不见」）。
+    //    自 v2.1.0 起切换工具不再重建导航，所以「被自动展开过的分组」会保持展开（修掉「先折叠再打开 + 闪烁」的代价）；
+    //    「没设置过偏好 = 默认全收起」由启动瞬间的「启动默认收起」探针断言，这里不再重复要求其它分组是收起的。
     const before = heads.map(stateOf);
-    const defaults = before.map((s) => ({ id: s.id, collapsed: s.collapsed, expected: s.id === activeGroup ? false : (pref ? pref.includes(s.id) : true) }));
-    const defaultsOk = defaults.every((d) => d.collapsed === d.expected)
-      && before.every((s) => s.expandedAttr === !s.collapsed && s.visible === !s.collapsed);
+    const defaults = before.map((s) => ({ id: s.id, collapsed: s.collapsed, isActiveGroup: s.id === activeGroup }));
+    const defaultsOk = before.every((s) => s.expandedAttr === !s.collapsed && s.visible === !s.collapsed)
+      && before.filter((s) => s.id === activeGroup).every((s) => s.collapsed === false);
 
     // 2) 点标题：收起 → 展开，展开过程中采样高度，确认是平滑过渡而不是瞬间跳出
     const head = heads.find((h) => h.closest('.tool-group').dataset.groupId === 'image') || heads[0];
@@ -347,6 +377,7 @@ async function runMediaUiTest(win) {
   result.checks.工具清单 = await evalJs(`[...document.querySelectorAll('#toolNav .tool-item')].map((b) => b.textContent.trim())`);
   const entries = Object.values(result.tools);
   result.pass = entries.length >= 3 && entries.every((e) => e.ok || e.skipped)
+    && !!result.checks.启动默认收起 && result.checks.启动默认收起.ok
     && !!result.checks.分组折叠 && result.checks.分组折叠.ok
     && !!result.checks.分组折叠记忆 && result.checks.分组折叠记忆.ok
     && !!result.checks.AI预设 && result.checks.AI预设.ok;

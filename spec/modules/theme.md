@@ -18,6 +18,12 @@
 4. **原生控件跟随**：深色块里设 `color-scheme: dark`，滚动条、下拉框等系统控件才不会突兀地亮一块。
 5. **纸张语义区域不参与**：PDF 的 Office 降级打印页（`pdf-convert/preview/office-print.css`）是"纸面"，必须永远白底黑字（反色既费墨又不可读），其色值刻意写死并加注释说明，不算遗漏。
 
+## 玻璃令牌（v2.1.0 新增，配合 ui 的「玻璃质感」）
+- `:root` 里新增一批玻璃 / 光晕 / 选中令牌：`--glass-blur`、`--glass-blur-strong`、`--glass-saturate`、`--glass-bg-strong`、`--glass-bg-soft`、`--glass-border`、`--glass-inner-highlight`、`--glass-sheen`、`--bg-grain`、`--bg-aurora-*`、`--color-select-*`、`--shadow-select`、`--shadow-float`，深色块只覆盖同名变量（规矩不变）。
+- 表面色令牌改为半透明玻璃值：`--color-surface`、`--color-surface-soft`、`--color-sidebar-bg`（都带 alpha，浮在光晕背景上）。
+- `--color-bg`（窗口底色）与 `--shadow-*` 的语义不变：`--color-bg` 必须继续等于 `main.js` 里 `windowBackgroundColor()` 的 `#f5f6f8` / `#16181d`，否则启动会闪白。
+- 深色下的玻璃面必须是「深色 rgb + alpha」（不能用白色加 alpha），否则 `--theme-test` 的深色浅色残留扫描会误判。
+
 ## 输入 / 输出
 - 输入：用户点击顶栏按钮或设置面板下拉框；系统深浅色变化事件。
 - 输出：`<html data-theme>`；`settings.theme` 落盘。
@@ -27,7 +33,8 @@
 - 不反色工具内部的内容画布（图片预览、PDF 画布、Office 预览），它们永远按原始颜色呈现。
 
 ## 验收
-- 三态循环正确；浅色/深色下外壳关键色值与 `theme.css` 一致（自检断言到具体 rgb）。
+- 三态循环正确；浅色/深色下外壳关键色值与 `theme.css` 一致（自检断言到具体 rgb；侧栏自 v2.1.0 起是玻璃值，断言到具体 rgba）。
+- 玻璃确实生效：侧栏 `backdrop-filter` 不为 `none`、背景光晕有 image 层、卡片底色带 alpha。
 - 选择落盘；重开软件仍生效。
 - 深色下逐个工具页走一遍：无「写死浅色」的容器漏出来。
 - 测试结束后必须恢复用户原来的档位（绝不能把使用者的设置改成测试用的深色）。

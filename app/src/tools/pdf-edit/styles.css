@@ -103,12 +103,15 @@
   border: 1px solid var(--color-border);
   border-radius: var(--radius-sm);
   cursor: pointer;
-  transition: border-color var(--transition-fast), background var(--transition-fast);
+  transition: border-color var(--transition-fast), background var(--transition-fast),
+              box-shadow var(--transition-base);
 }
 .ped-item:hover { border-color: var(--color-border-strong); }
+/* 选中项（v2.1.0 强化）：染色块 + 主色描边 + 外发光环 */
 .ped-item.is-active {
-  border-color: var(--color-primary);
-  background: var(--color-sidebar-active-bg);
+  border-color: var(--color-select-border);
+  background: var(--color-select-bg);
+  box-shadow: var(--shadow-select);
 }
 .ped-item-main { flex: 1 1 auto; min-width: 0; }
 .ped-item-name {

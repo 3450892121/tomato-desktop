@@ -12,10 +12,11 @@ const fs = require('fs/promises');
 const TEST_DIR = path.join(os.tmpdir(), 'tomato-uitest');
 const RESULT_FILE = path.join(os.tmpdir(), 'tomato-theme-test.json');
 
-/** 期望色值（与 theme.css 一一对应；写死在这里是为了防止变量被改坏而测试跟着"一起错"） */
+/** 期望色值（与 theme.css 一一对应；写死在这里是为了防止变量被改坏而测试跟着"一起错"）
+    注：自 v2.1.0 起侧栏是磨砂玻璃（半透明），所以断言到具体 rgba。 */
 const EXPECT = {
-  light: { bg: 'rgb(245, 246, 248)', sidebar: 'rgb(255, 255, 255)' },
-  dark: { bg: 'rgb(22, 24, 29)', sidebar: 'rgb(26, 29, 34)' }
+  light: { bg: 'rgb(245, 246, 248)', sidebar: 'rgba(255, 255, 255, 0.34)' },
+  dark: { bg: 'rgb(22, 24, 29)', sidebar: 'rgba(24, 27, 33, 0.44)' }
 };
 /** 档位 → 按钮文字（与 shell.js 的 THEME_MODES 一致） */
 const LABELS = { system: '跟随系统', light: '浅色', dark: '深色' };
@@ -58,6 +59,28 @@ const SCAN_LIGHT_CARDS = `(() => {
     if (l !== null && l > 0.7) light.push(el.className);
   }
   return { scanned: nodes.length, light };
+})()`;
+
+/** 玻璃与选中态探针（v2.1.0）：磨砂玻璃、背景光晕、选中反馈是否真的生效 */
+const GLASS_PROBE = `(() => {
+  const alphaOf = (c) => {
+    const m = /rgba?\\((\\d+),\\s*(\\d+),\\s*(\\d+)(?:,\\s*([\\d.]+))?\\)/.exec(c || '');
+    if (!m) return null;
+    return m[4] === undefined ? 1 : Number(m[4]);
+  };
+  const sidebar = document.querySelector('.sidebar');
+  const card = document.querySelector('.tool-page.is-active .card');
+  const active = document.querySelector('.tool-item.is-active');
+  const sidebarStyle = sidebar ? getComputedStyle(sidebar) : null;
+  const cardBg = card ? getComputedStyle(card).backgroundColor : '';
+  return {
+    sidebarBlur: sidebarStyle ? (sidebarStyle.backdropFilter || 'none') : 'none',
+    sidebarAlpha: sidebarStyle ? alphaOf(sidebarStyle.backgroundColor) : null,
+    aurora: getComputedStyle(document.body).backgroundImage !== 'none',
+    cardBg,
+    cardAlpha: alphaOf(cardBg),
+    activeShadow: active ? getComputedStyle(active).boxShadow : ''
+  };
 })()`;
 
 async function runThemeTest(win) {
@@ -139,6 +162,16 @@ async function runThemeTest(win) {
     lightColors.bg === EXPECT.light.bg && lightColors.sidebar === EXPECT.light.sidebar;
   if (!result.checks.lightApplied) result.failures.push(`浅色档色值不符：${JSON.stringify(lightColors)}`);
   await shot('01-浅色');
+
+  // 3b) 磨砂玻璃与选中反馈真的生效（v2.1.0：苹果风玻璃 + 一眼能看出选中的是哪个）
+  const glass = await evalJs(GLASS_PROBE);
+  result.steps.glass = glass;
+  result.checks.glass = glass.sidebarBlur !== 'none' && glass.aurora === true &&
+    glass.sidebarAlpha !== null && glass.sidebarAlpha < 1 &&
+    glass.cardAlpha !== null && glass.cardAlpha < 1;
+  if (!result.checks.glass) result.failures.push(`磨砂玻璃未生效：${JSON.stringify(glass)}`);
+  result.checks.selectVisible = !!glass.activeShadow && glass.activeShadow !== 'none';
+  if (!result.checks.selectVisible) result.failures.push(`当前工具的选中态没有高亮：${JSON.stringify(glass.activeShadow)}`);
 
   // 4) 深色档：外壳色值必须是深色那套
   await clickUntil('dark');

@@ -1,20 +1,22 @@
 /* ============================================================
    设计令牌（唯一改样式的地方）
    全部颜色 / 字号 / 间距 / 圆角 / 阴影都集中在这里，改一处全局生效。
-   风格：清爽浅色现代风
+   风格：清爽浅色现代风 + 苹果风磨砂玻璃（v2.1.0）
    注意：所有工具（tools/*）的样式必须引用这里的变量，不得写死色值。
    ============================================================ */
 :root {
-  /* 颜色 —— 基础 */
+  /* 颜色 —— 基础
+     注意：--color-surface / --color-surface-soft 自 v2.1.0 起是「半透明玻璃值」，
+     浮在背景光晕上；--color-bg 仍是实色（必须与 main.js 的 windowBackgroundColor 一致，否则启动闪白）。 */
   --color-bg: #f5f6f8;
-  --color-surface: #ffffff;
-  --color-surface-soft: #fafbfc;
+  --color-surface: rgba(255, 255, 255, 0.42);
+  --color-surface-soft: rgba(255, 255, 255, 0.26);
   --color-border: #e7e9ee;
   --color-border-strong: #d8dbe2;
 
   /* 颜色 —— 左侧工具列表 */
-  --color-sidebar-bg: #ffffff;
-  --color-sidebar-active-bg: #fff1ef;
+  --color-sidebar-bg: rgba(255, 255, 255, 0.34);
+  --color-sidebar-active-bg: rgba(255, 90, 78, 0.14);
   --color-sidebar-active-text: #d93a2e;
 
   /* 颜色 —— 文字 */
@@ -60,20 +62,53 @@
   --radius-md: 10px;
   --radius-lg: 14px;
 
-  /* 阴影 */
-  --shadow-card: 0 1px 2px rgba(16, 24, 40, 0.04), 0 2px 8px rgba(16, 24, 40, 0.05);
+  /* 阴影（玻璃面用更大更软的投影托出层次：玻璃「浮起来」才看得出厚度） */
+  --shadow-card: 0 2px 6px rgba(16, 24, 40, 0.06), 0 18px 44px rgba(16, 24, 40, 0.12);
   --shadow-btn: 0 1px 2px rgba(16, 24, 40, 0.08);
+  --shadow-float: 6px 0 28px rgba(16, 24, 40, 0.08); /* 侧栏等贴边玻璃向外投的浮起阴影 */
+
+  /* 玻璃（Apple 风磨砂玻璃）—— 所有玻璃面统一引用这几个令牌 */
+  --glass-blur: 30px;                                    /* 常规玻璃的模糊半径 */
+  --glass-blur-strong: 46px;                             /* 浮层（弹窗 / 抽屉）模糊更足 */
+  --glass-blur-overlay: 10px;                            /* 处理中进度遮罩：要盖满整窗，模糊刻意做浅（大模糊会拖慢批量任务） */
+  --glass-saturate: 200%;                                /* 玻璃下的颜色更饱和透亮（磨砂的「活」气） */
+  --glass-bg-strong: rgba(255, 255, 255, 0.74);          /* 更实的玻璃（弹窗、抽屉） */
+  --glass-bg-soft: rgba(255, 255, 255, 0.34);            /* 轻玻璃（顶栏、胶囊按钮） */
+  --glass-border: rgba(255, 255, 255, 0.85);             /* 玻璃高光边（亮边 = 玻璃的厚度感） */
+  --glass-inner-highlight: inset 0 1px 0 rgba(255, 255, 255, 0.85); /* 顶部内高光 */
+  /* 玻璃斜向高光（sheen）：左上角一层很淡的白，是「玻璃」与「半透明色块」的关键区别 */
+  --glass-sheen: linear-gradient(158deg, rgba(255, 255, 255, 0.62), rgba(255, 255, 255, 0) 46%);
+
+  /* 背景细颗粒（磨砂的关键：颗粒在玻璃后面会被糊掉，玻璃看起来才是「毛」的）。
+     内联 SVG 噪声，alpha 只有 5.5%，不影响任何内容；离线可用、不引入外部资源。 */
+  --bg-grain: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3CfeComponentTransfer%3E%3CfeFuncA type='linear' slope='0.055'/%3E%3C/feComponentTransfer%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23n)'/%3E%3C/svg%3E");
+
+  /* 背景光晕：玻璃要有东西可「糊」才看得出磨砂。
+     深浅色各一套；强度控制在 ≤0.35，保证看图配色与文字对比度不受影响。 */
+  --bg-aurora-warm: rgba(255, 118, 86, 0.34);            /* 左上：番茄暖色 */
+  --bg-aurora-cool: rgba(84, 140, 255, 0.30);            /* 右上：冷蓝 */
+  --bg-aurora-violet: rgba(176, 120, 255, 0.26);         /* 下方：淡紫 */
+
+  /* 选中反馈（全软件统一：实心染色块 + 描边环 + 投影，一眼能看出选中了哪个） */
+  --color-select-bg: rgba(255, 90, 78, 0.14);
+  --color-select-border: var(--color-primary);
+  --color-select-ring: rgba(255, 90, 78, 0.55);
+  /* 描边用「内描边」而不是外发光环：外环会被列表容器的 overflow 裁掉，看起来像选中块被切了一半 */
+  --shadow-select: inset 0 0 0 1px var(--color-select-ring), 0 6px 18px rgba(217, 58, 46, 0.18);
 
   /* 布局 */
   --sidebar-width: 188px;
   --topbar-height: 40px;
 
-  /* 动画（组件库与工具统一用这几个节奏令牌，保证全软件动效一致） */
-  --transition-fast: 120ms ease;                                  /* 微交互：悬停、按压、聚焦 */
-  --transition-base: 200ms cubic-bezier(0.22, 0.61, 0.36, 1);     /* 常规过渡：折叠、淡入 */
-  --transition-slow: 260ms cubic-bezier(0.22, 0.61, 0.36, 1);     /* 大幅过渡：页面切换、弹窗 */
-  --transition-collapse: 220ms cubic-bezier(0.22, 0.61, 0.36, 1); /* 收起/展开 */
+  /* 动画（组件库与工具统一用这几个节奏令牌，保证全软件动效一致）
+     v2.1.0：整体调强一档（用户反馈「动效不明显、看不出选中的是哪个」） */
+  --transition-fast: 150ms ease;                                  /* 微交互：悬停、按压、聚焦 */
+  --transition-base: 260ms cubic-bezier(0.22, 0.61, 0.36, 1);     /* 常规过渡：折叠、淡入 */
+  --transition-slow: 380ms cubic-bezier(0.22, 0.61, 0.36, 1);     /* 大幅过渡：页面切换、弹窗 */
+  --transition-collapse: 280ms cubic-bezier(0.22, 0.61, 0.36, 1); /* 收起/展开 */
   --ease-out: cubic-bezier(0.22, 0.61, 0.36, 1);
+  --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);               /* 回弹曲线：选中 / 切换用 */
+  --transition-spring: 340ms var(--ease-spring);
 }
 
 /* ============================================================
@@ -87,16 +122,18 @@
   /* 让原生滚动条、下拉框、日期选择等跟随深色（否则浅色控件会突兀地亮一块） */
   color-scheme: dark;
 
-  /* 颜色 —— 基础 */
+  /* 颜色 —— 基础
+     深色玻璃面的规则：必须是「深色 rgb + alpha」，不能用白色加 alpha，
+     否则 --theme-test 的深色浅色残留扫描会把玻璃误判成写死的浅色。 */
   --color-bg: #16181d;
-  --color-surface: #1e2126;
-  --color-surface-soft: #23262c;
+  --color-surface: rgba(34, 38, 44, 0.54);
+  --color-surface-soft: rgba(44, 49, 56, 0.38);
   --color-border: #2e3238;
   --color-border-strong: #3b4149;
 
   /* 颜色 —— 左侧工具列表 */
-  --color-sidebar-bg: #1a1d22;
-  --color-sidebar-active-bg: #3a2320;
+  --color-sidebar-bg: rgba(24, 27, 33, 0.44);
+  --color-sidebar-active-bg: rgba(255, 106, 94, 0.22);
   --color-sidebar-active-text: #ff8478;
 
   /* 颜色 —— 文字 */
@@ -122,6 +159,25 @@
   --color-danger: #f0554a;
 
   /* 阴影：深色下浅阴影看不见，改用更深的投影维持层次 */
-  --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.3), 0 2px 8px rgba(0, 0, 0, 0.35);
+  --shadow-card: 0 2px 8px rgba(0, 0, 0, 0.35), 0 18px 46px rgba(0, 0, 0, 0.45);
   --shadow-btn: 0 1px 2px rgba(0, 0, 0, 0.35);
+  --shadow-float: 6px 0 30px rgba(0, 0, 0, 0.45);
+
+  /* 玻璃：深色下玻璃更「暗更透」，高光边改成极细的亮线（白一点的玻璃在深色里会发灰） */
+  --glass-bg-strong: rgba(32, 36, 42, 0.80);
+  --glass-bg-soft: rgba(255, 255, 255, 0.06);
+  --glass-border: rgba(255, 255, 255, 0.14);
+  --glass-inner-highlight: inset 0 1px 0 rgba(255, 255, 255, 0.10);
+  /* 深色下高光要更含蓄，不然玻璃会发灰 */
+  --glass-sheen: linear-gradient(158deg, rgba(255, 255, 255, 0.14), rgba(255, 255, 255, 0) 46%);
+
+  /* 背景光晕：深色版的暖 / 冷 / 紫光（比浅色略含蓄，避免抬黑底） */
+  --bg-aurora-warm: rgba(255, 106, 94, 0.30);
+  --bg-aurora-cool: rgba(79, 150, 245, 0.26);
+  --bg-aurora-violet: rgba(150, 110, 255, 0.22);
+
+  /* 选中反馈：深色下染色块更浓一点，投影换成黑色 */
+  --color-select-bg: rgba(255, 106, 94, 0.22);
+  --color-select-ring: rgba(255, 106, 94, 0.6);
+  --shadow-select: inset 0 0 0 1px var(--color-select-ring), 0 6px 18px rgba(0, 0, 0, 0.45);
 }

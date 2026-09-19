@@ -92,13 +92,15 @@
   border: 1px solid var(--color-border);
   border-radius: var(--radius-sm);
   cursor: pointer;
-  transition: border-color var(--transition-fast), background var(--transition-fast);
+  transition: border-color var(--transition-fast), background var(--transition-fast),
+              box-shadow var(--transition-base);
 }
 .aedit-item:hover { border-color: var(--color-border-strong); }
+/* 选中项（v2.1.0 强化）：染色块 + 主色描边 + 外发光环 */
 .aedit-item.is-selected {
-  border-color: var(--color-primary);
-  background: var(--color-surface);
-  box-shadow: var(--shadow-btn);
+  border-color: var(--color-select-border);
+  background: var(--color-select-bg);
+  box-shadow: var(--shadow-select);
 }
 .aedit-item-main { flex: 1 1 auto; min-width: 0; }
 .aedit-item-name {

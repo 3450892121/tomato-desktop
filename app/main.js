@@ -506,13 +506,16 @@ function createMainWindow() {
   }
 
   if (queueUiTest) {
-    const { runQueueUiTest } = require('./tests/queue-ui-test.js');
+    const { runQueueUiTest, writeResult } = require('./tests/queue-ui-test.js');
     mainWindow.webContents.once('did-finish-load', async () => {
       try {
         const result = await runQueueUiTest(mainWindow);
         console.log(`QUEUE_UI_TEST ${JSON.stringify({ pass: result.pass, failures: result.failures })}`);
+        // 结果落盘（与 AGENTS.md 的约定一致；否则留下的旧文件会误导下次验收）
+        writeResult({ ok: !!result.pass, at: new Date().toISOString(), result });
       } catch (err) {
         console.log(`QUEUE_UI_TEST_FAIL ${err.message}\n${err.stack}`);
+        writeResult({ ok: false, at: new Date().toISOString(), error: err.message, stack: err.stack });
       } finally {
         app.quit();
       }
