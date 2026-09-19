@@ -40,6 +40,22 @@ export function getSettings() {
   return { ...current };
 }
 
+/**
+ * 强制从磁盘重新加载（忽略「只加载一次」的缓存）。
+ * 使用场景：导入设置文件之后——配置文件被主进程改写了，内存态必须跟着更新，
+ * 否则各工具通过 getSettings() 读到的还是旧值。
+ */
+export async function reloadSettings() {
+  try {
+    const saved = await window.desktop.settingsRead();
+    current = { ...DEFAULT_SETTINGS, ...(saved || {}) };
+  } catch {
+    current = { ...DEFAULT_SETTINGS };
+  }
+  loaded = true;
+  return { ...current };
+}
+
 /** 更新设置并落盘 */
 export async function updateSettings(patch) {
   current = { ...current, ...patch };

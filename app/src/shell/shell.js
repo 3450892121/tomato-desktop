@@ -550,6 +550,14 @@ function openSettings() {
         <input type="checkbox" id="setAskSavePath" ${s.askSavePath ? 'checked' : ''} />
         <span>每次保存前询问保存位置</span>
       </label>
+      <div class="field">
+        <label class="field-label">设置备份（换电脑 / 重装时用）</label>
+        <div class="control-row">
+          <button class="btn btn-ghost" id="setExport" type="button">导出设置…</button>
+          <button class="btn btn-ghost" id="setImport" type="button">导入设置…</button>
+        </div>
+        <div class="field-hint">导出成一个小 json 文件；在别的电脑上点「导入设置…」选中它即可恢复。导入只合并本软件认识的设置项。</div>
+      </div>
     `,
     actions: [
       {
@@ -619,6 +627,46 @@ function openSettings() {
     dirInput.value = '';
     setStatus('输出目录已设为「保存在原图旁边」');
   });
+
+  // 导出 / 导入设置（见 spec/modules/settings-io.md）
+  modal.backdrop.querySelector('#setExport').addEventListener('click', async () => {
+    const res = await window.desktop.settingsExport();
+    if (!res || res.canceled) return;
+    setStatus(res.ok ? `设置已导出到：${res.path}` : `导出失败：${res.message || '未知原因'}`);
+  });
+
+  modal.backdrop.querySelector('#setImport').addEventListener('click', async () => {
+    const res = await window.desktop.settingsImport();
+    if (!res || res.canceled) return;
+    if (!res.ok) {
+      setStatus(`导入失败：${res.message || '未知原因'}`);
+      return;
+    }
+    // 导入成功后要让界面立刻反映新设置：重载共享层内存态、刷新各控件、应用主题、重渲染导航
+    const fresh = await settings.reloadSettings();
+    refreshSettingsModalFrom(modal.backdrop, fresh);
+    applyTheme(fresh.theme);
+    collapsedGroups = new Set(
+      Array.isArray(fresh.collapsedGroups) ? fresh.collapsedGroups : GROUPS.map((g) => g.id)
+    );
+    renderNav();
+    setStatus(`设置已导入（${res.applied.length} 项）：${res.applied.join('、')}`);
+  });
+}
+
+/** 把设置值回填到设置弹窗的各个控件（导入设置、恢复默认后共用） */
+function refreshSettingsModalFrom(backdrop, s) {
+  const set = (sel, value) => {
+    const el = backdrop.querySelector(sel);
+    if (el) el.value = value;
+  };
+  set('#setTheme', s.theme);
+  set('#setBlockSize', s.blockSize);
+  set('#setJpegQuality', s.jpegQuality);
+  set('#setDefaultKey', s.defaultDoubleKey);
+  set('#setOutputDir', s.outputDir);
+  const check = backdrop.querySelector('#setAskSavePath');
+  if (check) check.checked = !!s.askSavePath;
 }
 
 function openHelp() {

@@ -93,6 +93,9 @@ contextBridge.exposeInMainWorld('desktop', {
   // 设置（绿色版：存在软件目录内）
   settingsRead: () => ipcRenderer.invoke('settings:read'),
   settingsWrite: (patch) => ipcRenderer.invoke('settings:write', patch),
+  // 设置的导出 / 导入（换机器一键带走；见 spec/modules/settings-io.md）
+  settingsExport: () => ipcRenderer.invoke('settings:export'),
+  settingsImport: () => ipcRenderer.invoke('settings:import'),
 
   // 拖拽文件取真实路径（Electron 新版不再提供 file.path）
   getPathForFile: (file) => {

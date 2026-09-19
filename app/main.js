@@ -60,13 +60,16 @@ const avTest = process.argv.includes('--av-test');
 // B 批图片工具自检：`electron . --imgbatch-test` 覆盖「批量重命名/加水印/长图拼接/九宫格切图」
 const imgbatchTest = process.argv.includes('--imgbatch-test');
 
+// 设置导入导出自检：`electron . --settingsio-test`
+const settingsIoTest = process.argv.includes('--settingsio-test');
+
 // 测试模式下关闭硬件加速：保证截图（capturePage）在任何机器上都能稳定拿到画面
-if (uiTest || pdfUiTest || mediaUiTest || audioUiTest || asrUiTest || themeTest || avTest || imgbatchTest) {
+if (uiTest || pdfUiTest || mediaUiTest || audioUiTest || asrUiTest || themeTest || avTest || imgbatchTest || settingsIoTest) {
   app.disableHardwareAcceleration();
 }
 
 /** 是否处于任一自动测试模式：此时系统对话框一律换成本地测试文件（避免测试卡在弹窗上） */
-const testMode = () => uiTest || pdfUiTest || mediaTest || mediaUiTest || audioTest || audioUiTest || asrTest || asrUiTest || ocrPoc || themeTest || avTest || imgbatchTest;
+const testMode = () => uiTest || pdfUiTest || mediaTest || mediaUiTest || audioTest || audioUiTest || asrTest || asrUiTest || ocrPoc || themeTest || avTest || imgbatchTest || settingsIoTest;
 
 /** 自动测试模式下：从测试目录取指定扩展名的文件（对话框桩用；扩展名带不带点都能匹配） */
 async function testDirFiles(exts, { startWith, exact } = {}) {
@@ -468,6 +471,20 @@ function createMainWindow() {
     });
   }
 
+  if (settingsIoTest) {
+    const { runSettingsIoTest } = require('./tests/settingsio-test.js');
+    mainWindow.webContents.once('did-finish-load', async () => {
+      try {
+        const result = await runSettingsIoTest(mainWindow);
+        console.log(`SETTINGSIO_TEST ${JSON.stringify({ pass: result.pass, failures: result.failures })}`);
+      } catch (err) {
+        console.log(`SETTINGSIO_TEST_FAIL ${err.message}\n${err.stack}`);
+      } finally {
+        app.quit();
+      }
+    });
+  }
+
   if (makeSamplesDir) {
     mainWindow.webContents.once('did-finish-load', async () => {
       try {
@@ -708,6 +725,93 @@ ipcMain.handle('settings:write', async (_event, patch) => {
   await fs.mkdir(USER_DATA_DIR, { recursive: true });
   await fs.writeFile(SETTINGS_FILE, JSON.stringify(next, null, 2), 'utf8');
   return next;
+});
+
+/**
+ * 导出设置：把当前设置写到用户选的位置（换机器/重装时一键带走，见 spec/modules/settings-io.md）
+ * 返回 {ok, path} 或 {ok:false, canceled:true} / {ok:false, message}
+ */
+ipcMain.handle('settings:export', async () => {
+  const current = await readSettingsFile();
+  const payload = {
+    _app: '番茄图片混淆 桌面版',
+    _format: 1,                 // 格式版本号：将来若结构变了，导入端据此提示
+    _exportedAt: new Date().toISOString(),
+    _appVersion: app.getVersion(),
+    settings: current
+  };
+  const bytes = Buffer.from(JSON.stringify(payload, null, 2), 'utf8');
+
+  let target = null;
+  if (testMode()) {
+    const { TEST_DIR } = require('./tests/ui-test.js');
+    target = path.join(TEST_DIR, '设置导出.json');
+  } else {
+    const res = await dialog.showSaveDialog(mainWindow, {
+      title: '导出设置',
+      defaultPath: '番茄工具箱-设置.json',
+      filters: [{ name: '设置文件', extensions: ['json'] }]
+    });
+    if (res.canceled || !res.filePath) return { ok: false, canceled: true };
+    target = res.filePath;
+  }
+  try {
+    await fs.writeFile(target, bytes);
+    return { ok: true, path: target };
+  } catch (err) {
+    return { ok: false, message: String((err && err.message) || err) };
+  }
+});
+
+/**
+ * 导入设置：让用户挑一个设置文件，校验后**合并**进当前设置并落盘。
+ * 安全性：只接受本软件导出的结构（`settings` 字段为对象），且**只合并已知键**——
+ * 野文件里的未知键一律忽略，避免把乱七八糟的东西写进配置文件。
+ * 返回 {ok, applied, settings} 或 {ok:false, canceled|message}
+ */
+ipcMain.handle('settings:import', async () => {
+  // 白名单：与 src/shared/settings.js 的 DEFAULT_SETTINGS 保持一致
+  const KNOWN_KEYS = ['blockSize', 'jpegQuality', 'defaultDoubleKey', 'outputDir', 'askSavePath', 'collapsedGroups', 'theme'];
+
+  let source = null;
+  if (testMode()) {
+    const { TEST_DIR } = require('./tests/ui-test.js');
+    source = path.join(TEST_DIR, '设置导入.json');
+  } else {
+    const res = await dialog.showOpenDialog(mainWindow, {
+      title: '导入设置',
+      properties: ['openFile'],
+      filters: [{ name: '设置文件', extensions: ['json'] }]
+    });
+    if (res.canceled || !res.filePaths || res.filePaths.length === 0) return { ok: false, canceled: true };
+    source = res.filePaths[0];
+  }
+
+  let parsed;
+  try {
+    parsed = JSON.parse(await fs.readFile(source, 'utf8'));
+  } catch (err) {
+    return { ok: false, message: `这个文件不是有效的设置文件（${String((err && err.message) || err)}）` };
+  }
+  const incoming = parsed && typeof parsed === 'object' ? parsed.settings : null;
+  if (!incoming || typeof incoming !== 'object') {
+    return { ok: false, message: '这个文件不是本软件导出的设置文件（缺少 settings 内容）' };
+  }
+
+  const patch = {};
+  const applied = [];
+  for (const k of KNOWN_KEYS) {
+    if (Object.prototype.hasOwnProperty.call(incoming, k)) {
+      patch[k] = incoming[k];
+      applied.push(k);
+    }
+  }
+  if (applied.length === 0) return { ok: false, message: '设置文件里没有可用的设置项' };
+
+  const merged = { ...(await readSettingsFile()), ...patch };
+  await fs.mkdir(USER_DATA_DIR, { recursive: true });
+  await fs.writeFile(SETTINGS_FILE, JSON.stringify(merged, null, 2), 'utf8');
+  return { ok: true, applied, settings: merged, source };
 });
 
 // —— 剪贴板 ——
