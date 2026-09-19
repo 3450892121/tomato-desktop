@@ -1,6 +1,7 @@
 /* ============================================================
-   框架样式：左右布局 + 通用组件（按钮/卡片/输入/进度）
-   只使用 theme.css 的令牌；工具自带样式放在各自 tools/<id>/styles.css
+   框架样式：左侧导航 + 工具页容器（左右布局、分组折叠、页面切换）
+   - 通用组件（按钮/卡片/输入/弹窗/进度）在 components.css
+   - 只使用 theme.css 的令牌；工具自带样式放各自 tools/<id>/styles.css
    ============================================================ */
 
 * { box-sizing: border-box; }
@@ -48,6 +49,7 @@ html, body {
 
 .tool-nav { display: flex; flex-direction: column; gap: var(--space-1); flex: 1 1 auto; padding: var(--space-1) var(--space-2); }
 .tool-item {
+  position: relative;
   display: flex;
   align-items: center;
   gap: var(--space-2);
@@ -68,7 +70,23 @@ html, body {
   color: var(--color-sidebar-active-text);
   font-weight: 600;
 }
-.tool-item-icon { flex: none; font-size: var(--font-size-lg); }
+/* 当前工具的左侧标记：切换时从中间「长出来」，比整块背景变化更柔和 */
+.tool-item::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 50%;
+  width: 3px;
+  height: 58%;
+  border-radius: 999px;
+  background: currentColor;
+  transform: translateY(-50%) scaleY(0);
+  opacity: 0;
+  transition: transform var(--transition-base), opacity var(--transition-base);
+}
+.tool-item.is-active::before { transform: translateY(-50%) scaleY(1); opacity: 0.9; }
+.tool-item-icon { flex: none; font-size: var(--font-size-lg); transition: transform var(--transition-base); }
+.tool-item:hover .tool-item-icon { transform: scale(1.08); }
 
 /* 工具分组（图片 / 视频 / 文档）—— 同类工具聚在一起，标题可点：收起 / 展开 */
 .tool-group { display: flex; flex-direction: column; }
@@ -114,9 +132,22 @@ html, body {
   font-size: var(--font-size-xs);
   font-weight: 400;
 }
-.tool-group-items { display: flex; flex-direction: column; gap: var(--space-1); }
+/* 分组内容：收起 / 展开是平滑的高度过渡（max-height 的具体值由 shell.js 量出来写进内联样式，
+   保证任何内容高度都能自然过渡）；收起完成后才隐藏，既不闪烁也不会用键盘 Tab 进隐藏项。 */
+.tool-group-items {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  overflow: hidden;
+  transition: max-height var(--transition-collapse), opacity var(--transition-collapse), visibility 0s 0s;
+}
+.tool-group.is-collapsed .tool-group-items {
+  max-height: 0;
+  opacity: 0;
+  visibility: hidden;
+  transition: max-height var(--transition-collapse), opacity var(--transition-collapse), visibility 0s var(--transition-collapse);
+}
 .tool-group-items .tool-item { padding-left: var(--space-5); } /* 略微缩进，体现层级 */
-.tool-group.is-collapsed .tool-group-items { display: none; }
 
 .sidebar-footer {
   display: flex;
@@ -153,134 +184,10 @@ html, body {
 .topbar-status { font-size: var(--font-size-md); }
 .topbar-info { font-size: var(--font-size-xs); color: var(--color-text-secondary); }
 
+/* —— 工具页容器 ——
+   每个工具一个 .tool-page：切走时整页从文档里取下（DOM 与工具内部状态留在内存），
+   切回来原样放回，所以列表、当前图、输入内容、滚动位置与顶栏提示都不会重置。
+   页面切换带轻微上浮淡入（page-in 定义在 components.css）。 */
 .tool-host { display: flex; flex-direction: column; flex: 1 1 auto; min-height: 0; padding: var(--space-3) var(--space-4) var(--space-4); }
-
-/* —— 通用组件（工具直接复用这些类） —— */
-.card {
-  background: var(--color-surface);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-card);
-}
-
-.control-row { display: flex; align-items: center; gap: var(--space-2); }
-.control-label { flex: none; color: var(--color-text-secondary); }
-.control-hint { flex: none; font-size: var(--font-size-xs); color: var(--color-text-secondary); }
-
-.select, .input {
-  flex: 1 1 auto;
-  min-height: 36px;
-  padding: 0 var(--space-3);
-  background: var(--color-surface-soft);
-  border: 1px solid var(--color-border-strong);
-  border-radius: var(--radius-sm);
-  color: var(--color-text);
-  font-family: inherit;
-  font-size: var(--font-size-md);
-  outline: none;
-  transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
-}
-.select:focus, .input:focus {
-  border-color: var(--color-primary);
-  box-shadow: 0 0 0 3px rgba(255, 90, 78, 0.14);
-}
-
-.btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-height: 36px;
-  padding: 0 var(--space-4);
-  border: 1px solid transparent;
-  border-radius: var(--radius-sm);
-  background: var(--color-neutral);
-  color: var(--color-neutral-text);
-  font-family: inherit;
-  font-size: var(--font-size-md);
-  cursor: pointer;
-  user-select: none;
-  transition: background var(--transition-fast), transform var(--transition-fast), opacity var(--transition-fast);
-}
-.btn:hover { background: var(--color-neutral-hover); }
-.btn:active { transform: translateY(1px); }
-.btn:disabled { opacity: 0.5; cursor: default; transform: none; }
-
-.btn-obfuscate { background: var(--color-primary); color: var(--color-text-inverse); box-shadow: var(--shadow-btn); }
-.btn-obfuscate:hover { background: var(--color-primary-hover); }
-.btn-deobfuscate { background: var(--color-deobfuscate); color: var(--color-text-inverse); box-shadow: var(--shadow-btn); }
-.btn-deobfuscate:hover { background: var(--color-deobfuscate-hover); }
-.btn-save { background: var(--color-save); color: var(--color-text-inverse); box-shadow: var(--shadow-btn); }
-.btn-save:hover { background: var(--color-save-hover); }
-.btn-plain { background: var(--color-neutral); color: var(--color-neutral-text); }
-.btn-primary { background: var(--color-primary); color: var(--color-text-inverse); box-shadow: var(--shadow-btn); }
-.btn-primary:hover { background: var(--color-primary-hover); }
-.btn-ghost {
-  flex: none;
-  background: transparent;
-  border-color: var(--color-border-strong);
-  color: var(--color-text-secondary);
-}
-.btn-ghost:hover { background: var(--color-surface-soft); }
-.btn-lg { min-height: 46px; padding: 0 var(--space-6); font-size: var(--font-size-lg); }
-
-/* —— 弹窗（设置 / 帮助共用） —— */
-.modal-backdrop {
-  position: fixed;
-  inset: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: rgba(24, 28, 36, 0.28);
-  z-index: 100;
-}
-.modal-card {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-3);
-  width: min(560px, 92vw);
-  max-height: 86vh;
-  padding: var(--space-5);
-  background: var(--color-surface);
-  border-radius: var(--radius-lg);
-  box-shadow: 0 12px 40px rgba(16, 24, 40, 0.18);
-}
-.modal-title { font-size: var(--font-size-lg); font-weight: 600; }
-.modal-body { display: flex; flex-direction: column; gap: var(--space-3); overflow-y: auto; }
-.modal-actions { display: flex; justify-content: flex-end; gap: var(--space-2); }
-
-.field { display: flex; flex-direction: column; gap: var(--space-1); }
-.field-label { font-size: var(--font-size-sm); color: var(--color-text-secondary); }
-.field-hint { font-size: var(--font-size-xs); color: var(--color-text-secondary); }
-.field-check { display: flex; align-items: center; gap: var(--space-2); font-size: var(--font-size-md); }
-
-.help-section h4 { margin: 0 0 var(--space-1); font-size: var(--font-size-md); }
-.help-section p, .help-section ul, .help-section ol { margin: 0; padding-left: var(--space-4); color: var(--color-text-secondary); font-size: var(--font-size-sm); line-height: 1.7; }
-.help-section p { padding-left: 0; }
-
-/* —— 框架级进度遮罩（所有工具共用） —— */
-.progress {
-  position: fixed;
-  inset: 0;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: var(--space-3);
-  background: rgba(255, 255, 255, 0.72);
-  backdrop-filter: blur(2px);
-}
-.progress-track {
-  width: 320px;
-  height: 8px;
-  border-radius: 999px;
-  background: var(--color-neutral);
-  overflow: hidden;
-}
-.progress-fill {
-  width: 0%;
-  height: 100%;
-  border-radius: 999px;
-  background: var(--color-primary);
-  transition: width var(--transition-fast);
-}
-.progress-text { font-size: var(--font-size-sm); color: var(--color-text-secondary); }
+.tool-page { display: flex; flex-direction: column; flex: 1 1 auto; min-height: 0; overflow-y: auto; }
+.tool-page.is-active { animation: page-in var(--transition-slow) both; }

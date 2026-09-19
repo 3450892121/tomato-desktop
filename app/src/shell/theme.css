@@ -68,6 +68,10 @@
   --sidebar-width: 188px;
   --topbar-height: 40px;
 
-  /* 动画 */
-  --transition-fast: 120ms ease;
+  /* 动画（组件库与工具统一用这几个节奏令牌，保证全软件动效一致） */
+  --transition-fast: 120ms ease;                                  /* 微交互：悬停、按压、聚焦 */
+  --transition-base: 200ms cubic-bezier(0.22, 0.61, 0.36, 1);     /* 常规过渡：折叠、淡入 */
+  --transition-slow: 260ms cubic-bezier(0.22, 0.61, 0.36, 1);     /* 大幅过渡：页面切换、弹窗 */
+  --transition-collapse: 220ms cubic-bezier(0.22, 0.61, 0.36, 1); /* 收起/展开 */
+  --ease-out: cubic-bezier(0.22, 0.61, 0.36, 1);
 }

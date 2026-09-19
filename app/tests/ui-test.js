@@ -130,6 +130,46 @@ async function runUiTest(win) {
     return { addButton: shown('#btnAddFirst'), progress: shown('#progressBar'), thumbs: shown('#thumbStrip') };
   })()`);
 
+  // 2.5) 页面状态保持：切到别的工具再切回来，已选图片/当前图预览/顶栏提示都不应丢或被重置
+  result.checks.stateKeep = JSON.parse(await evalJs(`(async () => {
+    const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+    const nav = (id) => [...document.querySelectorAll('#toolNav .tool-item')].find((b) => b.dataset.toolId === id);
+    const canvas = document.getElementById('previewCanvas');
+    const before = {
+      thumbs: document.querySelectorAll('#thumbList .thumb').length,
+      canvasW: canvas.width,
+      canvasH: canvas.height,
+      status: document.getElementById('statusText').textContent
+    };
+    nav('compress').click();
+    await wait(700);
+    const away = {
+      activePage: (document.querySelector('.tool-page.is-active') || { dataset: {} }).dataset.toolId || '',
+      obfuscateDetached: !document.querySelector('.tool-page[data-tool-id="obfuscate"]')
+    };
+    nav('obfuscate').click();
+    await wait(700);
+    const back = {
+      thumbs: document.querySelectorAll('#thumbList .thumb').length,
+      canvasW: canvas.width,
+      canvasH: canvas.height,
+      status: document.getElementById('statusText').textContent
+    };
+    // 状态不只是「看得见」还要「还能用」：点一次「还原」，工具内部状态应照常响应
+    document.querySelector('[data-action="revert"]').click();
+    await wait(400);
+    const afterAction = document.getElementById('statusText').textContent;
+    return JSON.stringify({
+      ok: before.thumbs === 2 && back.thumbs === before.thumbs
+        && back.canvasW === before.canvasW && back.canvasH === before.canvasH
+        && back.status === before.status
+        && away.activePage === 'compress'
+        && afterAction.includes('还原'),
+      before, away, back, afterAction
+    });
+  })()`));
+  await shot('02b-切走再切回');
+
   // 3) 切换到「像素混淆 (C)」并设置字符串密钥
   await evalJs(`(() => {
     const sel = document.getElementById('modeSelect');
@@ -247,7 +287,8 @@ async function runUiTest(win) {
     const status = document.getElementById('statusText').textContent;
     const closeBtn = [...document.querySelectorAll('.modal-actions .btn')].find((b) => b.textContent === '取消');
     if (closeBtn) closeBtn.click();
-    await new Promise((r) => setTimeout(r, 150));
+    // 关闭带一小段淡出动画（约 120ms）后移除，这里等足再数剩余弹窗
+    await new Promise((r) => setTimeout(r, 500));
     return status + '｜剩余弹窗数=' + document.querySelectorAll('.modal-backdrop').length;
   })()`);
   try {
@@ -328,6 +369,7 @@ async function runUiTest(win) {
     c.afterAddVisibility.addButton === false &&
     c.afterAddVisibility.progress === false &&
     c.afterAddVisibility.thumbs === true &&
+    c.stateKeep.ok === true &&
     c.obfuscatedDiffers === true &&
     c.revertEqualsOriginal === true &&
     result.steps.filesAfterSave.length >= 1 &&

@@ -435,6 +435,9 @@ async function onDrop(event) {
 }
 
 function onKeyDown(event) {
+  // 本工具的这些快捷键挂在窗口上：页面被切走（隐藏）时必须让位，
+  // 否则别的工具里按 Ctrl+V / Ctrl+C 会误触发这里的粘贴/复制。
+  if (typeof state.ctx.isActive === 'function' && !state.ctx.isActive()) return;
   const tag = (document.activeElement && document.activeElement.tagName) || '';
   if (tag === 'INPUT' || tag === 'SELECT' || tag === 'TEXTAREA') return;
   if (!(event.ctrlKey || event.metaKey)) return;

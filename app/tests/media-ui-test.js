@@ -67,6 +67,20 @@ async function runMediaUiTest(win) {
   const ffmpeg = findFfmpeg();
   result.ffmpeg = { found: !!ffmpeg, path: ffmpeg };
 
+  // 侧栏分组的用户偏好（settings.collapsedGroups：null = 没设置过 → 默认全收起）
+  const settingsFile = path.join(
+    app.isPackaged ? path.dirname(process.execPath) : path.join(__dirname, '..'),
+    'userdata',
+    'settings.json'
+  );
+  const readCollapsedPref = async () => {
+    try {
+      const saved = JSON.parse(await fs.readFile(settingsFile, 'utf8'));
+      return Array.isArray(saved.collapsedGroups) ? saved.collapsedGroups : null;
+    } catch { return null; }
+  };
+  result.steps.settingsAtStart = await readCollapsedPref();
+
   await fs.mkdir(TEST_DIR, { recursive: true });
 
   // —— 清理上次夹具（图片夹具也一起清：本测试只认「测试原图C」，历次副本会让列表膨胀） ——
@@ -227,26 +241,87 @@ async function runMediaUiTest(win) {
     }
   }
 
-  // —— 侧栏分组自检：大类带图标、点一下收起、再点一下展开 ——
+  // —— 侧栏分组自检：默认只显示分类标题（子项收起）、点标题平滑展开/再收起、大类带图标、选择被记住 ——
+  // 期望值以设置文件为准：没设置过（null）= 默认全收起；用户明确点过的按设置里的来；
+  // 无论哪种，当前工具所在分组都必须展开（否则「当前工具看不见」）。
+  // 走到这里用户还没点过分组标题，偏好应与启动时一致（用于确认「自动展开」不会偷偷改设置）
+  result.steps.settingsBeforeGroupCheck = await readCollapsedPref();
+  const collapsedPref = result.steps.settingsBeforeGroupCheck;
+
   result.checks.分组折叠 = JSON.parse(await evalJs(`(async () => {
-    const head = document.querySelector('.tool-group-head[data-group-id="image"]');
-    if (!head) return JSON.stringify({ ok: false, reason: '左侧没有找到「图片」分组标题' });
+    const heads = [...document.querySelectorAll('.tool-group-head')];
+    if (heads.length < 4) return JSON.stringify({ ok: false, reason: '分组标题不足 4 个' });
+    const icons = heads.map((h) => ((h.querySelector('.tool-group-icon') || {}).textContent || '').trim());
+    const pref = ${JSON.stringify(collapsedPref)};
+    const activeItem = document.querySelector('.tool-item.is-active');
+    const activeGroup = activeItem ? activeItem.closest('.tool-group').dataset.groupId : '';
+
+    const stateOf = (head) => {
+      const wrap = head.closest('.tool-group');
+      const items = wrap.querySelector('.tool-group-items');
+      const rect = items.getBoundingClientRect();
+      return {
+        id: wrap.dataset.groupId,
+        collapsed: wrap.classList.contains('is-collapsed'),
+        expandedAttr: head.getAttribute('aria-expanded') === 'true',
+        visible: getComputedStyle(items).visibility !== 'hidden' && rect.height > 1
+      };
+    };
+
+    // 1) 默认态：没设置过偏好 = 全收起；当前工具所在分组例外（自动展开）
+    const before = heads.map(stateOf);
+    const defaults = before.map((s) => ({ id: s.id, collapsed: s.collapsed, expected: s.id === activeGroup ? false : (pref ? pref.includes(s.id) : true) }));
+    const defaultsOk = defaults.every((d) => d.collapsed === d.expected)
+      && before.every((s) => s.expandedAttr === !s.collapsed && s.visible === !s.collapsed);
+
+    // 2) 点标题：收起 → 展开，展开过程中采样高度，确认是平滑过渡而不是瞬间跳出
+    const head = heads.find((h) => h.closest('.tool-group').dataset.groupId === 'image') || heads[0];
     const wrap = head.closest('.tool-group');
     const items = wrap.querySelector('.tool-group-items');
-    const before = { collapsed: wrap.classList.contains('is-collapsed'), tools: wrap.querySelectorAll('.tool-item').length, display: getComputedStyle(items).display };
-    head.click(); await new Promise((r) => setTimeout(r, 150));
-    const collapsed = { collapsed: wrap.classList.contains('is-collapsed'), display: getComputedStyle(items).display };
-    head.click(); await new Promise((r) => setTimeout(r, 150));
-    const expanded = { collapsed: wrap.classList.contains('is-collapsed'), display: getComputedStyle(items).display };
-    const icons = [...document.querySelectorAll('.tool-group-head')].map((h) => (h.querySelector('.tool-group-icon') || {}).textContent || '');
+    if (!wrap.classList.contains('is-collapsed')) {
+      head.click();
+      await new Promise((r) => setTimeout(r, 400));
+    }
+    const collapsed = stateOf(head);
+    const samples = [];
+    head.click();
+    for (let i = 0; i < 6; i += 1) {
+      await new Promise((r) => setTimeout(r, 40));
+      samples.push(Math.round(items.getBoundingClientRect().height));
+    }
+    await new Promise((r) => setTimeout(r, 400));
+    const expanded = stateOf(head);
+    const finalHeight = Math.round(items.getBoundingClientRect().height);
+    const animated = samples.some((h) => h > 1 && h < finalHeight - 1);
+    const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+    // 3) 再点一次收起（顺带让设置里落下「收起」状态，给下面的记忆校验用）
+    head.click();
+    await new Promise((r) => setTimeout(r, 400));
+    const recollapsed = stateOf(head);
+
     return JSON.stringify({
-      ok: !before.collapsed && before.display !== 'none' && before.tools >= 4
-        && collapsed.collapsed && collapsed.display === 'none'
-        && !expanded.collapsed && expanded.display !== 'none'
-        && icons.length >= 3 && icons.every((t) => t.trim().length > 0),
-      before, collapsed, expanded, icons
+      ok: defaultsOk
+        && collapsed.collapsed && !collapsed.visible
+        && !expanded.collapsed && expanded.visible
+        && (animated || reduceMotion)
+        && recollapsed.collapsed && !recollapsed.visible
+        && icons.length >= 4 && icons.every((t) => t.length > 0),
+      activeGroup, pref, defaults, collapsed, expanded, recollapsed,
+      samples, finalHeight, animated, reduceMotion, icons
     });
   })()`));
+
+  // 收起/展开的选择要记进设置（下次打开保持）
+  try {
+    const savedAfter = JSON.parse(await fs.readFile(settingsFile, 'utf8'));
+    result.checks.分组折叠记忆 = {
+      collapsedGroups: savedAfter.collapsedGroups,
+      ok: Array.isArray(savedAfter.collapsedGroups) && savedAfter.collapsedGroups.includes('image')
+    };
+  } catch (err) {
+    result.checks.分组折叠记忆 = { ok: false, error: err.message };
+  }
 
   // —— AI 放大预设自检：预设存在、选中后出现「加装包状态 + 硬件要求（Vulkan）」提示 ——
   result.checks.AI预设 = JSON.parse(await evalJs(`(async () => {
@@ -273,6 +348,7 @@ async function runMediaUiTest(win) {
   const entries = Object.values(result.tools);
   result.pass = entries.length >= 3 && entries.every((e) => e.ok || e.skipped)
     && !!result.checks.分组折叠 && result.checks.分组折叠.ok
+    && !!result.checks.分组折叠记忆 && result.checks.分组折叠记忆.ok
     && !!result.checks.AI预设 && result.checks.AI预设.ok;
   await shot('99-媒体测试结束');
 

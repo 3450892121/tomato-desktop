@@ -98,6 +98,59 @@ const ctx = {
   appInfo: () => window.desktop.appInfo()
 };
 
+// —— 工具页保活（切走不销毁，切回来原样） ——
+
+/**
+ * 已挂载的工具页：toolId → { el, status, info, mounted, scrollTop }。
+ * 每个工具一个 .tool-page 容器：首次进入时挂载；切走时整页从文档里取下（DOM 与工具内部状态都留在内存里，
+ * 不销毁、不重挂）；切回来原样放回，所以列表、当前图、输入内容、滚动位置、顶栏提示都不会重置。
+ * 取下而不只是隐藏的原因：同一时刻文档里只有当前工具的页面，工具与自动化测试用
+ * document.querySelector 找元素时不会误抓到别的页面。
+ */
+const pages = new Map();
+
+function pageFor(tool) {
+  let page = pages.get(tool.id);
+  if (!page) {
+    const el = document.createElement('div');
+    el.className = 'tool-page';
+    el.dataset.toolId = tool.id;
+    page = { el, status: `${tool.name} 已打开`, info: {}, mounted: false, scrollTop: 0 };
+    pages.set(tool.id, page);
+  }
+  return page;
+}
+
+/**
+ * 每个工具一份 ctx：在通用能力之上加「当前页」感知。
+ * - ctx.isActive()：工具是否正显示在右侧（隐藏时不要抢全局交互，如窗口快捷键）；
+ * - setStatus / setInfo：始终记到本页（切回来能恢复），但只有当前页才改顶栏；
+ * - showProgress / hideProgress：只有当前页才动全屏进度遮罩，避免隐藏的工具误开/误关。
+ */
+function makeToolCtx(tool) {
+  const active = () => !!(activeTool && activeTool.id === tool.id);
+  return {
+    ...ctx,
+    isActive: active,
+    setStatus: (text) => {
+      const page = pages.get(tool.id);
+      if (page) page.status = text;
+      if (active()) setStatus(text);
+    },
+    setInfo: (info = {}) => {
+      const page = pages.get(tool.id);
+      if (page) page.info = info || {};
+      if (active()) setInfo(info);
+    },
+    showProgress: (text, percent) => {
+      if (active()) showProgress(text, percent);
+    },
+    hideProgress: () => {
+      if (active()) hideProgress();
+    }
+  };
+}
+
 // —— 工具列表与挂载 ——
 
 function loadToolStyles(paths) {
@@ -123,31 +176,73 @@ function createToolButton(tool) {
 
 // —— 左侧分组折叠（点标题收起/展开，收起状态记到设置里） ——
 
-/** 被收起的分组 id 集合（启动时从设置读入；空 = 全部展开） */
-let collapsedGroups = new Set();
-/** groupId → { wrap, head }，供折叠与自动展开使用 */
+/**
+ * 被收起的分组 id 集合。
+ * 默认 = 全部收起（用户要求）：分类只显示标题与数量，点标题才展开子项，
+ * 避免工具变多后侧栏被全部展开的条目撑长、找东西费劲。
+ * settings.collapsedGroups 里只有「用户明确点过」的结果；没设置过（null）就用默认值。
+ */
+let collapsedGroups = new Set(GROUPS.map((g) => g.id));
+/** groupId → { wrap, head, items }，供折叠与自动展开使用 */
 const navGroups = new Map();
 
 function persistCollapsed() {
-  // 记忆折叠状态；写入失败不影响使用（下次启动退回默认全展开）
+  // 记忆折叠状态；写入失败不影响使用（下次启动退回默认：全部收起）
   settings.updateSettings({ collapsedGroups: [...collapsedGroups] }).catch(() => {});
 }
 
+/**
+ * 收起/展开的平滑过渡：先把「当前高度」写成内联 max-height 作为起点，
+ * 下一帧再改成目标高度（收起 0 / 展开内容高度），过渡结束清掉内联值回到自适应。
+ * 这样任何行数都能自然过渡，不会像 display:none 那样硬闪。
+ */
+function animateCollapse(items, collapsed) {
+  items.style.maxHeight = `${items.getBoundingClientRect().height}px`;
+  void items.offsetHeight; // 强制回流：让起点高度先落定，否则浏览器把它合并成一次变化、看不到动效
+  items.style.maxHeight = collapsed ? '0px' : `${items.scrollHeight}px`;
+
+  const finish = () => {
+    items.removeEventListener('transitionend', onEnd);
+    clearTimeout(timer);
+    items.style.maxHeight = ''; // 交还给样式表（展开=自适应，收起=0）
+  };
+  const onEnd = (event) => {
+    if (event.propertyName === 'max-height') finish();
+  };
+  items.addEventListener('transitionend', onEnd);
+  // 兜底：系统「减少动态效果」或过渡被打断时也能收尾
+  const timer = setTimeout(finish, 420);
+}
+
+/** 用户点标题：切成收起/展开，并记住这个选择（写进设置） */
 function setGroupCollapsed(groupId, collapsed) {
   if (collapsed) collapsedGroups.add(groupId);
   else collapsedGroups.delete(groupId);
-  const entry = navGroups.get(groupId);
-  if (entry) {
-    entry.wrap.classList.toggle('is-collapsed', collapsed);
-    entry.head.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
-    entry.head.title = collapsed ? `展开「${entry.head.dataset.groupName}」` : `收起「${entry.head.dataset.groupName}」`;
-  }
+
+  applyGroupVisual(groupId, collapsed);
   persistCollapsed();
 }
 
-/** 展开指定分组：切到该组内的工具时调用，避免「当前工具藏在收起的分组里」 */
+/** 只改外观（带平滑过渡），不动偏好设置——自动展开与用户点击共用 */
+function applyGroupVisual(groupId, collapsed) {
+  const entry = navGroups.get(groupId);
+  if (!entry) return;
+  const { wrap, head, items } = entry;
+  animateCollapse(items, collapsed);
+  wrap.classList.toggle('is-collapsed', collapsed);
+  head.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
+  head.title = collapsed ? `展开「${head.dataset.groupName}」` : `收起「${head.dataset.groupName}」`;
+}
+
+/**
+ * 展开指定分组：切到该组内的工具时调用，避免「当前工具藏在收起的分组里」。
+ * 只改当前这次显示（不写设置、也不改用户偏好）——列表下次重渲染时仍按用户的偏好来，
+ * 所以「用户明明收起了这一类」不会被悄悄改成永久展开。
+ */
 function expandGroup(groupId) {
-  if (collapsedGroups.has(groupId)) setGroupCollapsed(groupId, false);
+  const entry = navGroups.get(groupId);
+  if (!entry || !entry.wrap.classList.contains('is-collapsed')) return;
+  applyGroupVisual(groupId, false);
 }
 
 /**
@@ -163,7 +258,7 @@ function renderNav() {
 
   const renderGroup = (group, tools) => {
     if (tools.length === 0) return; // 空分组不显示
-    const collapsed = collapsedGroups.has(group.id);
+    const collapsed = collapsedGroups.has(group.id); // 一律按用户偏好渲染，当前工具所在组随后再展开
 
     const wrap = document.createElement('div');
     wrap.className = 'tool-group' + (collapsed ? ' is-collapsed' : '');
@@ -180,7 +275,8 @@ function renderNav() {
       + `<span class="tool-group-icon">${group.icon || '📁'}</span>`
       + `<span class="tool-group-name">${group.name}</span>`
       + `<span class="tool-group-count">${tools.length}</span>`;
-    head.addEventListener('click', () => setGroupCollapsed(group.id, !collapsedGroups.has(group.id)));
+    // 以「眼睛看到的当前状态」为准取反：自动展开过的分组，点一下就是收起
+    head.addEventListener('click', () => setGroupCollapsed(group.id, !wrap.classList.contains('is-collapsed')));
     wrap.appendChild(head);
 
     const items = document.createElement('div');
@@ -189,7 +285,7 @@ function renderNav() {
     wrap.appendChild(items);
 
     els.nav.appendChild(wrap);
-    navGroups.set(group.id, { wrap, head });
+    navGroups.set(group.id, { wrap, head, items });
   };
 
   for (const group of GROUPS) {
@@ -198,30 +294,54 @@ function renderNav() {
   renderGroup({ id: 'other', name: '其它', icon: '📁' }, others);
 }
 
-/** 切换到指定工具：先卸载旧工具，再加载样式并挂载新工具 */
+/**
+ * 切换到指定工具：只切换「显示哪个页面」，不销毁其它页面。
+ * 首次进入某工具时才 mount；之后每次切回只是显示出来，页面内容与数据原样保留（用户要求）。
+ * 生命周期：mount（首次进入一次）→ 反复 activate / deactivate（每次切入/切出）；
+ *          unmount 只在页面被销毁时调用（当前实现页面常驻，保留接口用于将来回收）。
+ */
 function switchTool(id) {
   const tool = TOOLS.find((t) => t.id === id);
-  if (!tool || tool === activeTool) return;
+  if (!tool || (activeTool && activeTool.id === tool.id)) return;
 
-  if (activeTool && typeof activeTool.unmount === 'function') {
-    try {
-      activeTool.unmount();
-    } catch (err) {
-      console.error('[shell] 卸载工具失败', err);
+  const prev = activeTool;
+  if (prev) {
+    const prevPage = pages.get(prev.id);
+    if (prevPage) {
+      prevPage.scrollTop = prevPage.el.scrollTop; // 先记滚动位置：脱离文档后它会归零
+      prevPage.el.classList.remove('is-active');
+      prevPage.el.remove();
+    }
+    if (typeof prev.deactivate === 'function') {
+      try {
+        prev.deactivate();
+      } catch (err) {
+        console.error('[shell] 工具 deactivate 失败', err);
+      }
     }
   }
 
-  els.host.innerHTML = '';
+  const page = pageFor(tool);
   loadToolStyles(tool.styles);
   activeTool = tool;
-  if (tool.group) expandGroup(tool.group); // 当前工具所在分组必须是展开的
   renderNav();
+  if (tool.group) expandGroup(tool.group); // 当前工具所在分组必须是展开的（渲染后再展开，带平滑动画）
 
   try {
-    tool.mount(els.host, ctx);
-    setStatus(`${tool.name} 已打开`);
-    setInfo({});
+    if (!page.mounted) {
+      page.mounted = true;
+      tool.mount(page.el, makeToolCtx(tool));
+    } else if (typeof tool.activate === 'function') {
+      tool.activate();
+    }
+    page.el.classList.add('is-active'); // 先加类再入文档：入文档时正好播一次切换动画
+    els.host.appendChild(page.el);
+    void page.el.offsetHeight; // 强制一次布局，下面恢复滚动位置才生效
+    page.el.scrollTop = page.scrollTop;
+    setStatus(page.status); // 恢复这一页上次的提示与参数信息（不是清空）
+    setInfo(page.info);
   } catch (err) {
+    page.mounted = false;
     console.error('[shell] 挂载工具失败', err);
     setStatus(`打开「${tool.name}」失败：${err.message}`);
   }
@@ -240,9 +360,18 @@ function showModal({ title, bodyHTML, actions = [] }) {
     </div>`;
   const actionsEl = backdrop.querySelector('.modal-actions');
 
+  // 关闭：先播一小段淡出动画再移除（动效见 components.css 的 is-closing）
+  let closing = false;
   function close() {
-    backdrop.remove();
+    if (closing) return;
+    closing = true;
     document.removeEventListener('keydown', onEsc);
+    const remove = () => backdrop.remove();
+    backdrop.classList.add('is-closing');
+    backdrop.addEventListener('animationend', (event) => {
+      if (event.target === backdrop) remove(); // 只认遮罩自己的动画，避免卡片动画提前触发移除
+    });
+    setTimeout(remove, 300); // 兜底：动效被禁用或动画事件缺失时也能正常关闭
   }
   function onEsc(event) {
     if (event.key === 'Escape') close();
@@ -412,8 +541,13 @@ function openHelp() {
 
 async function init() {
   const loadedSettings = await settings.loadSettings();
-  // 应用上次记住的分组收起状态（设置读取是异步的，这里拿到后重渲染一次列表）
-  collapsedGroups = new Set(Array.isArray(loadedSettings.collapsedGroups) ? loadedSettings.collapsedGroups : []);
+  // 应用上次记住的分组收起状态（设置读取是异步的，这里拿到后重渲染一次列表）。
+  // 没设置过（null/缺省）＝用默认值：全部分组收起，只显示分类标题（避免侧栏一长串）。
+  collapsedGroups = new Set(
+    Array.isArray(loadedSettings.collapsedGroups)
+      ? loadedSettings.collapsedGroups
+      : GROUPS.map((g) => g.id)
+  );
   renderNav();
 
   // 版本号：异步补上即可，绝不能阻塞工具列表渲染（否则窗口刚打开时列表会短暂为空）
