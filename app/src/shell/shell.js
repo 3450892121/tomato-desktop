@@ -159,6 +159,9 @@ const ctx = {
   openGridSlice: () => window.desktop.openGridSlice(),
   openPdfEdit: () => window.desktop.openPdfEdit(),
   openOcr: () => window.desktop.openOcr(),
+  // 文件压缩与解压工具：专用对话框（待压缩的文件 / 压缩包）
+  openArchiveFiles: () => window.desktop.openArchiveFiles(),
+  openArchives: () => window.desktop.openArchives(),
   // OCR 加装包（文字识别工具）
   ocrStatus: () => window.desktop.ocrStatus(),
   ocrRecognize: (options) => window.desktop.ocrRecognize(options),

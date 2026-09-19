@@ -48,6 +48,21 @@ contextBridge.exposeInMainWorld('desktop', {
   // C 批：PDF 编辑整理 / 文字识别 专用对话框
   openPdfEdit: () => ipcRenderer.invoke('dialog:open-pdf-edit'),
   openOcr: () => ipcRenderer.invoke('dialog:open-ocr'),
+  // 文件压缩与解压 专用对话框（待压缩的文件 / 压缩包）
+  openArchiveFiles: () => ipcRenderer.invoke('dialog:open-archive-files'),
+  openArchives: () => ipcRenderer.invoke('dialog:open-archives'),
+
+  // 文件压缩与解压（「压缩 / 解压」工具；引擎为主进程里的 7zip 加装包）
+  archiveStatus: () => ipcRenderer.invoke('archive:status'),
+  archiveList: (options) => ipcRenderer.invoke('archive:list', options),
+  archiveCreate: (options) => ipcRenderer.invoke('archive:create', options),
+  archiveExtract: (options) => ipcRenderer.invoke('archive:extract', options),
+  archiveCancel: (jobId) => ipcRenderer.invoke('archive:cancel', jobId),
+  archiveOnProgress: (callback) => {
+    const handler = (_event, data) => callback(data);
+    ipcRenderer.on('archive:progress', handler);
+    return () => ipcRenderer.removeListener('archive:progress', handler);
+  },
 
   // OCR 加装包（「文字识别」工具）：引擎在主进程跑（无 CSP 限制、原生模块直载）
   ocrStatus: () => ipcRenderer.invoke('ocr:status'),

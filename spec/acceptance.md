@@ -216,3 +216,15 @@
 - 全部加装包（LibreOffice / ffmpeg / Real-ESRGAN / FunASR / OCR）随主包附带，**解压即用、无需额外安装**。
 - 体积控制：`onnxruntime-node` 只带 Windows x64，其余平台二进制在打包时剔除（省约 220MB）。
 - 证据：v2.0.0 产物 2468.2 MB / zip 1041.6 MB；产物结构自检（OCR 模型与字体、cantoo CJS+ESM 产物、onnxruntime 仅 win32）全部 OK；**产物上复检** `--smoke-test`（tools=17）、`--self-test`、`--ui-test`、`--theme-test`、`--av-test`、`--imgbatch-test`、`--pdf-ocr-test`、`--queue-ui-test`、`--settingsio-test`、`--media-ui-test`、`--audio-ui-test`、`--pdf-ui-test`、`--asr-ui-test` 全部通过。
+
+## A37 文件压缩与解压（新工具，需 7zip 加装包）
+- **双向覆盖**：ZIP / 7Z / TAR / GZIP 四个主流格式 + BZIP2 / XZ / ZSTANDARD / BROTLI 四个非主流格式，各自「压缩 → 列目录 → 解压 → 逐字节比对」全部一致（≥8 个双向格式，满足「主流全覆盖 + 非主流 ≥2 种」）。
+- **仅解压格式如实标注**：RAR/RAR5、CAB、ISO、ARJ、LZH、CPIO、Z、WIM、MSI、DEB、RPM、CHM、DMG、XAR、UDF、VHD、VMDK、SquashFS 等在界面标注「仅解压」，选中后「开始压缩」禁用并给出原因（RAR 无法由免费工具创建）。
+- **密码**：7z AES-256（含文件名加密 `-mhe=on`）、zip AES-256、zip ZipCrypto 三种「加密 → 输对密码解出且内容一致」；**错误密码必须失败**并给出可读中文错误，不产出空文件/垃圾文件。
+- **分卷（分块）**：`7z` 与 `zip` 分卷压缩（如 `-v100m` 或测试用小分卷）产出 `.001/.002…`；**只给第一卷即可解出完整内容**且逐字节一致。
+- **免解压预览**：对压缩包调用 `archive:list`（`7z l -slt`）得到的条目数/名称/大小与真实内容一致，且断言**解压目录未被创建**（证明未解压）。
+- **大文件**：≥100MB 文件压缩 + 解压成功（记录耗时），界面进程内存无 GB 级增长（流式处理）。
+- **路径安全**：含 `..` 或绝对路径的条目被识别为可疑并在列表中标注，解压被拒绝（防 zip-slip）。
+- **引擎缺失降级**：隐藏 `addons/7zip` 后工具给出放置说明；`zst` / `br`（Node 原生）仍可用，其余格式如实提示不可用，软件不崩。
+- **文档**：使用说明（面向使用者）、技术实现与格式性能对比（各格式压缩率/耗时/内存实测表）、测试报告（逐条对照）。
+- 证据：`--archive-test` `ok:true`、`--archive-ui-test` `pass:true`、`npm test` 含 archive 纯逻辑用例，截图 `shot-archive-*.png`。

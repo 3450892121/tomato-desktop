@@ -104,6 +104,9 @@ for (const f of ['pdf-edit-test.js', 'ocr-test.js']) {
 }
 // v2.0.0 起：任务中心自检（含「切走工具页后任务继续跑完」核心断言）
 fs.copyFileSync(path.join(appRoot, 'tests', 'queue-ui-test.js'), path.join(appTarget, 'tests', 'queue-ui-test.js'));
+// v2.2.0 起：文件压缩与解压（引擎自检 + 界面自动测试）
+fs.copyFileSync(path.join(appRoot, 'tests', 'archive-test.js'), path.join(appTarget, 'tests', 'archive-test.js'));
+fs.copyFileSync(path.join(appRoot, 'tests', 'archive-ui-test.js'), path.join(appTarget, 'tests', 'archive-ui-test.js'));
 
 // —— 4b) 复制 PDF 工具运行时依赖（纯 JS，界面进程按相对路径直接引用） ——
 // 说明：本项目没有打包器，工具代码里写的是 ../../../../node_modules/pdfjs-dist/... 这样的
@@ -289,6 +292,19 @@ if (fs.existsSync(path.join(ocrAddon, 'det.onnx')) && fs.existsSync(path.join(oc
   copyTree(ocrAddon, path.join(outDir, 'addons', 'ocr'));
 } else {
   log('警告：未发现 app/addons/ocr（或缺 det.onnx/rec.onnx）—— 产物中「文字识别」将不可用（其余功能不受影响）');
+}
+
+// —— 5g) 7-Zip 加装包（「文件压缩与解压」必需，随主包分发） ——
+// 说明：7z.exe + 7z.dll（约 2.4MB，LGPL 2.1+，unRAR 部分带「不得用于制作 RAR 压缩器」的额外限制），
+//      放在 app/addons/7zip/（不进 git，见 spec/modules/archive.md）。
+//      缺失时工具会显示「未检测到 7-Zip 加装包」；ZSTANDARD / BROTLI 走 Node 内置 zlib 仍可用，
+//      其余格式如实提示不可用，软件不崩。
+const sevenZipAddon = path.join(appRoot, 'addons', '7zip');
+if (fs.existsSync(path.join(sevenZipAddon, '7z.exe')) && fs.existsSync(path.join(sevenZipAddon, '7z.dll'))) {
+  log('步骤5g：复制 7-Zip 加装包（约 2.4MB）…');
+  copyTree(sevenZipAddon, path.join(outDir, 'addons', '7zip'));
+} else {
+  log('警告：未发现 app/addons/7zip（或缺 7z.exe / 7z.dll）—— 产物中「压缩与解压」除 ZSTD/BROTLI 外将不可用');
 }
 
 // —— 6) 设置 exe 图标与版本信息（需要 build/rcedit.exe，缺失则跳过） ——

@@ -3,20 +3,22 @@
 把安卓 App「番茄图片混淆」（`番茄图片混淆.apk`）的图片混淆 / 解混淆能力完整搬到 Windows 电脑上：
 **免安装绿色版、纯离线、与手机版互相兼容**，给身边人用的傻瓜化工具。
 
-软件按「工具箱」形态搭建：左侧按「图片 / 视频 / 音频 / 文档」分组列出全部 **17 个工具**——
+软件按「工具箱」形态搭建：左侧按「图片 / 视频 / 音频 / 文档 / 压缩」分组列出全部 **18 个工具**——
 - 图片：图片混淆、图片压缩、图片变清晰、图片格式转换、批量重命名、加水印、长图拼接、九宫格切图
 - 视频：视频格式转换、视频压缩、动图与视频互转
 - 音频：音频格式转换、音频剪辑、语音转文字
 - 文档：PDF 转格式、PDF 编辑整理、文字识别
+- 压缩：压缩与解压
 
 右侧是当前工具界面；新功能按同一套模板低成本接入（见 `docs/新增工具指南.md`）。
 
 ---
 
-## 当前状态（v2.0.0）
+## 当前状态（v2.2.0）
 
 | 项 | 状态 |
 |---|---|
+| **压缩与解压（新）**：ZIP/7Z/TAR/GZIP + BZIP2/XZ/ZSTANDARD/BROTLI 双向、RAR 等仅解压 | ✅ 可用（13 种格式真实往返逐字节一致；密码 AES-256、分卷、免解压预览、zip-slip 防护） |
 | **跨工具任务队列 + 任务中心（新）** | ✅ 可用（顶栏「任务」按钮 + 未完成徽标；切走工具页任务照跑完，界面测试含 LRU 回收后仍跑完的核心断言） |
 | **PDF 编辑整理（新）**：压缩瘦身 / 文字水印 / 页码 / 旋转 / 重排 / 加密 / 解密 | ✅ 可用（七类操作均读回校验；压缩实测 1,052,712B → 170,874B 约 −84%） |
 | **文字识别（新）**：扫描件 → 可搜索 PDF（Ctrl+F 可搜、可复制）/ 纯文本 / Word；预处理与压缩 | ✅ 可用（OCR 引擎闸门 3/3 召回 100%、零网络请求；多页可搜索 PDF 关键词命中 3/3） |
@@ -91,9 +93,11 @@ npm test                                                    # 算法测试 55 �
 .\node_modules\electron\dist\electron.exe . --settingsio-test # 设置导入导出（结构合法性、白名单、野文件拒绝）
 .\node_modules\electron\dist\electron.exe . --pdf-ocr-test   # C 批：PDF 编辑整理 + 文字识别（七类操作读回 + 可搜索 PDF 关键词命中）
 .\node_modules\electron\dist\electron.exe . --queue-ui-test  # 任务中心（含「切走工具页后任务继续跑完」核心断言）
+.\node_modules\electron\dist\electron.exe . --archive-test   # 压缩与解压自检（13 种格式真实往返 + 密码 + 分卷 + 大文件 + 安全）
+.\node_modules\electron\dist\electron.exe . --archive-ui-test # 压缩与解压界面自动测试（压缩→预览→解压→密码→重复解压提示）
 ```
-> 界面类测试结果同时写入 `%TEMP%\tomato-*.json`（如 `tomato-pdf-test.json`、`tomato-av-test.json`、`tomato-pdf-ocr-test.json`、`tomato-queue-ui-test.json` 等），截图在 `%TEMP%\tomato-uitest`。
-> 媒体类自检需要 `app/addons/ffmpeg/ffmpeg.exe`；「文字识别」需要 `app/addons/ocr/`（模型 + 中文字体）。仓库内均已有、不进 git；缺失时相关检查会如实标注失败，其余功能不受影响。
+> 界面类测试结果同时写入 `%TEMP%\tomato-*.json`（如 `tomato-pdf-test.json`、`tomato-av-test.json`、`tomato-pdf-ocr-test.json`、`tomato-queue-ui-test.json`、`tomato-archive-test.json` 等），截图在 `%TEMP%\tomato-uitest`。
+> 媒体类自检需要 `app/addons/ffmpeg/ffmpeg.exe`；「文字识别」需要 `app/addons/ocr/`（模型 + 中文字体）；「压缩与解压」需要 `app/addons/7zip/`（引擎，约 2.4MB）。仓库内均已有、不进 git；缺失时相关检查会如实标注失败，其余功能不受影响（压缩工具的 ZSTANDARD/BROTLI 走 Node 内置引擎，无加装包也可用）。
 
 ### 打包免安装版
 ```powershell
@@ -127,6 +131,7 @@ electron . --verify-samples <目录> --key <密钥>
 │  ├─ 使用说明.txt           面向使用者的说明（随安装包分发）
 │  ├─ 新增工具指南.md         如何给工具箱加一个新工具
 │  ├─ 兼容性变体说明.md       三处兼容性开关的背景与锁定方法
+│  ├─ 压缩格式性能对比.md     压缩工具的技术实现与各格式实测性能对比
 │  └─ 验收报告-*.md           验收标准逐条对照与证据
 ├─ app/                      Electron 应用源码
 │  ├─ main.js / preload.js   主进程与安全桥
@@ -157,6 +162,7 @@ electron . --verify-samples <目录> --key <密钥>
 - **PDF 转格式**（v1.1.0 新增）：PDF→图片（PNG/JPG、批量、选页、清晰度档位）、图片→PDF（JPG 直嵌/适应 A4）、PDF 合并/拆分/提取页；Word/Excel→PDF 无加装包时用内置方式（docx-preview + SheetJS + 打印引擎），PDF→Word 与高保真转换走可选的 LibreOffice 加装包。
 - **音频格式转换**（v1.6.0 新增）：21 种输出格式（MP3/M4A/WAV/FLAC/OGG/Opus/WMA/AMR/ALAC/AIFF/CAF/WavPack/TTA/AC3/EAC3/MP2/Speex/AU/W64/RealAudio）；APE/DSD/Musepack/TAK 可作输入；视频直接拖入自动提取声音；保留标题/歌手标签；复用 ffmpeg 加装包、零新增依赖。
 - **语音转文字**（v1.7.0 新增）：音频/视频识别成文字（中/英/日/韩/粤自动识别），输出纯文本 .txt、字幕 .srt 或两者；视频自动提取音轨；纯离线、纯 CPU（实测约 20 倍实时）；内核 FunASR·SenseVoice（加装包随包，约 246MB，MIT 许可）。
+- **压缩与解压**（v2.2.0 新增）：**13 种格式双向**——ZIP / 7Z / TAR / GZIP（主流）与 BZIP2 / XZ / ZSTANDARD / BROTLI 及其 TAR 复合（非主流，满足「≥2 种」）；RAR/RAR5、ISO、CAB、WIM、DEB 等**仅解压**（RAR 专有，免费工具无法创建，界面如实标注）；**密码**（7Z 用 AES-256 并加密文件名、ZIP 支持 AES-256/ZipCrypto，中文密码自动引导改用 7Z）；**分卷**（ZIP/7Z/TAR 切 .001，解压只给首卷）；**免解压预览**（列条目/大小/加密位）；**zip-slip 防护**；**绝不覆盖**（重名自动加序号）；大文件全程流式。引擎为随包 7-Zip 26.03（LGPL 2.1+，约 2.4MB），ZSTANDARD/BROTLI 走 Node 内置 zlib（无加装包也可用）。详见 `docs/压缩格式性能对比.md`。
 
 ## 已知限制
 
@@ -168,6 +174,11 @@ electron . --verify-samples <目录> --key <密钥>
   - PDF→Word 依赖加装包；即便加装包就位，多栏/复杂表格的还原仍有偏差（PDF 本身不存版面结构，属格式固有限制）。
   - 清晰度档位 1×/2×/3× ≈ 72/144/216 DPI；超清档在大页面上单页约 4~5 百万像素，批量时耗时更长。
   - 加密 PDF 本期不支持处理（打开需要密码的 PDF 会给出提示）。
+- **压缩与解压**（v2.2.0）：
+  - **RAR 只能解压不能压缩**——RAR 是专有格式，7-Zip 的 unRAR 代码许可明确禁止用于制作 RAR 压缩器；界面如实标注「仅解压」，不做改后缀伪装。
+  - **ZIP 的密码只能用英文/数字**（7-Zip 限制，中文密码会报错）；中文密码请改用 7Z。
+  - **没有断点续传**——7-Zip 命令行中断不可续跑；改用「分卷 + 失败可重试」应对大文件。
+  - 流式单文件格式（GZIP/BZIP2/XZ/ZSTANDARD/BROTLI）**只能压单个文件**，多文件请选 TAR.xxx / ZIP / 7Z。
 - 拖拽与剪贴板未纳入自动化测试（原因：会覆盖使用者剪贴板），需人工抽测。
 
 ## 隐私

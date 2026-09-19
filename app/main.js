@@ -69,13 +69,17 @@ const pdfOcrTest = process.argv.includes('--pdf-ocr-test');
 // 任务中心界面自检：`electron . --queue-ui-test`（含「切走工具页后任务继续跑完」这条核心断言）
 const queueUiTest = process.argv.includes('--queue-ui-test');
 
+// 文件压缩与解压：引擎自检 / 界面自动测试
+const archiveTest = process.argv.includes('--archive-test');
+const archiveUiTest = process.argv.includes('--archive-ui-test');
+
 // 测试模式下关闭硬件加速：保证截图（capturePage）在任何机器上都能稳定拿到画面
-if (uiTest || pdfUiTest || mediaUiTest || audioUiTest || asrUiTest || themeTest || avTest || imgbatchTest || settingsIoTest || pdfOcrTest || queueUiTest) {
+if (uiTest || pdfUiTest || mediaUiTest || audioUiTest || asrUiTest || themeTest || avTest || imgbatchTest || settingsIoTest || pdfOcrTest || queueUiTest || archiveUiTest) {
   app.disableHardwareAcceleration();
 }
 
 /** 是否处于任一自动测试模式：此时系统对话框一律换成本地测试文件（避免测试卡在弹窗上） */
-const testMode = () => uiTest || pdfUiTest || mediaTest || mediaUiTest || audioTest || audioUiTest || asrTest || asrUiTest || ocrPoc || themeTest || avTest || imgbatchTest || settingsIoTest || pdfOcrTest || queueUiTest;
+const testMode = () => uiTest || pdfUiTest || mediaTest || mediaUiTest || audioTest || audioUiTest || asrTest || asrUiTest || ocrPoc || themeTest || avTest || imgbatchTest || settingsIoTest || pdfOcrTest || queueUiTest || archiveTest || archiveUiTest;
 
 /** 自动测试模式下：从测试目录取指定扩展名的文件（对话框桩用；扩展名带不带点都能匹配） */
 async function testDirFiles(exts, { startWith, exact } = {}) {
@@ -515,6 +519,36 @@ function createMainWindow() {
         writeResult({ ok: !!result.pass, at: new Date().toISOString(), result });
       } catch (err) {
         console.log(`QUEUE_UI_TEST_FAIL ${err.message}\n${err.stack}`);
+        writeResult({ ok: false, at: new Date().toISOString(), error: err.message, stack: err.stack });
+      } finally {
+        app.quit();
+      }
+    });
+  }
+
+  if (archiveTest) {
+    mainWindow.webContents.once('did-finish-load', async () => {
+      try {
+        const { runArchiveTest } = require('./tests/archive-test.js');
+        const result = await runArchiveTest({ portableDir: PORTABLE_DIR });
+        console.log(`ARCHIVE_TEST ${JSON.stringify({ ok: result.ok, failedFormats: result.failedFormats, formatsTested: result.formatsTested, ms: result.ms })}`);
+      } catch (err) {
+        console.log(`ARCHIVE_TEST_FAIL ${err.message}\n${err.stack}`);
+      } finally {
+        app.quit();
+      }
+    });
+  }
+
+  if (archiveUiTest) {
+    const { runArchiveUiTest, writeResult } = require('./tests/archive-ui-test.js');
+    mainWindow.webContents.once('did-finish-load', async () => {
+      try {
+        const result = await runArchiveUiTest(mainWindow);
+        console.log(`ARCHIVE_UI_TEST ${JSON.stringify({ pass: result.pass, failures: result.failures })}`);
+        writeResult({ ok: !!result.pass, at: new Date().toISOString(), result });
+      } catch (err) {
+        console.log(`ARCHIVE_UI_TEST_FAIL ${err.message}\n${err.stack}`);
         writeResult({ ok: false, at: new Date().toISOString(), error: err.message, stack: err.stack });
       } finally {
         app.quit();
@@ -1223,6 +1257,13 @@ const AUDIO_EXTS = [
   'mp2', 'spx', 'caf', 'au', 'w64', 'ra', 'rm', 'oma'
 ];
 
+// 文件压缩与解压工具：压缩包扩展名（仅用于「打开」对话框的过滤器；
+// 真正的解压按文件签名自动识别，扩展名不对也能解）。与 src/tools/archive/core/formats.mjs 保持一致。
+const ARCHIVE_EXTS_FOR_DIALOG = [
+  'zip', '7z', 'tar', 'gz', 'bz2', 'xz', 'zst', 'br', 'rar', 'cab', 'iso', 'arj', 'lzh',
+  'cpio', 'z', 'wim', 'msi', 'deb', 'rpm', 'chm', 'dmg', 'xar', 'udf', 'vhd', 'vmdk', 'squashfs'
+];
+
 // 图片（含 ICO/AVIF/SVG 等扩展名）
 ipcMain.handle('dialog:open-image-any', async () => {
   // 测试模式只返回固定夹具「测试原图C」：避免把历次测试产生的副本/产物一起选进来（曾导致一次载入上千张）
@@ -1372,6 +1413,153 @@ for (const [channel, cfg] of Object.entries(IMG_BATCH_DIALOGS)) {
     return result.canceled ? [] : result.filePaths;
   });
 }
+
+// —— 文件压缩与解压（工具：archive；见 spec/modules/archive.md） ——
+// 引擎 = 随包内置的 7-Zip（软件目录/addons/7zip/，见 pack.js 步骤 5g）；
+// 查找顺序「加装包 → 系统 PATH 的 7z/7za → 常见安装目录」实现了「引擎可替换」的跨平台约定。
+// 具体逻辑全在 src/tools/archive/core/engine.mjs（ESM，主进程用动态 import 加载）。
+let archiveEnginePromise = null;
+function loadArchiveEngine() {
+  if (!archiveEnginePromise) archiveEnginePromise = import('./src/tools/archive/core/engine.mjs');
+  return archiveEnginePromise;
+}
+let archiveStatusCache = null;
+
+ipcMain.handle('archive:status', async () => {
+  if (archiveStatusCache) return archiveStatusCache;
+  const engine = await loadArchiveEngine();
+  archiveStatusCache = await engine.sevenZipStatus(PORTABLE_DIR);
+  return archiveStatusCache;
+});
+
+// 列出压缩包内容（免解压预览）。tar.* 复合格式会自动解开外层到临时目录再列内层，绝不碰用户目录。
+ipcMain.handle('archive:list', async (_event, options) => {
+  const opt = options || {};
+  if (!opt.archivePath) return { ok: false, message: '缺少压缩包路径' };
+  const engine = await loadArchiveEngine();
+  const status = await engine.sevenZipStatus(PORTABLE_DIR);
+  if (!status.found) return { ok: false, message: '未检测到 7-Zip 加装包（把 addons/7zip 放回软件目录后重开本工具）' };
+  return engine.listArchive({ archivePath: opt.archivePath, password: opt.password || '', binPath: status.path });
+});
+
+// 压缩：按计划逐步执行（复合格式是「先 tar 再压外层」两步）
+ipcMain.handle('archive:create', async (event, options) => {
+  const opt = options || {};
+  const engine = await loadArchiveEngine();
+  const status = await engine.sevenZipStatus(PORTABLE_DIR);
+  if (!status.found) return { ok: false, message: '未检测到 7-Zip 加装包（把 addons/7zip 放回软件目录后重开本工具）' };
+
+  const steps = Array.isArray(opt.steps) ? opt.steps : [];
+  if (steps.length === 0) return { ok: false, message: '没有要执行的压缩步骤' };
+
+  // 绝不覆盖已有文件（项目硬约定）：重名自动加序号。
+  // 放在主进程做「最终裁决」——界面算出来的名字可能与磁盘实况不符（并发、外部新建）。
+  const finalPath = engine.uniqueArchivePath(opt.archivePath);
+  const renamed = finalPath !== opt.archivePath;
+  if (renamed) {
+    const oldName = path.basename(opt.archivePath);
+    const newName = path.basename(finalPath);
+    for (const step of steps) {
+      if (step.target === opt.archivePath) step.target = finalPath;
+      else if (typeof step.target === 'string' && step.target.endsWith(path.basename(opt.archivePath))) {
+        // 复合格式的中间 tar（在临时目录里）不参与改名，只改最终产物
+        if (step.action === 'compress') step.target = finalPath;
+      }
+      if (step.name === oldName) step.name = newName;
+    }
+  }
+
+  // 中间产物（复合格式的 .tar）放系统临时目录，跑完自动清理，不污染用户目录
+  const tempDir = opt.tempDir || await engine.makeTempDir('pack');
+  const send = (payload) => {
+    if (event.sender && !event.sender.isDestroyed()) event.sender.send('archive:progress', { jobId: opt.jobId, ...payload });
+  };
+  try {
+    // 注意：必须把**改名后**的 finalPath 交给引擎汇总产物——否则重名加序号时
+    // 「按 opt.archivePath 找产物」会找不到（曾导致「压缩完成但没有找到产物文件」）
+    const res = await engine.createArchive({
+      steps, archivePath: finalPath, binPath: status.path, jobId: opt.jobId,
+      onProgress: (p) => send(p),
+      isCancelled: () => opt.jobId ? archiveCancelFlags.has(opt.jobId) : false
+    });
+    if (res.ok) send({ percent: 100, text: '完成' });
+    return res;
+  } finally {
+    await fs.rm(tempDir, { recursive: true, force: true }).catch(() => {});
+  }
+});
+
+// 解压：按计划逐个压缩包执行（分卷自动指向第一卷；复合格式两趟）
+ipcMain.handle('archive:extract', async (event, options) => {
+  const opt = options || {};
+  const engine = await loadArchiveEngine();
+  const status = await engine.sevenZipStatus(PORTABLE_DIR);
+  if (!status.found) return { ok: false, message: '未检测到 7-Zip 加装包（把 addons/7zip 放回软件目录后重开本工具）' };
+
+  const steps = Array.isArray(opt.steps) ? opt.steps : [];
+  if (steps.length === 0) return { ok: false, message: '没有要执行的解压步骤' };
+  const send = (payload) => {
+    if (event.sender && !event.sender.isDestroyed()) event.sender.send('archive:progress', { jobId: opt.jobId, ...payload });
+  };
+  const res = await engine.extractArchive({
+    steps, binPath: status.path, jobId: opt.jobId,
+    onProgress: (p) => send(p),
+    isCancelled: () => opt.jobId ? archiveCancelFlags.has(opt.jobId) : false
+  });
+  if (res.ok) send({ percent: 100, text: '完成' });
+  return res;
+});
+
+/** 已请求取消的 jobId（取消是「置标志 + 杀进程」，两边都要） */
+const archiveCancelFlags = new Set();
+
+ipcMain.handle('archive:cancel', async (_event, jobId) => {
+  const engine = await loadArchiveEngine();
+  archiveCancelFlags.add(jobId);
+  const killed = engine.cancelJob(jobId);
+  return { ok: killed };
+});
+
+// 压缩包 / 待压缩文件的专用对话框（测试模式用「测试压缩」前缀夹具，避免与其它工具互相污染）
+ipcMain.handle('dialog:open-archive-files', async () => {
+  if (testMode()) {
+    const { TEST_DIR } = require('./tests/ui-test.js');
+    const dir = path.join(TEST_DIR, '测试压缩源');
+    const entries = await fs.readdir(dir, { withFileTypes: true }).catch(() => []);
+    return entries
+      .filter((e) => e.isFile())
+      .map((e) => path.join(dir, e.name))
+      .sort();
+  }
+  const result = await dialog.showOpenDialog(mainWindow, {
+    title: '选择要压缩的文件',
+    properties: ['openFile', 'multiSelections'],
+    filters: [{ name: '全部文件', extensions: ['*'] }]
+  });
+  return result.canceled ? [] : result.filePaths;
+});
+
+ipcMain.handle('dialog:open-archives', async () => {
+  if (testMode()) {
+    // 只要「压缩包类扩展名」的文件：压缩包只有本工具会产出，不会与其它工具的夹具撞车。
+    // （不用前缀过滤：产物是「按第一个被压文件」命名的，比如 说明.7z，前缀对不上）
+    const { TEST_DIR } = require('./tests/ui-test.js');
+    const entries = await fs.readdir(TEST_DIR, { withFileTypes: true }).catch(() => []);
+    return entries
+      .filter((e) => e.isFile() && /\.(zip|7z|tar|gz|bz2|xz|zst|br|rar|cab|iso)$/i.test(e.name))
+      .map((e) => path.join(TEST_DIR, e.name))
+      .sort();
+  }
+  const result = await dialog.showOpenDialog(mainWindow, {
+    title: '选择压缩包',
+    properties: ['openFile', 'multiSelections'],
+    filters: [
+      { name: '压缩包', extensions: ARCHIVE_EXTS_FOR_DIALOG },
+      { name: '全部文件', extensions: ['*'] }
+    ]
+  });
+  return result.canceled ? [] : result.filePaths;
+});
 
 // —— ffmpeg 加装包（视频格式转换 / 动图与视频互转 工具；见 spec/modules/video-convert.md） ——
 // 位置约定 = 软件目录/addons/ffmpeg/ffmpeg.exe（随包分发，见 pack.js 步骤 5c）；缺失时视频类工具显示放置说明。
