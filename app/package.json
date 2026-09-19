@@ -1,7 +1,7 @@
 {
   "name": "tomato-obfuscator-desktop",
   "productName": "番茄图片混淆 桌面版",
-  "version": "1.12.1",
+  "version": "1.13.0",
   "description": "把安卓 App「番茄图片混淆」的图片混淆/解混淆能力搬到 Windows：免安装、纯离线、与手机版互相兼容",
   "main": "main.js",
   "private": true,
@@ -16,6 +16,8 @@
     "electron": "^44.4.2"
   },
   "dependencies": {
+    "@cantoo/fontkit": "^2.0.12",
+    "@cantoo/pdf-lib": "^2.11.1",
     "docx-preview": "^0.4.0",
     "onnxruntime-node": "^1.30.0",
     "pdf-lib": "^1.17.1",

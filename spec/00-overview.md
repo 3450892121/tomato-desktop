@@ -45,6 +45,8 @@
 | 外观主题 | `modules/theme.md` | 浅色/深色/跟随系统；只覆盖主题变量，工具零改动适配 |
 | 设置导入导出 | `modules/settings-io.md` | 设置备份成 json，换电脑一键带走（只合并已知键） |
 | PDF 转格式 | `modules/pdf-convert.md` | PDF/图片/Office 互转与页面操作（第二个工具；LibreOffice 为可选加装包） |
+| PDF 编辑整理 | `modules/pdf-edit.md` | 压缩瘦身 / 水印 / 页码 / 旋转 / 重排 / 加密解密 |
+| 文字识别 | `modules/ocr.md` | 扫描件 → 可搜索 PDF / 纯文本 / Word；预处理与压缩（ocr 加装包） |
 | 图片压缩 | `modules/image-compress.md` | 批量压缩图片体积（画质/尺寸/目标大小），纯内核能力 |
 | 图片变清晰 | `modules/image-enhance.md` | 锐化/降噪/明暗微调/清晰放大（USM，非 AI 超分） |
 | 图片格式转换 | `modules/image-convert.md` | PNG/JPG/WebP/BMP/ICO/TIFF/GIF/AVIF 互转 |

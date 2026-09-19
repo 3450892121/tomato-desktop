@@ -128,6 +128,13 @@ const ctx = {
   openWatermarkStamp: () => window.desktop.openWatermarkStamp(),
   openStitch: () => window.desktop.openStitch(),
   openGridSlice: () => window.desktop.openGridSlice(),
+  openPdfEdit: () => window.desktop.openPdfEdit(),
+  openOcr: () => window.desktop.openOcr(),
+  // OCR 加装包（文字识别工具）
+  ocrStatus: () => window.desktop.ocrStatus(),
+  ocrRecognize: (options) => window.desktop.ocrRecognize(options),
+  ocrCancel: (jobId) => window.desktop.ocrCancel(jobId),
+  ocrFont: () => window.desktop.ocrFont(),
   // ffmpeg 加装包（视频/动图工具）
   ffmpegStatus: () => window.desktop.ffmpegStatus(),
   ffmpegProbe: (filePath) => window.desktop.ffmpegProbe(filePath),

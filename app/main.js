@@ -63,13 +63,16 @@ const imgbatchTest = process.argv.includes('--imgbatch-test');
 // 设置导入导出自检：`electron . --settingsio-test`
 const settingsIoTest = process.argv.includes('--settingsio-test');
 
+// C 批工具自检：`electron . --pdf-ocr-test` 覆盖「PDF 编辑整理」与「文字识别」（含 OCR 引擎真实识别）
+const pdfOcrTest = process.argv.includes('--pdf-ocr-test');
+
 // 测试模式下关闭硬件加速：保证截图（capturePage）在任何机器上都能稳定拿到画面
-if (uiTest || pdfUiTest || mediaUiTest || audioUiTest || asrUiTest || themeTest || avTest || imgbatchTest || settingsIoTest) {
+if (uiTest || pdfUiTest || mediaUiTest || audioUiTest || asrUiTest || themeTest || avTest || imgbatchTest || settingsIoTest || pdfOcrTest) {
   app.disableHardwareAcceleration();
 }
 
 /** 是否处于任一自动测试模式：此时系统对话框一律换成本地测试文件（避免测试卡在弹窗上） */
-const testMode = () => uiTest || pdfUiTest || mediaTest || mediaUiTest || audioTest || audioUiTest || asrTest || asrUiTest || ocrPoc || themeTest || avTest || imgbatchTest || settingsIoTest;
+const testMode = () => uiTest || pdfUiTest || mediaTest || mediaUiTest || audioTest || audioUiTest || asrTest || asrUiTest || ocrPoc || themeTest || avTest || imgbatchTest || settingsIoTest || pdfOcrTest;
 
 /** 自动测试模式下：从测试目录取指定扩展名的文件（对话框桩用；扩展名带不带点都能匹配） */
 async function testDirFiles(exts, { startWith, exact } = {}) {
@@ -485,6 +488,20 @@ function createMainWindow() {
     });
   }
 
+  if (pdfOcrTest) {
+    const { runPdfOcrTest } = require('./tests/pdf-ocr-test.js');
+    mainWindow.webContents.once('did-finish-load', async () => {
+      try {
+        const result = await runPdfOcrTest(mainWindow);
+        console.log(`PDF_OCR_TEST ${JSON.stringify({ ok: result.ok, failures: result.failures })}`);
+      } catch (err) {
+        console.log(`PDF_OCR_TEST_FAIL ${err.message}\n${err.stack}`);
+      } finally {
+        app.quit();
+      }
+    });
+  }
+
   if (makeSamplesDir) {
     mainWindow.webContents.once('did-finish-load', async () => {
       try {
@@ -812,6 +829,124 @@ ipcMain.handle('settings:import', async () => {
   await fs.mkdir(USER_DATA_DIR, { recursive: true });
   await fs.writeFile(SETTINGS_FILE, JSON.stringify(merged, null, 2), 'utf8');
   return { ok: true, applied, settings: merged, source };
+});
+
+// —— OCR 加装包（「文字识别」工具；见 spec/modules/ocr.md） ——
+// 为什么放在主进程：主进程没有渲染进程的 CSP 限制，onnxruntime 的原生模块（N-API）可直接加载，
+// 不必为 WASM 放宽 script-src / worker-src，也不用把 20MB 模型搬成 blob URL。链路更短、风险更低。
+// 加装包位置：软件目录/addons/ocr/（随包分发，见 pack.js 步骤 5f）；缺失时工具显示放置说明。
+const OCR_ADDON_DIR = path.join(PORTABLE_DIR, 'addons', 'ocr');
+const OCR_MODEL_FILES = {
+  detection: 'det.onnx',
+  recognition: 'rec.onnx',
+  charactersDictionary: 'dict.txt'
+};
+const OCR_FONT_PATH = path.join(OCR_ADDON_DIR, 'fonts', 'NotoSansSC-VF.ttf');
+
+/** OCR 引擎实例：初始化要读约 20MB 模型（实测 275ms），建好后复用，不每次重建 */
+let ocrService = null;
+/** 正在初始化中的 Promise（避免并发重复初始化） */
+let ocrInitializing = null;
+/** 已请求取消的任务（按 jobId 记；引擎推理本身不可中断，在每次识别前检查即可） */
+const ocrCancelled = new Set();
+
+/** 加装包状态：文件是否齐全 + 各文件大小 */
+function ocrAddonStatus() {
+  const models = {};
+  let found = true;
+  for (const [key, file] of Object.entries(OCR_MODEL_FILES)) {
+    const p = path.join(OCR_ADDON_DIR, file);
+    const exists = fsSync.existsSync(p);
+    models[key] = { file, exists, size: exists ? fsSync.statSync(p).size : 0 };
+    if (!exists) found = false;
+  }
+  const fontExists = fsSync.existsSync(OCR_FONT_PATH);
+  return {
+    found,
+    dir: OCR_ADDON_DIR,
+    models,
+    font: { path: OCR_FONT_PATH, exists: fontExists, size: fontExists ? fsSync.statSync(OCR_FONT_PATH).size : 0 }
+  };
+}
+
+/** 懒加载并复用引擎；缺加装包时抛出可读错误 */
+async function getOcrService() {
+  if (ocrService) return ocrService;
+  if (ocrInitializing) return ocrInitializing;
+  const status = ocrAddonStatus();
+  if (!status.found) {
+    throw new Error('未检测到文字识别加装包：请把模型放到软件目录的 addons/ocr（需要 det.onnx / rec.onnx / dict.txt）');
+  }
+  ocrInitializing = (async () => {
+    // ppu-paddle-ocr 是 ESM 包，主进程是 CommonJS —— 用动态 import 加载
+    const { PaddleOcrService } = await import('ppu-paddle-ocr');
+    const svc = new PaddleOcrService({
+      model: {
+        detection: path.join(OCR_ADDON_DIR, OCR_MODEL_FILES.detection),
+        recognition: path.join(OCR_ADDON_DIR, OCR_MODEL_FILES.recognition),
+        charactersDictionary: path.join(OCR_ADDON_DIR, OCR_MODEL_FILES.charactersDictionary)
+      }
+    });
+    await svc.initialize();
+    ocrService = svc;
+    return svc;
+  })();
+  try {
+    return await ocrInitializing;
+  } finally {
+    ocrInitializing = null;
+  }
+}
+
+ipcMain.handle('ocr:status', async () => {
+  const status = ocrAddonStatus();
+  return { ...status, ready: !!ocrService };
+});
+
+/** 读中文字体字节（渲染进程做「可搜索 PDF」的隐形文字层要用；字体缺失时返回 null 由界面降级提示） */
+ipcMain.handle('ocr:font', async () => {
+  try {
+    return { ok: true, bytes: await fs.readFile(OCR_FONT_PATH), path: OCR_FONT_PATH };
+  } catch (err) {
+    return { ok: false, message: `没有找到中文字体（${OCR_FONT_PATH}）：${(err && err.message) || err}` };
+  }
+});
+
+/**
+ * 识别一张图片的字节（PNG/JPG）
+ * options: { bytes, jobId }
+ * 返回：{ok, text, lines, ms, confidence}；lines 为二维数组（每行是若干识别项，含 box 坐标）
+ */
+ipcMain.handle('ocr:recognize', async (_event, options) => {
+  const opt = options || {};
+  if (!opt.bytes) return { ok: false, message: '缺少图片数据' };
+  if (opt.jobId) ocrCancelled.delete(opt.jobId);
+  try {
+    const svc = await getOcrService();
+    if (opt.jobId && ocrCancelled.has(opt.jobId)) return { ok: false, cancelled: true, message: '已取消' };
+    const bytes = Buffer.isBuffer(opt.bytes) ? opt.bytes : Buffer.from(opt.bytes);
+    const ab = bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength);
+    const t0 = Date.now();
+    const r = await svc.recognize(ab);
+    return {
+      ok: true,
+      text: r.text || '',
+      lines: r.lines || [],
+      confidence: r.confidence || 0,
+      ms: Date.now() - t0
+    };
+  } catch (err) {
+    return { ok: false, message: String((err && err.message) || err) };
+  } finally {
+    if (opt.jobId) ocrCancelled.delete(opt.jobId);
+  }
+});
+
+/** 取消某次识别（引擎推理不可中断，在下一张/下一页开始前生效） */
+ipcMain.handle('ocr:cancel', async (_event, jobId) => {
+  if (!jobId) return { ok: false };
+  ocrCancelled.add(jobId);
+  return { ok: true };
 });
 
 // —— 剪贴板 ——
@@ -1158,6 +1293,31 @@ const IMG_BATCH_DIALOGS = {
 };
 // 注意：印章夹具前缀故意**不以「测试水印」开头**，否则会被主对话框（startWith '测试水印'）一起选进来，
 // 导致界面测试里图片张数多出一张（踩过）。
+
+// PDF 编辑整理工具专用对话框（测试模式下只取自己的夹具，避免与 PDF 转格式工具的样本互相污染）
+ipcMain.handle('dialog:open-pdf-edit', async () => {
+  if (testMode()) return testDirFiles(['pdf'], { startWith: '测试PDF编辑' });
+  const result = await dialog.showOpenDialog(mainWindow, {
+    title: '选择要整理的 PDF',
+    properties: ['openFile', 'multiSelections'],
+    filters: [{ name: 'PDF 文档', extensions: ['pdf'] }]
+  });
+  return result.canceled ? [] : result.filePaths;
+});
+
+// 文字识别工具专用对话框：图片与 PDF 混选（PDF 会逐页识别）
+ipcMain.handle('dialog:open-ocr', async () => {
+  if (testMode()) return testDirFiles(['pdf', ...IMAGE_ANY_EXTS], { startWith: '测试识别' });
+  const result = await dialog.showOpenDialog(mainWindow, {
+    title: '选择图片或扫描版 PDF',
+    properties: ['openFile', 'multiSelections'],
+    filters: [
+      { name: '图片与 PDF', extensions: [...IMAGE_ANY_EXTS, 'pdf'] },
+      { name: '全部文件', extensions: ['*'] }
+    ]
+  });
+  return result.canceled ? [] : result.filePaths;
+});
 
 // 批量重命名要能处理任意文件，所以不按图片扩展名过滤，而是按「本工具夹具前缀」取
 ipcMain.handle('dialog:open-batch-rename', async () => {

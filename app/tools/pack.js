@@ -97,6 +97,11 @@ for (const f of ['batch-rename-test.js', 'watermark-test.js', 'stitch-test.js', 
 }
 // v1.12.1 起：设置导入导出自检
 fs.copyFileSync(path.join(appRoot, 'tests', 'settingsio-test.js'), path.join(appTarget, 'tests', 'settingsio-test.js'));
+// v1.13.0 起：C 批工具（PDF 编辑整理 / 文字识别）自检
+fs.copyFileSync(path.join(appRoot, 'tests', 'pdf-ocr-test.js'), path.join(appTarget, 'tests', 'pdf-ocr-test.js'));
+for (const f of ['pdf-edit-test.js', 'ocr-test.js']) {
+  fs.copyFileSync(path.join(appRoot, 'tests', f), path.join(appTarget, 'tests', f));
+}
 
 // —— 4b) 复制 PDF 工具运行时依赖（纯 JS，界面进程按相对路径直接引用） ——
 // 说明：本项目没有打包器，工具代码里写的是 ../../../../node_modules/pdfjs-dist/... 这样的
@@ -126,6 +131,63 @@ copyIfExists(path.join('jszip', 'dist', 'jszip.min.js'));
 copyIfExists(path.join('jszip', 'LICENSE.markdown'));
 copyIfExists(path.join('xlsx', 'dist', 'xlsx.full.min.js'));
 copyIfExists(path.join('xlsx', 'dist', 'LICENSE'));
+// 4b-2) C 批工具依赖：@cantoo/pdf-lib（加密/隐形文字层）+ @cantoo/fontkit（中文字子集化）
+//   注意：fontkit 必须带 **UMD** 产物——界面进程没有打包器，它的 ESM 产物里是裸模块名
+//   （restructure / brotli / dfa / fflate），浏览器直接 import 会 Failed to resolve module specifier。
+copyIfExists(path.join('@cantoo', 'pdf-lib', 'dist', 'pdf-lib.esm.js'));
+copyIfExists(path.join('@cantoo', 'pdf-lib', 'LICENSE.md'));
+copyIfExists(path.join('@cantoo', 'fontkit', 'dist', 'fontkit.umd.min.js'));
+copyIfExists(path.join('@cantoo', 'fontkit', 'LICENSE'));
+// —— 4c) 复制 OCR 引擎运行时依赖（「文字识别」工具；引擎在主进程跑，需完整 Node 依赖树） ——
+// 说明：ppu-paddle-ocr 是 ESM 包 + N-API 原生模块，主进程动态 import 它，因此不能像界面依赖那样
+//      只挑单文件，必须按 npm 的目录结构带过去。
+// 体积控制（重要）：onnxruntime-node 自带 darwin / linux / win32 三平台二进制（共约 287MB），
+//      本软件只发 Windows x64，故**只复制 win32/x64**，其余平台全部跳过（省约 220MB）。
+log('步骤4c：复制 OCR 引擎运行时依赖（onnxruntime 只带 win32/x64）');
+const ocrRuntimeDirs = [
+  ['ppu-paddle-ocr', 'ppu-paddle-ocr'],
+  ['ppu-ocv', 'ppu-ocv'],
+  [path.join('@techstark', 'opencv-js'), path.join('@techstark', 'opencv-js')],
+  ['onnxruntime-common', 'onnxruntime-common'],
+  [path.join('@napi-rs', 'canvas'), path.join('@napi-rs', 'canvas')],
+  [path.join('@napi-rs', 'canvas-win32-x64-msvc'), path.join('@napi-rs', 'canvas-win32-x64-msvc')]
+];
+for (const [src, dst] of ocrRuntimeDirs) {
+  const from = path.join(nmSrc, src);
+  if (!fs.existsSync(from)) {
+    log(`警告：未发现 node_modules/${src} —— 产物中「文字识别」可能不可用`);
+    continue;
+  }
+  copyTree(from, path.join(nmDst, dst));
+}
+// onnxruntime-node：只带 win32/x64（其余平台按目录名跳过）
+{
+  const srcRoot = path.join(nmSrc, 'onnxruntime-node');
+  const dstRoot = path.join(nmDst, 'onnxruntime-node');
+  if (fs.existsSync(srcRoot)) {
+    copyTree(srcRoot, dstRoot);
+    // 复制完再删掉非 Windows-x64 的平台目录（copyTree 是通用函数，这里做一次精简）
+    const binRoot = path.join(dstRoot, 'bin');
+    const keep = path.join('napi-v6', 'win32', 'x64');
+    if (fs.existsSync(binRoot)) {
+      for (const p of fs.readdirSync(path.join(binRoot, 'napi-v6'), { withFileTypes: true })) {
+        if (!p.isDirectory()) continue;
+        const platDir = path.join(binRoot, 'napi-v6', p.name);
+        if (p.name === 'win32') {
+          for (const arch of fs.readdirSync(platDir, { withFileTypes: true })) {
+            if (arch.isDirectory() && arch.name !== 'x64') fs.rmSync(path.join(platDir, arch.name), { recursive: true, force: true });
+          }
+        } else if (path.join('napi-v6', p.name) !== path.dirname(keep)) {
+          fs.rmSync(platDir, { recursive: true, force: true });
+        }
+      }
+      log('  onnxruntime-node 已精简为仅 win32/x64');
+    }
+  } else {
+    log('警告：未发现 node_modules/onnxruntime-node —— 产物中「文字识别」将不可用');
+  }
+}
+
 fs.writeFileSync(
   path.join(appTarget, 'package.json'),
   JSON.stringify(
@@ -198,6 +260,18 @@ if (fs.existsSync(path.join(asrAddon, 'llama-funasr-sensevoice.exe'))) {
   copyTree(asrAddon, path.join(outDir, 'addons', 'asr'));
 } else {
   log('警告：未发现 app/addons/asr —— 产物中「语音转文字」将不可用（其余工具不受影响）');
+}
+
+// —— 5f) OCR 加装包（「文字识别」必需：模型 + 中文字体，随主包分发） ——
+// 说明：PP-OCRv5 mobile 的 det/rec ONNX 模型（约 20MB）+ NotoSansSC-VF.ttf（约 17MB，做可搜索 PDF 的
+//      隐形文字层要嵌中文字体），放在 app/addons/ocr/（不进 git）。
+//      缺失时工具会提示「未检测到文字识别加装包」，其余工具不受影响。
+const ocrAddon = path.join(appRoot, 'addons', 'ocr');
+if (fs.existsSync(path.join(ocrAddon, 'det.onnx')) && fs.existsSync(path.join(ocrAddon, 'rec.onnx'))) {
+  log('步骤5f：复制 OCR 加装包（模型约 20MB + 中文字体约 17MB）…');
+  copyTree(ocrAddon, path.join(outDir, 'addons', 'ocr'));
+} else {
+  log('警告：未发现 app/addons/ocr（或缺 det.onnx/rec.onnx）—— 产物中「文字识别」将不可用（其余功能不受影响）');
 }
 
 // —— 6) 设置 exe 图标与版本信息（需要 build/rcedit.exe，缺失则跳过） ——

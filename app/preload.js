@@ -45,6 +45,15 @@ contextBridge.exposeInMainWorld('desktop', {
   openWatermarkStamp: () => ipcRenderer.invoke('dialog:open-watermark-stamp'),
   openStitch: () => ipcRenderer.invoke('dialog:open-stitch'),
   openGridSlice: () => ipcRenderer.invoke('dialog:open-grid-slice'),
+  // C 批：PDF 编辑整理 / 文字识别 专用对话框
+  openPdfEdit: () => ipcRenderer.invoke('dialog:open-pdf-edit'),
+  openOcr: () => ipcRenderer.invoke('dialog:open-ocr'),
+
+  // OCR 加装包（「文字识别」工具）：引擎在主进程跑（无 CSP 限制、原生模块直载）
+  ocrStatus: () => ipcRenderer.invoke('ocr:status'),
+  ocrRecognize: (options) => ipcRenderer.invoke('ocr:recognize', options),
+  ocrCancel: (jobId) => ipcRenderer.invoke('ocr:cancel', jobId),
+  ocrFont: () => ipcRenderer.invoke('ocr:font'),
 
   // ffmpeg 加装包（视频/动图工具；见 spec/modules/video-convert.md）
   ffmpegStatus: () => ipcRenderer.invoke('ffmpeg:status'),

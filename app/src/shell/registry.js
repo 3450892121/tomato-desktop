@@ -3,6 +3,8 @@
 // 详见 docs/新增工具指南.md
 import obfuscate from '../tools/obfuscate/index.js';
 import pdfConvert from '../tools/pdf-convert/index.js';
+import pdfEdit from '../tools/pdf-edit/index.js';
+import ocr from '../tools/ocr/index.js';
 import compress from '../tools/compress/index.js';
 import enhance from '../tools/enhance/index.js';
 import imgConvert from '../tools/convert/index.js';
@@ -33,6 +35,8 @@ export const GROUPS = [
 export const TOOLS = [
   obfuscate,
   pdfConvert,
+  pdfEdit,
+  ocr,
   compress,
   enhance,
   imgConvert,
