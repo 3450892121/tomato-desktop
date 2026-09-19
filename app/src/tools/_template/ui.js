@@ -1,9 +1,11 @@
 // 【新工具模板】界面与交互
 // 约定：
-//  - mount(container, ctx)：首次进入本工具时把界面渲染进 container，并绑定事件（只会调用一次）
+//  - mount(container, ctx)：把界面渲染进 container 并绑定事件；正常切换只调用一次（页面保活），
+//      但页面被 LRU 回收后再次进入会重新调用——每次都当「从零建界面」来写
 //  - activate() / deactivate()（可选）：每次切入 / 切出本工具时调用；用来收敛全局交互
 //      （窗口快捷键、定时器、进度订阅等），不做也不会报错
-//  - unmount()：页面被销毁时清理（当前框架页面常驻，切换工具不会调用它）；
+//  - unmount()：页面被销毁时清理（正常切换工具不会调用；页面被 LRU 回收时会调用，
+//      之后再次进入会重新 mount，所以 mount 必须能把界面从零建好、unmount 必须清干净）；
 //      临时资源（定时器、blob URL、进度订阅）仍建议在 deactivate 里停掉，在 activate 里恢复
 //  - 通用能力一律通过 ctx 取（ctx.setStatus / ctx.openImages / ctx.settings …）
 //  - ctx.isActive()：当前是否正显示在右侧；挂到 window / document 上的交互必须先判断它

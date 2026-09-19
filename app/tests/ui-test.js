@@ -359,6 +359,35 @@ async function runUiTest(win) {
   result.steps.afterClear = await evalJs('document.getElementById("statusText").textContent');
   result.checks.clearedThumbs = await evalJs('document.querySelectorAll("#thumbList .thumb").length');
 
+  // 14) LRU 回收：切过 5 个以上工具后，最久没用过的页面会被释放（当前页不释放）
+  //     做法：给图片混淆重新载入图片 → 依次切 5 个别的工具（保活页数超上限）→ 切回来
+  //     期望：图片列表已被释放（回到空状态 + 提示「已自动释放」），说明内存被回收了
+  await evalJs('document.getElementById("btnAddFirst").click()');
+  await wait(3000);
+  result.checks.lruRelease = JSON.parse(await evalJs(`(async () => {
+    const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+    const nav = (id) => [...document.querySelectorAll('#toolNav .tool-item')].find((b) => b.dataset.toolId === id);
+    const before = { thumbs: document.querySelectorAll('#thumbList .thumb').length };
+    for (const id of ['compress', 'enhance', 'img-convert', 'video-convert', 'audio-convert']) {
+      nav(id).click();
+      await wait(600);
+    }
+    nav('obfuscate').click();
+    await wait(800);
+    const after = {
+      thumbs: document.querySelectorAll('#thumbList .thumb').length,
+      addButtonShown: !document.getElementById('btnAddFirst').hidden,
+      stripHidden: document.getElementById('thumbStrip').hidden,
+      status: document.getElementById('statusText').textContent
+    };
+    return JSON.stringify({
+      ok: before.thumbs > 0 && after.thumbs === 0 && after.addButtonShown === true
+        && after.stripHidden === true && after.status.includes('自动释放'),
+      before, after
+    });
+  })()`));
+  await shot('12-LRU回收后');
+
   // 汇总判定
   const c = result.checks;
   result.pass =
@@ -394,7 +423,8 @@ async function runUiTest(win) {
     result.steps.batchObfuscate20.includes('成功 20 张') &&
     result.steps.batchSave20.includes('成功 20 张') &&
     result.steps.batchSavedFiles >= 20 &&
-    c.clearedThumbs === 0;
+    c.clearedThumbs === 0 &&
+    c.lruRelease.ok === true;
 
   return result;
 }

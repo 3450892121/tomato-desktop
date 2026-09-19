@@ -101,13 +101,27 @@ const ctx = {
 // —— 工具页保活（切走不销毁，切回来原样） ——
 
 /**
- * 已挂载的工具页：toolId → { el, status, info, mounted, scrollTop }。
+ * 已挂载的工具页：toolId → { el, status, info, mounted, scrollTop, lastUsed }。
  * 每个工具一个 .tool-page 容器：首次进入时挂载；切走时整页从文档里取下（DOM 与工具内部状态都留在内存里，
  * 不销毁、不重挂）；切回来原样放回，所以列表、当前图、输入内容、滚动位置、顶栏提示都不会重置。
  * 取下而不只是隐藏的原因：同一时刻文档里只有当前工具的页面，工具与自动化测试用
  * document.querySelector 找元素时不会误抓到别的页面。
+ *
+ * 保活不等于永远留着：各工具的内存（尤其是已选图片的像素数据）会随着切过的工具越来越多而堆高，
+ * 所以给了上限，超过就按 LRU 回收最久没用过的那页（见 evictPages）。
  */
 const pages = new Map();
+
+/**
+ * 同时保活的工具页上限：超过就淘汰最久没用过的（LRU）。当前页永不淘汰。
+ * 取值考虑：日常最多同时在几个工具之间来回（图片混淆 + 一两个转换工具），5 页足够顺手；
+ * 被回收的工具再进去时会重新挂载，并在状态栏说明「上次的内容已自动释放」，不会让人以为文件丢了。
+ */
+const MAX_ALIVE_PAGES = 5;
+/** 页面访问序号：每次切入自增记到 lastUsed，回收时挑最小的那个（最久未用） */
+let pageTick = 0;
+/** 被 LRU 回收过的工具：下次进入时提示一句「内容已自动释放」 */
+const releasedTools = new Set();
 
 function pageFor(tool) {
   let page = pages.get(tool.id);
@@ -115,10 +129,44 @@ function pageFor(tool) {
     const el = document.createElement('div');
     el.className = 'tool-page';
     el.dataset.toolId = tool.id;
-    page = { el, status: `${tool.name} 已打开`, info: {}, mounted: false, scrollTop: 0 };
+    page = { el, status: `${tool.name} 已打开`, info: {}, mounted: false, scrollTop: 0, lastUsed: 0 };
     pages.set(tool.id, page);
   }
+  page.lastUsed = ++pageTick; // 记一次访问，供 LRU 判断谁最久没用过
   return page;
+}
+
+/** 释放一个工具页：先让工具自己清理（事件、进度订阅、后台任务），再丢掉 DOM 与记录 */
+function disposePage(toolId, page) {
+  const tool = TOOLS.find((t) => t.id === toolId);
+  if (tool && typeof tool.unmount === 'function') {
+    try {
+      tool.unmount();
+    } catch (err) {
+      console.error('[shell] 释放工具页失败', err);
+    }
+  }
+  page.el.remove();
+  page.el.innerHTML = '';
+  pages.delete(toolId);
+  releasedTools.add(toolId); // 下次进来时说明一下，免得用户以为文件丢了
+}
+
+/** LRU 回收：保活的页超过上限时，淘汰最久没用过的那页（当前页除外） */
+function evictPages() {
+  while (pages.size > MAX_ALIVE_PAGES) {
+    let victimId = null;
+    let victim = null;
+    for (const [id, page] of pages) {
+      if (activeTool && activeTool.id === id) continue; // 当前页永不淘汰
+      if (!victim || page.lastUsed < victim.lastUsed) {
+        victimId = id;
+        victim = page;
+      }
+    }
+    if (!victim) break; // 只剩当前页也超限（理论上不会）：留着，别把自己也回收了
+    disposePage(victimId, victim);
+  }
 }
 
 /**
@@ -298,7 +346,8 @@ function renderNav() {
  * 切换到指定工具：只切换「显示哪个页面」，不销毁其它页面。
  * 首次进入某工具时才 mount；之后每次切回只是显示出来，页面内容与数据原样保留（用户要求）。
  * 生命周期：mount（首次进入一次）→ 反复 activate / deactivate（每次切入/切出）；
- *          unmount 只在页面被销毁时调用（当前实现页面常驻，保留接口用于将来回收）。
+ *          unmount（页面被 LRU 回收、或将来别的销毁时机）——被回收的工具下次进入会重新 mount。
+ * 保活页数有上限（MAX_ALIVE_PAGES），超出时淘汰最久没用过的那页，避免内存一直涨。
  */
 function switchTool(id) {
   const tool = TOOLS.find((t) => t.id === id);
@@ -338,8 +387,11 @@ function switchTool(id) {
     els.host.appendChild(page.el);
     void page.el.offsetHeight; // 强制一次布局，下面恢复滚动位置才生效
     page.el.scrollTop = page.scrollTop;
-    setStatus(page.status); // 恢复这一页上次的提示与参数信息（不是清空）
+    // 恢复这一页上次的提示与参数信息（不是清空）；若是被 LRU 回收后重新挂载的，说明一句原因
+    const wasReleased = releasedTools.delete(tool.id);
+    setStatus(wasReleased ? `${page.status}（较长时间未使用，上次的内容已自动释放）` : page.status);
     setInfo(page.info);
+    evictPages(); // 新页进来后再回收，保证「当前页永不淘汰」
   } catch (err) {
     page.mounted = false;
     console.error('[shell] 挂载工具失败', err);
