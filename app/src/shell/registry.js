@@ -6,6 +6,10 @@ import pdfConvert from '../tools/pdf-convert/index.js';
 import compress from '../tools/compress/index.js';
 import enhance from '../tools/enhance/index.js';
 import imgConvert from '../tools/convert/index.js';
+import batchRename from '../tools/batch-rename/index.js';
+import watermark from '../tools/watermark/index.js';
+import stitch from '../tools/stitch/index.js';
+import gridSlice from '../tools/grid-slice/index.js';
 import videoConvert from '../tools/video-convert/index.js';
 import videoCompress from '../tools/video-compress/index.js';
 import sticker from '../tools/sticker/index.js';
@@ -32,6 +36,10 @@ export const TOOLS = [
   compress,
   enhance,
   imgConvert,
+  batchRename,
+  watermark,
+  stitch,
+  gridSlice,
   videoConvert,
   videoCompress,
   sticker,

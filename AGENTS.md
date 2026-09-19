@@ -13,7 +13,7 @@
 - `app/`：Electron 应用源码：
   - `main.js` / `preload.js`：主进程与安全桥（窗口、文件对话框等系统能力）。
   - `src/shell/`：工具箱框架（工具页容器、左侧导航、`registry.js` 工具注册表、`theme.css` 设计令牌、`components.css` 通用组件库）。**工具页保活**：切换工具不销毁页面，切回时列表/输入/预览/滚动位置与顶栏提示全部保留（保活上限 5 页，超出按 LRU 回收最久没用过的那页，当前页不回收）；工具里的全局交互要用 `ctx.isActive()` 让位，被回收时会走 `unmount()` 清理。
-  - `src/tools/<工具名>/`：各工具自包含目录（声明 + 界面 + 逻辑 + 样式）。现有：`obfuscate` 图片混淆、`pdf-convert` PDF 转格式、`compress` 图片压缩、`enhance` 图片变清晰、`img-convert` 图片格式转换、`video-convert` 视频格式转换、`sticker` 动图与视频互转、`audio-convert` 音频格式转换、`transcribe` 语音转文字；`_template` 为新工具模板。
+  - `src/tools/<工具名>/`：各工具自包含目录（声明 + 界面 + 逻辑 + 样式）。现有：`obfuscate` 图片混淆、`pdf-convert` PDF 转格式、`compress` 图片压缩、`enhance` 图片变清晰、`img-convert` 图片格式转换、`batch-rename` 批量重命名、`watermark` 加水印、`stitch` 长图拼接、`grid-slice` 九宫格切图、`video-convert` 视频格式转换、`video-compress` 视频压缩、`sticker` 动图与视频互转、`audio-convert` 音频格式转换、`audio-edit` 音频剪辑、`transcribe` 语音转文字；`_template` 为新工具模板。
   - `src/shared/`：跨工具复用能力（图片读写、ffmpeg 封装与编码参数、文件封装、设置）。
   - `addons/`：随包加装包（不进 git）：`libreoffice/`（PDF→Word 与高保真 Office→PDF，可选）、`ffmpeg/`（视频/动图工具必需，单文件 83MB，GPL v3）、`realesrgan/`（「图片变清晰」的 AI 放大，约 50MB，BSD 3-Clause，需 Vulkan 显卡）、`asr/`（「语音转文字」的 FunASR·SenseVoice 识别引擎，约 246MB，MIT，纯 CPU）、`ocr/`（「文字识别」的 PP-OCRv5 mobile ONNX 模型，约 20MB，Apache-2.0 模型 + MIT 运行时，纯 CPU）；许可与来源见各自目录的 LICENSE/说明.txt。
 - `docs/`：开发指南（如《新增工具指南》）。
@@ -59,7 +59,8 @@
 - 外观主题自检：`cd app` → `.\node_modules\electron\dist\electron.exe . --theme-test`（顶栏三态循环 → 浅色/深色两套色值 rgb 断言 → 落盘断言 → 9 个工具页深色下浅色残留扫描 → 恢复用户原档位；截图 `shot-theme-*.png` 落 `%TEMP%\tomato-uitest`，结果写 `%TEMP%\tomato-theme-test.json`，`pass:true` 为通过）。
 - OCR 引擎闸门（P0）：`cd app` → `.\node_modules\electron\dist\electron.exe . --ocr-poc`（界面进程画中文扫描件夹具 → 主进程用 `app/addons/ocr/` 本地模型识别 → 字符召回/耗时/零网络请求三项判据；结果写 `%TEMP%\tomato-ocr-poc.json`，`ok:true` 为通过）。
 - 媒体工具（A 批）自检：`cd app` → `.\node_modules\electron\dist\electron.exe . --av-test`（「视频压缩」+「音频剪辑」两个工具：纯逻辑断言 + 真实 ffmpeg 转码（含两遍编码与多段拼接）+ 界面走查与截图；结果写 `%TEMP%\tomato-av-test.json`，另有各工具明细 `tomato-video-compress(-ui)-test.json`、`tomato-audio-edit(-ui)-test.json`，`ok:true` 为通过）。
-- 交付前必须全绿：算法测试 + 冒烟自检 + 端到端自检 + 界面自动测试 + PDF 工具自检 + PDF 工具界面自动测试 + 媒体工具自检 + 媒体工具界面自动测试 + 音频工具自检 + 音频工具界面自动测试 + 语音转文字自检 + 语音转文字界面自动测试 + 外观主题自检 + OCR 引擎闸门 + 媒体工具（A 批）自检，且截图人工过目一遍；打包产物需再跑一次冒烟与各界面自测。
+- 图片批量工具（B 批）自检：`cd app` → `.\node_modules\electron\dist\electron.exe . --imgbatch-test`（「批量重命名 / 加水印 / 长图拼接 / 九宫格切图」四个工具：纯逻辑断言 + 真实处理与像素校验 + 界面走查与截图；结果写 `%TEMP%\tomato-imgbatch-test.json`，另有各工具明细，`ok:true` 为通过）。
+- 交付前必须全绿：算法测试 + 冒烟自检 + 端到端自检 + 界面自动测试 + PDF 工具自检 + PDF 工具界面自动测试 + 媒体工具自检 + 媒体工具界面自动测试 + 音频工具自检 + 音频工具界面自动测试 + 语音转文字自检 + 语音转文字界面自动测试 + 外观主题自检 + OCR 引擎闸门 + 媒体工具（A 批）自检 + 图片批量工具（B 批）自检，且截图人工过目一遍；打包产物需再跑一次冒烟与各界面自测。
 - 生成图标：`cd app` → `npm run icon`（产出 `src/assets/icon.png` 与 `build/icon.ico`）。
 - 打包免安装版：`cd app` → `npm run pack`（产物：`app/release/番茄图片混淆-桌面版-v<版本>-win64/` 免安装文件夹 + 同名 `.zip`；exe 图标与版本信息由 `build/rcedit.exe` 写入，缺失则跳过）。
 - 兼容性样本工具（锁定 variants.js 用）：

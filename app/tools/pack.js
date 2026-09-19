@@ -90,6 +90,11 @@ fs.copyFileSync(path.join(appRoot, 'tests', 'ocr-poc.js'), path.join(appTarget, 
 fs.copyFileSync(path.join(appRoot, 'tests', 'av-test.js'), path.join(appTarget, 'tests', 'av-test.js'));
 fs.copyFileSync(path.join(appRoot, 'tests', 'video-compress-test.js'), path.join(appTarget, 'tests', 'video-compress-test.js'));
 fs.copyFileSync(path.join(appRoot, 'tests', 'audio-edit-test.js'), path.join(appTarget, 'tests', 'audio-edit-test.js'));
+// v1.12.0 起：B 批图片工具（批量重命名 / 加水印 / 长图拼接 / 九宫格切图）自检
+fs.copyFileSync(path.join(appRoot, 'tests', 'imgbatch-test.js'), path.join(appTarget, 'tests', 'imgbatch-test.js'));
+for (const f of ['batch-rename-test.js', 'watermark-test.js', 'stitch-test.js', 'grid-slice-test.js']) {
+  fs.copyFileSync(path.join(appRoot, 'tests', f), path.join(appTarget, 'tests', f));
+}
 
 // —— 4b) 复制 PDF 工具运行时依赖（纯 JS，界面进程按相对路径直接引用） ——
 // 说明：本项目没有打包器，工具代码里写的是 ../../../../node_modules/pdfjs-dist/... 这样的

@@ -47,6 +47,7 @@
 | 图片压缩 | `modules/image-compress.md` | 批量压缩图片体积（画质/尺寸/目标大小），纯内核能力 |
 | 图片变清晰 | `modules/image-enhance.md` | 锐化/降噪/明暗微调/清晰放大（USM，非 AI 超分） |
 | 图片格式转换 | `modules/image-convert.md` | PNG/JPG/WebP/BMP/ICO/TIFF/GIF/AVIF 互转 |
+| 图片批量工具 | `modules/image-batch.md` | 批量重命名 / 加水印 / 长图拼接 / 九宫格切图（四个小工具，纯 canvas） |
 | 视频格式转换 | `modules/video-convert.md` | MP4/WebM/MKV/MOV/AVI 互转（ffmpeg 随包） |
 | 视频压缩 | `modules/video-compress.md` | 按画质档 / 目标体积压小视频（两遍编码 + 不达标自动重跑） |
 | 动图与视频互转 | `modules/sticker-video.md` | GIF/WebP 动图/APNG ↔ 视频，含聊天表情预设 |

@@ -57,13 +57,16 @@ const themeTest = process.argv.includes('--theme-test');
 // A 批媒体工具自检：`electron . --av-test` 覆盖「视频压缩」与「音频剪辑」（逻辑 + 真实转码 + 界面走查）
 const avTest = process.argv.includes('--av-test');
 
+// B 批图片工具自检：`electron . --imgbatch-test` 覆盖「批量重命名/加水印/长图拼接/九宫格切图」
+const imgbatchTest = process.argv.includes('--imgbatch-test');
+
 // 测试模式下关闭硬件加速：保证截图（capturePage）在任何机器上都能稳定拿到画面
-if (uiTest || pdfUiTest || mediaUiTest || audioUiTest || asrUiTest || themeTest || avTest) {
+if (uiTest || pdfUiTest || mediaUiTest || audioUiTest || asrUiTest || themeTest || avTest || imgbatchTest) {
   app.disableHardwareAcceleration();
 }
 
 /** 是否处于任一自动测试模式：此时系统对话框一律换成本地测试文件（避免测试卡在弹窗上） */
-const testMode = () => uiTest || pdfUiTest || mediaTest || mediaUiTest || audioTest || audioUiTest || asrTest || asrUiTest || ocrPoc || themeTest || avTest;
+const testMode = () => uiTest || pdfUiTest || mediaTest || mediaUiTest || audioTest || audioUiTest || asrTest || asrUiTest || ocrPoc || themeTest || avTest || imgbatchTest;
 
 /** 自动测试模式下：从测试目录取指定扩展名的文件（对话框桩用；扩展名带不带点都能匹配） */
 async function testDirFiles(exts, { startWith, exact } = {}) {
@@ -451,6 +454,20 @@ function createMainWindow() {
     });
   }
 
+  if (imgbatchTest) {
+    const { runImgbatchTest } = require('./tests/imgbatch-test.js');
+    mainWindow.webContents.once('did-finish-load', async () => {
+      try {
+        const result = await runImgbatchTest(mainWindow);
+        console.log(`IMGBATCH_TEST ${JSON.stringify({ ok: result.ok, failures: result.failures })}`);
+      } catch (err) {
+        console.log(`IMGBATCH_TEST_FAIL ${err.message}\n${err.stack}`);
+      } finally {
+        app.quit();
+      }
+    });
+  }
+
   if (makeSamplesDir) {
     mainWindow.webContents.once('did-finish-load', async () => {
       try {
@@ -547,19 +564,82 @@ ipcMain.handle('fs:read-file', async (_event, filePath) => {
   return fs.readFile(filePath);
 });
 
-// 取路径信息（目录 / 文件名 / 去扩展名的基础名 / 是否目录 / 体积）
+// 取路径信息（目录 / 文件名 / 去扩展名的基础名 / 是否目录 / 体积 / 修改时间）
 ipcMain.handle('fs:path-info', async (_event, filePath) => {
   const dir = path.dirname(filePath);
   const name = path.basename(filePath);
   const ext = path.extname(name);
   let isDirectory = false;
   let size = 0;
+  let mtimeMs = 0;
   try {
     const st = await fs.stat(filePath);
     isDirectory = st.isDirectory();
     size = isDirectory ? 0 : st.size;
+    mtimeMs = st.mtimeMs || 0; // 批量重命名的「按日期」规则要用
   } catch { /* 路径不存在时按文件处理 */ }
-  return { dir, name, baseName: ext ? name.slice(0, -ext.length) : name, ext, isDirectory, size };
+  return { dir, name, baseName: ext ? name.slice(0, -ext.length) : name, ext, isDirectory, size, mtimeMs };
+});
+
+/**
+ * 批量重命名（「批量重命名」工具用）
+ * 入参：renames = [{from, to}]
+ * 返回：{ok, done, failed:[{from, to, message}]}
+ *
+ * 安全性：**绝不覆盖已存在的文件**——目标已存在（且不是本批次里要被改名的源文件）就跳过该条并报原因。
+ * 正确性：分两阶段执行（先把所有源改成同目录下的临时名，再改成最终名），
+ *        这样「链式改名」（001→002、002→003）与「互换名」都不会互相踩。
+ * 跨目录：fs.rename 在跨盘时会失败，自动回退为复制 + 删除源文件。
+ */
+ipcMain.handle('fs:rename-batch', async (_event, renames) => {
+  const list = (Array.isArray(renames) ? renames : []).filter((r) => r && r.from && r.to);
+  if (list.length === 0) return { ok: false, message: '没有需要重命名的文件', done: 0, failed: [] };
+
+  const sources = new Set(list.map((r) => path.resolve(r.from)));
+  const failed = [];
+  const stage1 = [];
+
+  // 阶段 1：源文件 → 同目录临时名（源不存在或临时名创建失败的直接记为失败）
+  for (let i = 0; i < list.length; i++) {
+    const { from, to } = list[i];
+    const src = path.resolve(from);
+    const dst = path.resolve(to);
+    try {
+      const st = await fs.stat(src);
+      if (st.isDirectory()) throw new Error('是文件夹，已跳过');
+      // 目标已存在，且它不在本批次的源文件里 → 改名会覆盖别人的文件，拒绝
+      if (dst !== src && sources.has(dst) === false && fsSync.existsSync(dst)) {
+        throw new Error('目标文件已存在');
+      }
+      const tmp = path.join(path.dirname(src), `.tomato-rename-${Date.now()}-${i}`);
+      await fs.rename(src, tmp);
+      stage1.push({ tmp, dst, from, to });
+    } catch (err) {
+      failed.push({ from, to, message: String((err && err.message) || err) });
+    }
+  }
+
+  // 阶段 2：临时名 → 最终名
+  let done = 0;
+  for (const item of stage1) {
+    try {
+      await fs.rename(item.tmp, item.dst);
+      done += 1;
+    } catch (err) {
+      // 跨盘（EXDEV）等情况：回退为复制 + 删源
+      try {
+        await fs.copyFile(item.tmp, item.dst);
+        await fs.rm(item.tmp, { force: true });
+        done += 1;
+      } catch (err2) {
+        failed.push({ from: item.from, to: item.to, message: String((err2 && err2.message) || err2) });
+        // 尽力把临时名还原回原名，避免文件"消失"
+        try { await fs.rename(item.tmp, item.from); } catch { /* 还原失败只能如实报告 */ }
+      }
+    }
+  }
+
+  return { ok: failed.length === 0, done, failed };
 });
 
 // 列出文件夹内的图片（用于文件夹拖入 / 批量导入）
@@ -961,6 +1041,53 @@ ipcMain.handle('dialog:open-audios-edit', async () => {
   });
   return result.canceled ? [] : result.filePaths;
 });
+
+// —— B 批图片工具专用对话框 ——
+// 每个工具一个独立前缀：测试模式下只返回自己的夹具，避免历次测试的产物互相污染
+// （踩过坑：共用前缀会一次加进几十个历史文件）。
+const IMG_BATCH_DIALOGS = {
+  'dialog:open-batch-rename': { startWith: '测试重命名', title: '选择要重命名的文件' },
+  'dialog:open-watermark': { startWith: '测试水印', title: '选择要加水印的图片' },
+  'dialog:open-stitch': { startWith: '测试拼接', title: '选择要拼接的图片（按列表顺序拼接）' },
+  'dialog:open-grid-slice': { startWith: '测试切图', title: '选择要切图的图片' },
+  'dialog:open-watermark-stamp': { startWith: '测试印章', title: '选择水印图片（印章）' }
+};
+// 注意：印章夹具前缀故意**不以「测试水印」开头**，否则会被主对话框（startWith '测试水印'）一起选进来，
+// 导致界面测试里图片张数多出一张（踩过）。
+
+// 批量重命名要能处理任意文件，所以不按图片扩展名过滤，而是按「本工具夹具前缀」取
+ipcMain.handle('dialog:open-batch-rename', async () => {
+  if (testMode()) {
+    const { TEST_DIR } = require('./tests/ui-test.js');
+    const entries = await fs.readdir(TEST_DIR, { withFileTypes: true }).catch(() => []);
+    return entries
+      .filter((e) => e.isFile() && e.name.startsWith('测试重命名'))
+      .map((e) => path.join(TEST_DIR, e.name))
+      .sort();
+  }
+  const result = await dialog.showOpenDialog(mainWindow, {
+    title: '选择要重命名的文件',
+    properties: ['openFile', 'multiSelections'],
+    filters: [
+      { name: '图片与常用文件', extensions: ['png', 'jpg', 'jpeg', 'webp', 'bmp', 'gif', 'txt', 'pdf', 'mp4'] },
+      { name: '全部文件', extensions: ['*'] }
+    ]
+  });
+  return result.canceled ? [] : result.filePaths;
+});
+
+for (const [channel, cfg] of Object.entries(IMG_BATCH_DIALOGS)) {
+  if (channel === 'dialog:open-batch-rename') continue; // 上面已单独注册
+  ipcMain.handle(channel, async () => {
+    if (testMode()) return testDirFiles(IMAGE_ANY_EXTS, { startWith: cfg.startWith });
+    const result = await dialog.showOpenDialog(mainWindow, {
+      title: cfg.title,
+      properties: ['openFile', 'multiSelections'],
+      filters: [{ name: '图片', extensions: IMAGE_ANY_EXTS }]
+    });
+    return result.canceled ? [] : result.filePaths;
+  });
+}
 
 // —— ffmpeg 加装包（视频格式转换 / 动图与视频互转 工具；见 spec/modules/video-convert.md） ——
 // 位置约定 = 软件目录/addons/ffmpeg/ffmpeg.exe（随包分发，见 pack.js 步骤 5c）；缺失时视频类工具显示放置说明。

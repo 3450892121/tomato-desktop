@@ -27,6 +27,8 @@ contextBridge.exposeInMainWorld('desktop', {
   listImages: (dirPath) => ipcRenderer.invoke('fs:list-images', dirPath),
   listFiles: (dirPath, exts) => ipcRenderer.invoke('fs:list-files', dirPath, exts),
   saveImageNextTo: (options) => ipcRenderer.invoke('fs:save-image', options),
+  // 批量重命名（「批量重命名」工具用；两阶段改名，绝不覆盖已存在文件）
+  renameBatch: (renames) => ipcRenderer.invoke('fs:rename-batch', renames),
 
   // 新工具（图片格式转换 / 视频格式转换 / 动图与视频互转）：专用对话框
   openImageAny: () => ipcRenderer.invoke('dialog:open-image-any'),
@@ -37,6 +39,12 @@ contextBridge.exposeInMainWorld('desktop', {
   openVideosCompress: () => ipcRenderer.invoke('dialog:open-videos-compress'),
   openAudiosEdit: () => ipcRenderer.invoke('dialog:open-audios-edit'),
   openSpeech: () => ipcRenderer.invoke('dialog:open-speech'),
+  // B 批图片工具专用对话框（各工具独立夹具前缀，避免测试互相污染）
+  openBatchRename: () => ipcRenderer.invoke('dialog:open-batch-rename'),
+  openWatermark: () => ipcRenderer.invoke('dialog:open-watermark'),
+  openWatermarkStamp: () => ipcRenderer.invoke('dialog:open-watermark-stamp'),
+  openStitch: () => ipcRenderer.invoke('dialog:open-stitch'),
+  openGridSlice: () => ipcRenderer.invoke('dialog:open-grid-slice'),
 
   // ffmpeg 加装包（视频/动图工具；见 spec/modules/video-convert.md）
   ffmpegStatus: () => ipcRenderer.invoke('ffmpeg:status'),

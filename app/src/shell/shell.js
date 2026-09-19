@@ -114,6 +114,7 @@ const ctx = {
   listImages: (dirPath) => window.desktop.listImages(dirPath),
   listFiles: (dirPath, exts) => window.desktop.listFiles(dirPath, exts),
   saveImageNextTo: (options) => window.desktop.saveImageNextTo(options),
+  renameBatch: (renames) => window.desktop.renameBatch(renames),
   // 新工具（图片格式转换 / 视频格式转换 / 动图与视频互转）专用对话框
   openImageAny: () => window.desktop.openImageAny(),
   openVideos: () => window.desktop.openVideos(),
@@ -122,6 +123,11 @@ const ctx = {
   openVideosCompress: () => window.desktop.openVideosCompress(),
   openAudiosEdit: () => window.desktop.openAudiosEdit(),
   openSpeech: () => window.desktop.openSpeech(),
+  openBatchRename: () => window.desktop.openBatchRename(),
+  openWatermark: () => window.desktop.openWatermark(),
+  openWatermarkStamp: () => window.desktop.openWatermarkStamp(),
+  openStitch: () => window.desktop.openStitch(),
+  openGridSlice: () => window.desktop.openGridSlice(),
   // ffmpeg 加装包（视频/动图工具）
   ffmpegStatus: () => window.desktop.ffmpegStatus(),
   ffmpegProbe: (filePath) => window.desktop.ffmpegProbe(filePath),
