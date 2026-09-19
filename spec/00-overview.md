@@ -48,8 +48,10 @@
 | 图片变清晰 | `modules/image-enhance.md` | 锐化/降噪/明暗微调/清晰放大（USM，非 AI 超分） |
 | 图片格式转换 | `modules/image-convert.md` | PNG/JPG/WebP/BMP/ICO/TIFF/GIF/AVIF 互转 |
 | 视频格式转换 | `modules/video-convert.md` | MP4/WebM/MKV/MOV/AVI 互转（ffmpeg 随包） |
+| 视频压缩 | `modules/video-compress.md` | 按画质档 / 目标体积压小视频（两遍编码 + 不达标自动重跑） |
 | 动图与视频互转 | `modules/sticker-video.md` | GIF/WebP 动图/APNG ↔ 视频，含聊天表情预设 |
 | 音频格式转换 | `modules/audio-convert.md` | 21 种音频格式互转 + 视频提取声音（ffmpeg 随包；APE/DSD 等可读） |
+| 音频剪辑 | `modules/audio-edit.md` | 波形选区截取、多段拼接、淡入淡出、音量标准化 |
 | 语音转文字 | `modules/transcribe.md` | 音频/视频 → 文字（中英日韩粤自动识别；字幕 SRT 可选；asr 加装包随包） |
 
 ## 代码结构约定（新增工具时只动 tools/ 与 registry 一行）

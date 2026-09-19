@@ -54,13 +54,16 @@ const ocrPoc = process.argv.includes('--ocr-poc');
 // 深色主题自检：`electron . --theme-test` 验证外观三态切换、色值生效、落盘与深色下各工具页渲染
 const themeTest = process.argv.includes('--theme-test');
 
+// A 批媒体工具自检：`electron . --av-test` 覆盖「视频压缩」与「音频剪辑」（逻辑 + 真实转码 + 界面走查）
+const avTest = process.argv.includes('--av-test');
+
 // 测试模式下关闭硬件加速：保证截图（capturePage）在任何机器上都能稳定拿到画面
-if (uiTest || pdfUiTest || mediaUiTest || audioUiTest || asrUiTest || themeTest) {
+if (uiTest || pdfUiTest || mediaUiTest || audioUiTest || asrUiTest || themeTest || avTest) {
   app.disableHardwareAcceleration();
 }
 
 /** 是否处于任一自动测试模式：此时系统对话框一律换成本地测试文件（避免测试卡在弹窗上） */
-const testMode = () => uiTest || pdfUiTest || mediaTest || mediaUiTest || audioTest || audioUiTest || asrTest || asrUiTest || ocrPoc || themeTest;
+const testMode = () => uiTest || pdfUiTest || mediaTest || mediaUiTest || audioTest || audioUiTest || asrTest || asrUiTest || ocrPoc || themeTest || avTest;
 
 /** 自动测试模式下：从测试目录取指定扩展名的文件（对话框桩用；扩展名带不带点都能匹配） */
 async function testDirFiles(exts, { startWith, exact } = {}) {
@@ -434,6 +437,20 @@ function createMainWindow() {
     });
   }
 
+  if (avTest) {
+    const { runAvTest } = require('./tests/av-test.js');
+    mainWindow.webContents.once('did-finish-load', async () => {
+      try {
+        const result = await runAvTest(mainWindow);
+        console.log(`AV_TEST ${JSON.stringify({ ok: result.ok, failures: result.failures })}`);
+      } catch (err) {
+        console.log(`AV_TEST_FAIL ${err.message}\n${err.stack}`);
+      } finally {
+        app.quit();
+      }
+    });
+  }
+
   if (makeSamplesDir) {
     mainWindow.webContents.once('did-finish-load', async () => {
       try {
@@ -530,16 +547,19 @@ ipcMain.handle('fs:read-file', async (_event, filePath) => {
   return fs.readFile(filePath);
 });
 
-// 取路径信息（目录 / 文件名 / 去扩展名的基础名 / 是否目录）
+// 取路径信息（目录 / 文件名 / 去扩展名的基础名 / 是否目录 / 体积）
 ipcMain.handle('fs:path-info', async (_event, filePath) => {
   const dir = path.dirname(filePath);
   const name = path.basename(filePath);
   const ext = path.extname(name);
   let isDirectory = false;
+  let size = 0;
   try {
-    isDirectory = (await fs.stat(filePath)).isDirectory();
+    const st = await fs.stat(filePath);
+    isDirectory = st.isDirectory();
+    size = isDirectory ? 0 : st.size;
   } catch { /* 路径不存在时按文件处理 */ }
-  return { dir, name, baseName: ext ? name.slice(0, -ext.length) : name, ext, isDirectory };
+  return { dir, name, baseName: ext ? name.slice(0, -ext.length) : name, ext, isDirectory, size };
 });
 
 // 列出文件夹内的图片（用于文件夹拖入 / 批量导入）
@@ -920,6 +940,28 @@ ipcMain.handle('dialog:open-speech', async () => {
   return result.canceled ? [] : result.filePaths;
 });
 
+// 视频（视频压缩工具；测试模式下取「测试压缩视频*」夹具，避免与视频格式转换的夹具相互污染）
+ipcMain.handle('dialog:open-videos-compress', async () => {
+  if (testMode()) return testDirFiles(VIDEO_EXTS, { startWith: '测试压缩视频' });
+  const result = await dialog.showOpenDialog(mainWindow, {
+    title: '选择要压缩的视频',
+    properties: ['openFile', 'multiSelections'],
+    filters: [{ name: '视频', extensions: VIDEO_EXTS }]
+  });
+  return result.canceled ? [] : result.filePaths;
+});
+
+// 音频与视频（音频剪辑工具；测试模式下取「测试剪辑音频*」夹具，避免与音频转换/语音转文字的夹具相互污染）
+ipcMain.handle('dialog:open-audios-edit', async () => {
+  if (testMode()) return testDirFiles([...AUDIO_EXTS, ...VIDEO_EXTS], { startWith: '测试剪辑音频' });
+  const result = await dialog.showOpenDialog(mainWindow, {
+    title: '选择音频或视频',
+    properties: ['openFile', 'multiSelections'],
+    filters: [{ name: '音频与视频（视频自动提取声音）', extensions: [...AUDIO_EXTS, ...VIDEO_EXTS] }]
+  });
+  return result.canceled ? [] : result.filePaths;
+});
+
 // —— ffmpeg 加装包（视频格式转换 / 动图与视频互转 工具；见 spec/modules/video-convert.md） ——
 // 位置约定 = 软件目录/addons/ffmpeg/ffmpeg.exe（随包分发，见 pack.js 步骤 5c）；缺失时视频类工具显示放置说明。
 const FFMPEG_ADDON_PATH = path.join(PORTABLE_DIR, 'addons', 'ffmpeg', 'ffmpeg.exe');
@@ -1093,6 +1135,136 @@ ipcMain.handle('ffmpeg:convert', async (event, options) => {
     const detail = res.notFound ? '未检测到 ffmpeg' : res.timedOut ? '处理超时' : `ffmpeg 退出码 ${res.code}`;
     const tail = (res.stderr || '').trim().split(/\r?\n/).slice(-3).join(' ｜ ').slice(0, 300);
     return { ok: false, message: `转换失败：${detail}${tail ? `｜${tail}` : ''}` };
+  }
+  return { ok: true, path: target, size: fsSync.statSync(target).size, ms: Date.now() - t0 };
+});
+
+/**
+ * 两遍编码转码（「视频压缩」的目标体积模式用）：
+ * 第一遍只分析并写 passlog、第二遍按统计结果落盘，体积控制比单遍编码准得多。
+ * passlog 放系统临时目录、两遍共用一个前缀，跑完（含失败）一定清理，不留垃圾。
+ * options: { inputPath, outputDir?, baseName?, ext, inputArgs?, pass1Args[], pass2Args[], durationMs?, timeoutMs?, jobId }
+ */
+ipcMain.handle('ffmpeg:convert-two-pass', async (event, options) => {
+  const opt = options || {};
+  const inputPath = opt.inputPath;
+  if (!inputPath) return { ok: false, message: '缺少输入文件' };
+  const bin = findFfmpeg();
+  if (!bin.found) return { ok: false, message: '未检测到 ffmpeg（把加装包解压到软件目录的 addons/ffmpeg 后重开本工具）' };
+
+  const dir = opt.outputDir || path.dirname(inputPath);
+  const ext = String(opt.ext || '.mp4');
+  const base = opt.baseName || path.basename(inputPath, path.extname(inputPath));
+  const target = uniqueTargetPath(dir, base, ext);
+  await fs.mkdir(dir, { recursive: true });
+
+  const durationMs = Number(opt.durationMs) || 0;
+  const limit = opt.timeoutMs || Math.min(6 * 3600 * 1000, Math.max(20 * 60 * 1000, durationMs * 10));
+  const workDir = path.join(os.tmpdir(), `tomato-2pass-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`);
+  await fs.mkdir(workDir, { recursive: true });
+  const passLog = path.join(workDir, 'pass');
+  const t0 = Date.now();
+
+  const send = (payload) => {
+    if (!event.sender || event.sender.isDestroyed()) return;
+    event.sender.send('ffmpeg:progress', { jobId: opt.jobId, ...payload });
+  };
+  // 两遍各占进度的一半：第一遍 0~50%，第二遍 50~100%
+  const progressFrom = (chunk, from, span) => {
+    for (const line of chunk.split(/\r?\n/)) {
+      const t = /^out_time_us=(\d+)/.exec(line);
+      if (t && durationMs > 0) {
+        const pct = from + (Number(t[1]) / 1000 / durationMs) * span;
+        send({ percent: Math.max(0, Math.min(99, pct)) });
+      }
+      const s = /^speed=(.+)$/.exec(line);
+      if (s) send({ speed: s[1].trim() });
+    }
+  };
+
+  const common = ['-hide_banner', '-nostdin', '-y', '-progress', 'pipe:1', '-nostats'];
+  const inputArgs = opt.inputArgs || [];
+  let failure = '';
+
+  try {
+    // 第一遍：输出丢弃（Windows 的空设备 NUL），只产出 passlog
+    const pass1 = [...common, ...inputArgs, '-i', inputPath, ...(opt.pass1Args || []),
+      '-pass', '1', '-passlogfile', passLog, '-f', 'null', 'NUL'];
+    const r1 = await runFfmpeg(pass1, { jobId: opt.jobId, timeoutMs: limit, onStdout: (c) => progressFrom(c, 0, 50) });
+    if (r1.timedOut || r1.code !== 0) {
+      failure = `转换失败：${r1.timedOut ? '处理超时' : `第一遍分析失败（退出码 ${r1.code}）`}`;
+    } else {
+      send({ percent: 50 });
+      const pass2 = [...common, ...inputArgs, '-i', inputPath, ...(opt.pass2Args || []),
+        '-pass', '2', '-passlogfile', passLog, target];
+      const r2 = await runFfmpeg(pass2, { jobId: opt.jobId, timeoutMs: limit, onStdout: (c) => progressFrom(c, 50, 50) });
+      const produced = fsSync.existsSync(target) && fsSync.statSync(target).size > 0;
+      if (r2.timedOut || r2.code !== 0 || !produced) {
+        const detail = r2.timedOut ? '处理超时' : `ffmpeg 退出码 ${r2.code}`;
+        const tail = (r2.stderr || '').trim().split(/\r?\n/).slice(-3).join(' ｜ ').slice(0, 300);
+        failure = `转换失败：${detail}${tail ? `｜${tail}` : ''}`;
+      }
+    }
+  } finally {
+    try { await fs.rm(workDir, { recursive: true, force: true }); } catch { /* 临时目录清理失败不影响结论 */ }
+  }
+
+  if (failure) {
+    try { if (fsSync.existsSync(target)) fsSync.rmSync(target, { force: true }); } catch { /* 忽略 */ }
+    return { ok: false, message: failure };
+  }
+  return { ok: true, path: target, size: fsSync.statSync(target).size, ms: Date.now() - t0 };
+});
+
+/**
+ * 多输入转码（「音频剪辑」的拼接用）：把多个文件按顺序合成一个输出。
+ * 说明：ffmpeg 的 concat 滤镜需要多个 -i 与 filter_complex，与单输入的 ffmpeg:convert 不同，故单开一个通道。
+ * options: { inputPaths[], outputDir?, baseName?, ext, args[], durationMs?, timeoutMs?, jobId }
+ *   args 里应含 -filter_complex 与 -map（由 shared/ffmpeg.js 的 concatAudioArgs 产出）。
+ */
+ipcMain.handle('ffmpeg:convert-multi', async (event, options) => {
+  const opt = options || {};
+  const inputs = Array.isArray(opt.inputPaths) ? opt.inputPaths.filter(Boolean) : [];
+  if (inputs.length < 2) return { ok: false, message: '拼接至少需要 2 个文件' };
+  const bin = findFfmpeg();
+  if (!bin.found) return { ok: false, message: '未检测到 ffmpeg（把加装包解压到软件目录的 addons/ffmpeg 后重开本工具）' };
+
+  const dir = opt.outputDir || path.dirname(inputs[0]);
+  const ext = String(opt.ext || '.mp3');
+  const base = opt.baseName || '拼接结果';
+  const target = uniqueTargetPath(dir, base, ext);
+  await fs.mkdir(dir, { recursive: true });
+
+  const durationMs = Number(opt.durationMs) || 0;
+  const limit = opt.timeoutMs || Math.min(6 * 3600 * 1000, Math.max(20 * 60 * 1000, durationMs * 10));
+  const inputArgs = [];
+  for (const p of inputs) inputArgs.push('-i', p);
+  const args = ['-hide_banner', '-nostdin', '-y', '-progress', 'pipe:1', '-nostats',
+    ...inputArgs, ...(opt.args || []), target];
+  const t0 = Date.now();
+  const res = await runFfmpeg(args, {
+    jobId: opt.jobId,
+    timeoutMs: limit,
+    onStdout: (chunk) => {
+      if (!event.sender || event.sender.isDestroyed()) return;
+      for (const line of chunk.split(/\r?\n/)) {
+        const t = /^out_time_us=(\d+)/.exec(line);
+        if (t && durationMs > 0) {
+          const percent = Math.max(0, Math.min(99, (Number(t[1]) / 1000 / durationMs) * 100));
+          event.sender.send('ffmpeg:progress', { jobId: opt.jobId, percent, timeMs: Number(t[1]) / 1000 });
+        }
+        const s = /^speed=(.+)$/.exec(line);
+        if (s) event.sender.send('ffmpeg:progress', { jobId: opt.jobId, speed: s[1].trim() });
+      }
+    }
+  });
+
+  const produced = fsSync.existsSync(target) && fsSync.statSync(target).size > 0;
+  if (res.timedOut || res.code !== 0 || !produced) {
+    try { if (fsSync.existsSync(target)) fsSync.rmSync(target, { force: true }); } catch { /* 忽略 */ }
+    const detail = res.notFound ? '未检测到 ffmpeg' : res.timedOut ? '处理超时' : `ffmpeg 退出码 ${res.code}`;
+    const tail = (res.stderr || '').trim().split(/\r?\n/).slice(-3).join(' ｜ ').slice(0, 300);
+    return { ok: false, message: `拼接失败：${detail}${tail ? `｜${tail}` : ''}` };
   }
   return { ok: true, path: target, size: fsSync.statSync(target).size, ms: Date.now() - t0 };
 });

@@ -58,7 +58,8 @@
 - 语音转文字界面自动测试：`cd app` → `.\node_modules\electron\dist\electron.exe . --asr-ui-test`（切工具→添加音频/视频→两轮识别（文本+字幕 / 纯文本重名不覆盖）→清空，截图并校验产物内容；结果写 `%TEMP%\tomato-asr-ui-test.json`，`pass:true` 为通过）。
 - 外观主题自检：`cd app` → `.\node_modules\electron\dist\electron.exe . --theme-test`（顶栏三态循环 → 浅色/深色两套色值 rgb 断言 → 落盘断言 → 9 个工具页深色下浅色残留扫描 → 恢复用户原档位；截图 `shot-theme-*.png` 落 `%TEMP%\tomato-uitest`，结果写 `%TEMP%\tomato-theme-test.json`，`pass:true` 为通过）。
 - OCR 引擎闸门（P0）：`cd app` → `.\node_modules\electron\dist\electron.exe . --ocr-poc`（界面进程画中文扫描件夹具 → 主进程用 `app/addons/ocr/` 本地模型识别 → 字符召回/耗时/零网络请求三项判据；结果写 `%TEMP%\tomato-ocr-poc.json`，`ok:true` 为通过）。
-- 交付前必须全绿：算法测试 + 冒烟自检 + 端到端自检 + 界面自动测试 + PDF 工具自检 + PDF 工具界面自动测试 + 媒体工具自检 + 媒体工具界面自动测试 + 音频工具自检 + 音频工具界面自动测试 + 语音转文字自检 + 语音转文字界面自动测试 + 外观主题自检 + OCR 引擎闸门，且截图人工过目一遍；打包产物需再跑一次冒烟与各界面自测。
+- 媒体工具（A 批）自检：`cd app` → `.\node_modules\electron\dist\electron.exe . --av-test`（「视频压缩」+「音频剪辑」两个工具：纯逻辑断言 + 真实 ffmpeg 转码（含两遍编码与多段拼接）+ 界面走查与截图；结果写 `%TEMP%\tomato-av-test.json`，另有各工具明细 `tomato-video-compress(-ui)-test.json`、`tomato-audio-edit(-ui)-test.json`，`ok:true` 为通过）。
+- 交付前必须全绿：算法测试 + 冒烟自检 + 端到端自检 + 界面自动测试 + PDF 工具自检 + PDF 工具界面自动测试 + 媒体工具自检 + 媒体工具界面自动测试 + 音频工具自检 + 音频工具界面自动测试 + 语音转文字自检 + 语音转文字界面自动测试 + 外观主题自检 + OCR 引擎闸门 + 媒体工具（A 批）自检，且截图人工过目一遍；打包产物需再跑一次冒烟与各界面自测。
 - 生成图标：`cd app` → `npm run icon`（产出 `src/assets/icon.png` 与 `build/icon.ico`）。
 - 打包免安装版：`cd app` → `npm run pack`（产物：`app/release/番茄图片混淆-桌面版-v<版本>-win64/` 免安装文件夹 + 同名 `.zip`；exe 图标与版本信息由 `build/rcedit.exe` 写入，缺失则跳过）。
 - 兼容性样本工具（锁定 variants.js 用）：

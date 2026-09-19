@@ -33,12 +33,19 @@ contextBridge.exposeInMainWorld('desktop', {
   openVideos: () => ipcRenderer.invoke('dialog:open-videos'),
   openMedia: () => ipcRenderer.invoke('dialog:open-media'),
   openAudios: () => ipcRenderer.invoke('dialog:open-audios'),
+  // 新工具专用对话框（避免测试夹具互相污染，与 openAudios/openSpeech 同理）
+  openVideosCompress: () => ipcRenderer.invoke('dialog:open-videos-compress'),
+  openAudiosEdit: () => ipcRenderer.invoke('dialog:open-audios-edit'),
   openSpeech: () => ipcRenderer.invoke('dialog:open-speech'),
 
   // ffmpeg 加装包（视频/动图工具；见 spec/modules/video-convert.md）
   ffmpegStatus: () => ipcRenderer.invoke('ffmpeg:status'),
   ffmpegProbe: (filePath) => ipcRenderer.invoke('ffmpeg:probe', filePath),
   ffmpegConvert: (options) => ipcRenderer.invoke('ffmpeg:convert', options),
+  // 两遍编码（「视频压缩」的目标体积模式：第一遍分析、第二遍落盘）
+  ffmpegConvertTwoPass: (options) => ipcRenderer.invoke('ffmpeg:convert-two-pass', options),
+  // 多输入转码（「音频剪辑」的拼接：多个 -i + concat 滤镜）
+  ffmpegConvertMulti: (options) => ipcRenderer.invoke('ffmpeg:convert-multi', options),
   ffmpegTransform: (options) => ipcRenderer.invoke('ffmpeg:transform', options),
   ffmpegCancel: (jobId) => ipcRenderer.invoke('ffmpeg:cancel', jobId),
   // 进度订阅（返回取消订阅函数，工具 unmount 时必须调用）

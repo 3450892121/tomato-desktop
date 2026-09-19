@@ -23,6 +23,24 @@ export function convertMedia(options) {
   return window.desktop.ffmpegConvert(options);
 }
 
+/**
+ * 两遍编码转码（「视频压缩」的目标体积模式）
+ * options: { inputPath, outputDir?, baseName?, ext, inputArgs?, pass1Args[], pass2Args[], durationMs?, jobId? }
+ * 与 convertMedia 的区别：先跑一遍只统计的 pass1，再按统计结果跑 pass2 落盘，体积更接近目标。
+ */
+export function convertMediaTwoPass(options) {
+  return window.desktop.ffmpegConvertTwoPass(options);
+}
+
+/**
+ * 多输入转码（「音频剪辑」的拼接用）
+ * options: { inputPaths[], outputDir?, baseName?, ext, args[], durationMs?, jobId? }
+ * args 里应含 filter_complex 与 -map（见 concatAudioArgs）。
+ */
+export function convertMediaMulti(options) {
+  return window.desktop.ffmpegConvertMulti(options);
+}
+
 /** 图片字节 → 字节（TIFF/GIF/AVIF 等内核编不了的格式走这里） */
 export function transformImageBytes(bytes, ext, args) {
   return window.desktop.ffmpegTransform({ bytes, ext, args });
@@ -253,4 +271,121 @@ export function audioEncodeArgs(target, quality = 'standard') {
     case 'ra': return ['-c:a', 'real_144'];
     default: return ['-c:a', 'libmp3lame', '-b:a', q.mp3];
   }
+}
+
+// —— 视频压缩（工具：视频压缩） ——
+
+/**
+ * 目标体积档位（用户选「压到多大」）。
+ * 说明：targetMB 是**目标**不是保证——VBR 有波动，压完会实测校验，超出阈值会自动降码率重跑一次。
+ */
+export const SIZE_TARGETS = [
+  { value: 5, label: '5 MB 以内（微信/邮件）' },
+  { value: 10, label: '10 MB 以内（微信）' },
+  { value: 20, label: '20 MB 以内' },
+  { value: 50, label: '50 MB 以内' },
+  { value: 100, label: '100 MB 以内' },
+  { value: 200, label: '200 MB 以内' }
+];
+
+/** 音频码率档（目标体积模式下用来预留音频占用；越小留给画面的码率越多） */
+export const COMPRESS_AUDIO_KBPS = [
+  { value: 64, label: '64k（省体积）' },
+  { value: 96, label: '96k（推荐）' },
+  { value: 128, label: '128k（音质好）' },
+  { value: 0, label: '去掉声音（把码率全给画面）' }
+];
+
+/**
+ * 按目标体积反推视频码率（kbps）
+ * @param {{durationSec:number, targetMB:number, audioKbps:number}} o
+ * @returns {number} 视频码率（kbps），下限 50
+ */
+export function planTargetBitrate({ durationSec, targetMB, audioKbps = 96 }) {
+  const dur = Number(durationSec) || 0;
+  if (dur <= 0) return 800; // 时长未知时给一个中庸值，压完靠实测校验兜底
+  const totalKbits = Number(targetMB) * 8 * 1024;
+  const audioKbits = (Number(audioKbps) || 0) * dur;
+  // 留 3% 容器/封装余量，避免刚好卡在目标线上
+  const videoKbps = Math.floor(((totalKbits - audioKbits) / dur) * 0.97);
+  return Math.max(50, videoKbps);
+}
+
+/**
+ * 两遍编码参数（目标体积模式用；第一遍只统计、第二遍才落盘，体积控制比单遍准得多）
+ * @param {{pass:1|2, videoKbps:number, audioKbps?:number}} o
+ * @returns {string[]} 输出参数（不含输出文件名；两遍的 -pass/-passlogfile 由主进程拼）
+ */
+export function twoPassArgs({ pass, videoKbps, audioKbps = 96 }) {
+  const kbps = Math.max(50, Math.round(videoKbps));
+  const base = ['-c:v', 'libx264', '-b:v', `${kbps}k`, '-preset', 'medium', '-pix_fmt', 'yuv420p'];
+  if (pass === 1) return [...base, '-an'];
+  const audio = audioKbps > 0 ? ['-c:a', 'aac', '-b:a', `${audioKbps}k`] : ['-an'];
+  return [...base, ...audio, '-movflags', '+faststart'];
+}
+
+// —— 音频剪辑（工具：音频剪辑） ——
+
+/** 音量增益档（正值变大、负值变小；0 = 不调） */
+export const AUDIO_GAIN_PRESETS = [
+  { value: 0, label: '不调整' },
+  { value: -6, label: '减小一半（-6 dB）' },
+  { value: 3, label: '稍微大声（+3 dB）' },
+  { value: 6, label: '明显大声（+6 dB）' },
+  { value: 'normalize', label: '音量标准化（自动统一响度）' }
+];
+
+/** 淡入淡出档位（毫秒；0 = 不做） */
+export const AUDIO_FADE_PRESETS = [
+  { value: 0, label: '不做' },
+  { value: 500, label: '0.5 秒' },
+  { value: 1000, label: '1 秒' },
+  { value: 2000, label: '2 秒' },
+  { value: 3000, label: '3 秒' }
+];
+
+/**
+ * 截取参数：从 startMs 截到 endMs（毫秒；endMs 为 0/缺省表示到结尾）
+ * 放在 -i 之前作为输入选项，配合 -c:a copy 可做到几乎瞬间完成。
+ * @returns {string[]} 输入侧参数
+ */
+export function atrimArgs({ startMs = 0, endMs = 0 } = {}) {
+  const args = [];
+  if (startMs > 0) args.push('-ss', (startMs / 1000).toFixed(3));
+  if (endMs > startMs) args.push('-to', (endMs / 1000).toFixed(3));
+  return args;
+}
+
+/**
+ * 音量与淡入淡出滤镜（音频滤镜链）
+ * @param {{gainDb?:number|'normalize', fadeInMs?:number, fadeOutMs?:number, durationMs?:number}} o
+ * @returns {string[]} -af 相关参数（无滤镜时返回空数组）
+ */
+export function audioFilterArgs(o = {}) {
+  const chain = [];
+  if (o.gainDb === 'normalize') {
+    // loudnorm 单遍模式：把响度统一到 -16 LUFS（手机/社交平台的常见目标）
+    chain.push('loudnorm=I=-16:TP=-1.5:LRA=11');
+  } else if (Number.isFinite(o.gainDb) && o.gainDb !== 0) {
+    chain.push(`volume=${o.gainDb}dB`);
+  }
+  const dur = Number(o.durationMs) || 0;
+  if (o.fadeInMs > 0) chain.push(`afade=t=in:st=0:d=${(o.fadeInMs / 1000).toFixed(3)}`);
+  if (o.fadeOutMs > 0) {
+    // 淡出起点 = 总时长 - 淡出时长；时长未知时退化为「从 0 开始」（ffmpeg 会自行处理越界）
+    const st = dur > o.fadeOutMs ? ((dur - o.fadeOutMs) / 1000).toFixed(3) : '0';
+    chain.push(`afade=t=out:st=${st}:d=${(o.fadeOutMs / 1000).toFixed(3)}`);
+  }
+  return chain.length ? ['-af', chain.join(',')] : [];
+}
+
+/**
+ * 多文件拼接：用 concat 滤镜（重编码，能容忍采样率/声道不一致，比 concat 解复用器稳）
+ * @param {{count:number}} o 输入段数
+ * @returns {string[]} -filter_complex 相关参数
+ */
+export function concatAudioArgs({ count }) {
+  const n = Math.max(2, Math.floor(count) || 2);
+  const inputs = Array.from({ length: n }, (_, i) => `[${i}:a]`).join('');
+  return ['-filter_complex', `${inputs}concat=n=${n}:v=0:a=1[out]`, '-map', '[out]'];
 }

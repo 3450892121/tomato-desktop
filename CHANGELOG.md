@@ -2,6 +2,36 @@
 
 本项目遵循语义化版本（x.y.z）：修 bug → z+1；加功能 → y+1；重要改动 → x+1。
 
+## v1.11.0（2026-09-19）视频压缩 + 音频剪辑
+
+> 说明：继续「工具箱大扩展（→ v2.0.0）」。本批只跑源码级测试，最终一次性打包交付。
+
+**新增：视频压缩（🗜️，group `video`，order 62）** —— 解决「视频太大微信发不出去」的最高频痛点
+- 两种压缩方式：**画质档**（高质量/标准/小体积 + 分辨率档 + 可选去掉声音）与**目标体积**（压到 5~200 MB 内 + 音频码率档）。
+- 目标体积用**两遍编码**（先分析后落盘），压完实测校验，超出目标 5% 会自动降码率重跑一次，精准接近目标。
+- 输出固定 MP4（H.264+AAC，`+faststart`）；批量、进度可取消、失败逐项标注；结果显示「实际体积/目标」。
+- `main.js` 新增 IPC `ffmpeg:convert-two-pass`（两遍编码，passlog 走系统临时目录、跑完即清）。
+
+**新增：音频剪辑（✂️，group `audio`，order 72）** —— 波形上拖就能剪
+- **波形预览**：选中文件即画波形，可直接拖选区或输时间，先降采样成 8 kHz WAV 解析，避免大文件爆内存。
+- **截取**（无滤镜时 `-c copy` 秒完成）、**淡入淡出**、**音量调整**（含响度标准化 loudnorm）、**多段拼接**。
+- 拼接用 concat 滤镜（重编码、容忍各段格式不一致）；`main.js` 新增 IPC `ffmpeg:convert-multi`（多输入）。
+- 输出复用音频转换那 21 种格式与音质档。
+
+**工程**
+- `shared/ffmpeg.js` 新增：`convertMediaTwoPass` / `convertMediaMulti`、`convertMedia` 支持 `inputArgs`、`SIZE_TARGETS` / `COMPRESS_AUDIO_KBPS` / `AUDIO_GAIN_PRESETS` / `AUDIO_FADE_PRESETS` / `planTargetBitrate` / `twoPassArgs` / `atrimArgs` / `audioFilterArgs` / `concatAudioArgs`。
+- `main.js` 新增：`ffmpeg:convert-two-pass`、`ffmpeg:convert-multi`、两个专用测试对话框（`open-videos-compress` / `open-audios-edit`，测试夹具前缀 `测试压缩视频` / `测试剪辑音频` 避免互相污染）；`fs:path-info` 补 `size`。
+- `preload.js` / `shell.js` 同步暴露新通道；`registry.js` 注册两个新工具（tools=11）。
+- 新增测试 `tests/av-test.js`（汇总）+ `tests/video-compress-test.js` / `tests/audio-edit-test.js`（各含纯逻辑 + 真实 ffmpeg 转码 + 界面走查）；`pack.js` 步骤 4 同步拷贝。
+
+**踩坑记录**
+- 界面自动测试等「一次运行结束」**不能只比状态文案**：两轮压缩的结束文案相同（都是「压缩完成：成功 N 个」），第二轮会一直等到超时。改为以运行按钮文本（运行中变「取消」）作为结束信号。
+- 新工具测试夹具前缀必须避免被老工具前缀（`测试视频`/`测试音频`）误匹配 `startWith`，否则会把历史遗留文件一起加入（曾一次加进 41 个）。已用专用前缀 + 专用对话框解决。
+
+**验证**
+- `--av-test`：`ok:true`（视频压缩：画质档 3.48MB→1.05MB/30.1%，目标体积两遍编码 1.44MB 达标、降码率重跑合法；音频剪辑：纯截取 3.03s/75ms、带滤镜 4.05s/106ms、拼接 95.96s→95.63s 可完整解码）。
+- 回归：算法 55/55、冒烟 tools=11 options=6、外观主题自检 pass:true。
+
 ## v1.10.0（2026-09-19）深色模式 + OCR 引擎可用性闸门
 
 > 说明：这是「工具箱大扩展（→ v2.0.0）」的第一步，后续还有视频压缩/音频剪辑、图片批量工具、PDF 编辑整理、文字识别、跨工具任务队列。中间版本只跑源码级测试，最终一次性打包交付。

@@ -7,8 +7,10 @@ import compress from '../tools/compress/index.js';
 import enhance from '../tools/enhance/index.js';
 import imgConvert from '../tools/convert/index.js';
 import videoConvert from '../tools/video-convert/index.js';
+import videoCompress from '../tools/video-compress/index.js';
 import sticker from '../tools/sticker/index.js';
 import audioConvert from '../tools/audio-convert/index.js';
+import audioEdit from '../tools/audio-edit/index.js';
 import transcribe from '../tools/transcribe/index.js';
 
 /**
@@ -31,7 +33,9 @@ export const TOOLS = [
   enhance,
   imgConvert,
   videoConvert,
+  videoCompress,
   sticker,
   audioConvert,
+  audioEdit,
   transcribe
 ];
