@@ -35,13 +35,19 @@ const mediaTest = process.argv.includes('--media-test');
 // 媒体工具界面自动测试：`electron . --media-ui-test` 逐个打开新工具、点按钮走流程并截图
 const mediaUiTest = process.argv.includes('--media-ui-test');
 
+// 音频工具自检：`electron . --audio-test` 真实转码全部输出格式并逐个回读校验
+const audioTest = process.argv.includes('--audio-test');
+
+// 音频工具界面自动测试：`electron . --audio-ui-test` 像真人一样切工具、选格式、点按钮走完整流程并截图
+const audioUiTest = process.argv.includes('--audio-ui-test');
+
 // 测试模式下关闭硬件加速：保证截图（capturePage）在任何机器上都能稳定拿到画面
-if (uiTest || pdfUiTest || mediaUiTest) {
+if (uiTest || pdfUiTest || mediaUiTest || audioUiTest) {
   app.disableHardwareAcceleration();
 }
 
 /** 是否处于任一自动测试模式：此时系统对话框一律换成本地测试文件（避免测试卡在弹窗上） */
-const testMode = () => uiTest || pdfUiTest || mediaTest || mediaUiTest;
+const testMode = () => uiTest || pdfUiTest || mediaTest || mediaUiTest || audioTest || audioUiTest;
 
 /** 自动测试模式下：从测试目录取指定扩展名的文件（对话框桩用；扩展名带不带点都能匹配） */
 async function testDirFiles(exts, { startWith, exact } = {}) {
@@ -304,6 +310,36 @@ function createMainWindow() {
         writeResult({ ok: false, at: new Date().toISOString(), error: err.message, stack: err.stack });
       }
       app.quit();
+    });
+  }
+
+  if (audioTest) {
+    mainWindow.webContents.once('did-finish-load', async () => {
+      try {
+        const { runAudioTest } = require('./tests/audio-test.js');
+        const result = await runAudioTest(mainWindow);
+        console.log(`AUDIO_TEST ${JSON.stringify(result)}`);
+      } catch (err) {
+        console.log(`AUDIO_TEST_FAIL ${err.message}\n${err.stack}`);
+      }
+      app.quit();
+    });
+  }
+
+  if (audioUiTest) {
+    const { runAudioUiTest, writeResult } = require('./tests/audio-ui-test.js');
+    mainWindow.webContents.once('did-finish-load', async () => {
+      try {
+        const result = await runAudioUiTest(mainWindow);
+        console.log(`AUDIO_UI_TEST ${JSON.stringify(result)}`);
+        writeResult({ ok: !!result.pass, at: new Date().toISOString(), result });
+      } catch (err) {
+        console.log(`AUDIO_UI_TEST_FAIL ${err.message}\n${err.stack}`);
+        try { writeResult({ ok: false, at: new Date().toISOString(), error: err.message, stack: err.stack }); } catch { /* 结果写不进去也要退出 */ }
+      } finally {
+        // app.quit() 必须在 finally：曾因 catch 里二次抛错跳过退出，留下常驻进程（测试窗口不关、干扰后续测试）
+        app.quit();
+      }
     });
   }
 
@@ -730,6 +766,12 @@ ipcMain.handle('libreoffice:convert', async (_event, options) => {
 const IMAGE_ANY_EXTS = ['png', 'jpg', 'jpeg', 'webp', 'gif', 'bmp', 'ico', 'avif', 'svg'];
 const VIDEO_EXTS = ['mp4', 'mov', 'mkv', 'avi', 'webm', 'flv', 'wmv', 'm4v', 'ts', '3gp', 'mpg', 'mpeg', 'vob', 'rmvb', 'ogv'];
 const ANIMATED_EXTS = ['gif', 'webp', 'apng'];
+// 音频格式转换工具：音频扩展名 + 视频（视频会自动提取声音）
+const AUDIO_EXTS = [
+  'mp3', 'wav', 'flac', 'm4a', 'aac', 'ogg', 'oga', 'opus', 'wma', 'amr',
+  'aiff', 'aif', 'ape', 'dsf', 'mpc', 'tak', 'wv', 'tta', 'ac3', 'eac3',
+  'mp2', 'spx', 'caf', 'au', 'w64', 'ra', 'rm', 'oma'
+];
 
 // 图片（含 ICO/AVIF/SVG 等扩展名）
 ipcMain.handle('dialog:open-image-any', async () => {
@@ -761,6 +803,17 @@ ipcMain.handle('dialog:open-media', async () => {
     title: '选择动图或视频',
     properties: ['openFile', 'multiSelections'],
     filters: [{ name: '动图（GIF/WebP/APNG）与视频', extensions: [...ANIMATED_EXTS, ...VIDEO_EXTS] }]
+  });
+  return result.canceled ? [] : result.filePaths;
+});
+
+// 音频与视频（音频格式转换工具；视频会自动提取声音）
+ipcMain.handle('dialog:open-audios', async () => {
+  if (testMode()) return testDirFiles([...AUDIO_EXTS, ...VIDEO_EXTS], { startWith: '测试音频' });
+  const result = await dialog.showOpenDialog(mainWindow, {
+    title: '选择音频或视频',
+    properties: ['openFile', 'multiSelections'],
+    filters: [{ name: '音频与视频（视频自动提取声音）', extensions: [...AUDIO_EXTS, ...VIDEO_EXTS] }]
   });
   return result.canceled ? [] : result.filePaths;
 });
@@ -806,7 +859,10 @@ ipcMain.handle('ffmpeg:status', async () => {
 
 /** 从 `ffmpeg -i` 的 stderr 里提取时长/分辨率/帧率/音轨等信息（静态包只带 ffmpeg，没有 ffprobe） */
 function parseMediaInfo(stderr) {
-  const info = { durationSec: 0, width: 0, height: 0, fps: 0, hasAudio: false, videoCodec: '', format: '' };
+  const info = {
+    durationSec: 0, width: 0, height: 0, fps: 0, hasAudio: false, videoCodec: '', format: '',
+    audioCodec: '', sampleRate: 0, channelLayout: ''
+  };
   const dur = /Duration: (\d+):(\d+):(\d+(?:\.\d+)?)/.exec(stderr);
   if (dur) info.durationSec = (+dur[1]) * 3600 + (+dur[2]) * 60 + parseFloat(dur[3]);
   const fmt = /Input #0, ([^,]+),/.exec(stderr);
@@ -821,6 +877,13 @@ function parseMediaInfo(stderr) {
     const f = /(\d+(?:\.\d+)?) fps/.exec(line);
     if (f && !info.fps) info.fps = parseFloat(f[1]);
     if (/Stream #\d+:\d+.*?: Audio:/.test(line)) info.hasAudio = true;
+    // 音频流细节（音频格式转换工具用：列表显示采样率/声道；缺失时保持默认值）
+    const a = /Stream #\d+:\d+.*?: Audio: ([^,]+), (\d+) Hz, ([^,]+)/.exec(line);
+    if (a && !info.sampleRate) {
+      info.audioCodec = a[1].trim().split(' ')[0];
+      info.sampleRate = Number(a[2]);
+      info.channelLayout = a[3].trim();
+    }
   }
   return info;
 }

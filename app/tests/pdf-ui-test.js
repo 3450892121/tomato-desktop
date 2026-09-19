@@ -68,11 +68,25 @@ async function runPdfUiTest(win) {
   await fs.mkdir(TEST_DIR, { recursive: true });
 
   // —— 清理上次夹具与产物，保证重复运行结果干净 ——
-  for (const f of await fs.readdir(TEST_DIR)) {
-    if (/\.(pdf|docx|xlsx)$/i.test(f) || f.startsWith('测试原图') || f.endsWith('_图片')) {
-      await fs.rm(path.join(TEST_DIR, f), { recursive: true, force: true });
+  //    注意：%TEMP%/tomato-uitest 是所有界面测试共用的夹具目录，历史运行可能留下各种文件；
+  //    删除带 try/catch 并做二次复查（曾因残留 PDF 混进文件列表，把合并/拆分步骤误判为失败）
+  const cleanRemoved = [];
+  const cleanFailures = [];
+  const cleanPass = async () => {
+    for (const f of await fs.readdir(TEST_DIR)) {
+      if (/\.(pdf|docx|xlsx)$/i.test(f) || f.startsWith('测试原图') || f.endsWith('_图片')) {
+        try {
+          await fs.rm(path.join(TEST_DIR, f), { recursive: true, force: true });
+          cleanRemoved.push(f);
+        } catch (err) {
+          cleanFailures.push(`${f}: ${err.message}`);
+        }
+      }
     }
-  }
+  };
+  await cleanPass();
+  await cleanPass(); // 二次复查：极端情况下（文件被短暂占用后释放）第二遍能清干净
+  result.steps.清理 = { removed: cleanRemoved, failures: cleanFailures };
 
   // —— 夹具：2 份 PDF（各 3 页）+ docx/xlsx + 2 张图片 ——
   await makeSamplePdf(path.join(TEST_DIR, '测试样本.pdf'), { red: true, label: 'RED' });

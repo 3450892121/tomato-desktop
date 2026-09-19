@@ -3,16 +3,17 @@
 把安卓 App「番茄图片混淆」（`番茄图片混淆.apk`）的图片混淆 / 解混淆能力完整搬到 Windows 电脑上：
 **免安装绿色版、纯离线、与手机版互相兼容**，给身边人用的傻瓜化工具。
 
-软件按「工具箱」形态搭建：左侧按「图片 / 视频 / 文档」分组列出所有工具（图片：图片混淆、图片压缩、图片变清晰、图片格式转换；视频：视频格式转换、动图与视频互转；文档：PDF 转格式），
+软件按「工具箱」形态搭建：左侧按「图片 / 视频 / 音频 / 文档」分组列出所有工具（图片：图片混淆、图片压缩、图片变清晰、图片格式转换；视频：视频格式转换、动图与视频互转；音频：音频格式转换；文档：PDF 转格式），
 右侧是当前工具界面；新功能按同一套模板低成本接入（见 `docs/新增工具指南.md`）。
 
 ---
 
-## 当前状态（v1.5.0）
+## 当前状态（v1.6.0）
 
 | 项 | 状态 |
 |---|---|
-| 左侧工具分组（图片 / 视频 / 文档，带图标、可折叠并记住状态） | ✅ 可用（界面自动测试含折叠断言与截图） |
+| **音频格式转换（新）**：21 种输出格式 → MP3/M4A/WAV/FLAC/OGG/Opus + 15 种更多格式；视频提取声音 | ✅ 可用（自检 21/21 格式真实转码 + 回读校验；界面测试连续两轮 `pass: true`） |
+| 左侧工具分组（图片 / 视频 / 音频 / 文档，带图标、可折叠并记住状态） | ✅ 可用（界面自动测试含折叠断言与截图） |
 | **AI 放大（超分，图片变清晰）** | ✅ 可用（Real-ESRGAN 加装包随包；需 Vulkan 显卡，实测 720p→4K 约 10 秒） |
 | 六大模式混淆 / 解混淆 | ✅ 可用（逐像素可逆，自动测试 55/55 通过） |
 | 单张 / 批量 / 拖拽 / 剪贴板 / 保存 | ✅ 可用（界面自动测试 `pass: true`） |
@@ -62,8 +63,10 @@ npm test                                                    # 算法测试 55 �
 .\node_modules\electron\dist\electron.exe . --pdf-ui-test    # PDF 工具界面自动测试（五个方向 + 截图）
 .\node_modules\electron\dist\electron.exe . --media-test     # 媒体工具自检（压缩/变清晰/转换 + 视频↔动图真实转码）
 .\node_modules\electron\dist\electron.exe . --media-ui-test  # 媒体工具界面自动测试（5 个新工具逐个走查 + 截图）
+.\node_modules\electron\dist\electron.exe . --audio-test     # 音频工具自检（21 种输出格式真实转码 + 回读校验 + 视频提取 + 标签保留）
+.\node_modules\electron\dist\electron.exe . --audio-ui-test  # 音频工具界面自动测试（选格式、两轮转码、清空 + 截图）
 ```
-> 界面类测试结果同时写入 `%TEMP%\tomato-pdf-test.json`、`%TEMP%\tomato-pdf-ui-test.json`、`%TEMP%\tomato-media-test.json`、`%TEMP%\tomato-media-ui-test.json`，截图在 `%TEMP%\tomato-uitest`。
+> 界面类测试结果同时写入 `%TEMP%\tomato-pdf-test.json`、`%TEMP%\tomato-pdf-ui-test.json`、`%TEMP%\tomato-media-test.json`、`%TEMP%\tomato-media-ui-test.json`、`%TEMP%\tomato-audio-test.json`、`%TEMP%\tomato-audio-ui-test.json`，截图在 `%TEMP%\tomato-uitest`。
 > 媒体类自检需要 `app/addons/ffmpeg/ffmpeg.exe`（仓库内已有，不进 git；缺失时视频/动图相关检查会如实标注失败）。
 
 ### 打包免安装版
@@ -126,6 +129,7 @@ electron . --verify-samples <目录> --key <密钥>
 - **绿色免安装**：整个文件夹拷走即用；设置与缓存都写在软件目录 `userdata/`，**不写系统 AppData**。
 - **纯离线**：源码中没有任何网络调用（fetch / XHR / WebSocket / 外部 URL 零命中），断网可用。
 - **PDF 转格式**（v1.1.0 新增）：PDF→图片（PNG/JPG、批量、选页、清晰度档位）、图片→PDF（JPG 直嵌/适应 A4）、PDF 合并/拆分/提取页；Word/Excel→PDF 无加装包时用内置方式（docx-preview + SheetJS + 打印引擎），PDF→Word 与高保真转换走可选的 LibreOffice 加装包。
+- **音频格式转换**（v1.6.0 新增）：21 种输出格式（MP3/M4A/WAV/FLAC/OGG/Opus/WMA/AMR/ALAC/AIFF/CAF/WavPack/TTA/AC3/EAC3/MP2/Speex/AU/W64/RealAudio）；APE/DSD/Musepack/TAK 可作输入；视频直接拖入自动提取声音；保留标题/歌手标签；复用 ffmpeg 加装包、零新增依赖。
 
 ## 已知限制
 

@@ -8,6 +8,7 @@ import enhance from '../tools/enhance/index.js';
 import imgConvert from '../tools/convert/index.js';
 import videoConvert from '../tools/video-convert/index.js';
 import sticker from '../tools/sticker/index.js';
+import audioConvert from '../tools/audio-convert/index.js';
 
 /**
  * 左侧导航分组（按此顺序显示；工具声明里的 group 对应这里的 id）。
@@ -17,6 +18,7 @@ import sticker from '../tools/sticker/index.js';
 export const GROUPS = [
   { id: 'image', name: '图片', icon: '🖼️' },
   { id: 'video', name: '视频', icon: '🎬' },
+  { id: 'audio', name: '音频', icon: '🎵' },
   { id: 'doc', name: '文档', icon: '🗂️' }
 ];
 
@@ -28,5 +30,6 @@ export const TOOLS = [
   enhance,
   imgConvert,
   videoConvert,
-  sticker
+  sticker,
+  audioConvert
 ];

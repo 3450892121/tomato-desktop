@@ -32,6 +32,7 @@ contextBridge.exposeInMainWorld('desktop', {
   openImageAny: () => ipcRenderer.invoke('dialog:open-image-any'),
   openVideos: () => ipcRenderer.invoke('dialog:open-videos'),
   openMedia: () => ipcRenderer.invoke('dialog:open-media'),
+  openAudios: () => ipcRenderer.invoke('dialog:open-audios'),
 
   // ffmpeg 加装包（视频/动图工具；见 spec/modules/video-convert.md）
   ffmpegStatus: () => ipcRenderer.invoke('ffmpeg:status'),

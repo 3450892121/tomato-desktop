@@ -182,3 +182,75 @@ export function animToVideoArgs(o = {}) {
   const vf = size ? `scale=${size.w}:${size.h},format=yuv420p` : 'scale=trunc(iw/2)*2:trunc(ih/2)*2,format=yuv420p';
   return ['-vf', vf, ...(o.fps ? ['-r', String(o.fps)] : [])];
 }
+
+// —— 音频（音频格式转换工具用；目标与实测依据见 spec/modules/audio-convert.md） ——
+
+/** 音频音质档 → 各编码器参数（无损格式忽略本档位） */
+export const AUDIO_QUALITY_PRESETS = {
+  high: { label: '高品质', mp3: '320k', aac: '256k', opus: '192k', vorbis: '6', wma: '192k', ac3: '384k', mp2: '320k', speex: '8' },
+  standard: { label: '标准', mp3: '192k', aac: '192k', opus: '96k', vorbis: '4', wma: '128k', ac3: '192k', mp2: '160k', speex: '5' },
+  small: { label: '省空间', mp3: '128k', aac: '128k', opus: '64k', vorbis: '2', wma: '64k', ac3: '128k', mp2: '128k', speex: '3' }
+};
+
+/**
+ * 音频输出格式清单（实测全部可用，见 spec/modules/audio-convert.md）
+ * group: common 常用 / more 更多；lossless: 无损（无需选音质）
+ */
+export const AUDIO_TARGETS = [
+  { value: 'mp3', ext: '.mp3', group: 'common', label: 'MP3（最通用，推荐）' },
+  { value: 'm4a', ext: '.m4a', group: 'common', label: 'M4A（AAC，苹果/手机通用）' },
+  { value: 'wav', ext: '.wav', group: 'common', lossless: true, label: 'WAV（无损，体积大）' },
+  { value: 'flac', ext: '.flac', group: 'common', lossless: true, label: 'FLAC（无损，体积小）' },
+  { value: 'ogg', ext: '.ogg', group: 'common', label: 'OGG（Vorbis，开源格式）' },
+  { value: 'opus', ext: '.opus', group: 'common', label: 'Opus（体积最小）' },
+  { value: 'wma', ext: '.wma', group: 'more', label: 'WMA（Windows Media）' },
+  { value: 'amr', ext: '.amr', group: 'more', label: 'AMR（手机录音，语音专用）' },
+  { value: 'aac', ext: '.aac', group: 'more', label: 'AAC 裸流（.aac）' },
+  { value: 'm4a-alac', ext: '.m4a', group: 'more', lossless: true, label: 'M4A 无损（ALAC，苹果无损）' },
+  { value: 'aiff', ext: '.aiff', group: 'more', lossless: true, label: 'AIFF（苹果无损）' },
+  { value: 'caf', ext: '.caf', group: 'more', lossless: true, label: 'CAF（苹果容器+无损）' },
+  { value: 'wv', ext: '.wv', group: 'more', lossless: true, label: 'WavPack（无损 .wv）' },
+  { value: 'tta', ext: '.tta', group: 'more', lossless: true, label: 'TTA（无损 .tta）' },
+  { value: 'ac3', ext: '.ac3', group: 'more', label: 'AC3（影视格式）' },
+  { value: 'eac3', ext: '.eac3', group: 'more', label: 'EAC3（影视格式）' },
+  { value: 'mp2', ext: '.mp2', group: 'more', label: 'MP2（老式广播）' },
+  { value: 'spx', ext: '.spx', group: 'more', label: 'Speex（语音 .spx）' },
+  { value: 'au', ext: '.au', group: 'more', lossless: true, label: 'AU（Sun/Unix 老格式）' },
+  { value: 'w64', ext: '.w64', group: 'more', lossless: true, label: 'W64（索尼 Wave64）' },
+  { value: 'ra', ext: '.ra', group: 'more', label: 'RealAudio（老式 .ra）' }
+];
+
+/**
+ * 音频输出编码参数
+ * @param {string} target AUDIO_TARGETS 的 value
+ * @param {'high'|'standard'|'small'} quality 音质档（无损格式忽略）
+ */
+export function audioEncodeArgs(target, quality = 'standard') {
+  const q = AUDIO_QUALITY_PRESETS[quality] || AUDIO_QUALITY_PRESETS.standard;
+  switch (target) {
+    case 'mp3': return ['-c:a', 'libmp3lame', '-b:a', q.mp3];
+    case 'm4a': return ['-c:a', 'aac', '-b:a', q.aac];
+    case 'wav': return ['-c:a', 'pcm_s16le'];
+    case 'flac': return ['-c:a', 'flac', '-compression_level', '5'];
+    case 'ogg': return ['-c:a', 'libvorbis', '-q:a', q.vorbis];
+    case 'opus': return ['-c:a', 'libopus', '-b:a', q.opus];
+    case 'wma': return ['-c:a', 'wmav2', '-b:a', q.wma];
+    // AMR 是窄带语音编码：必须 8kHz 单声道、码率固定（12.2k 为其最高档）
+    case 'amr': return ['-c:a', 'libopencore_amrnb', '-ar', '8000', '-ac', '1', '-b:a', '12.2k'];
+    case 'aac': return ['-c:a', 'aac', '-b:a', q.aac];
+    case 'm4a-alac': return ['-c:a', 'alac'];
+    case 'aiff': return ['-c:a', 'pcm_s16be'];
+    case 'caf': return ['-c:a', 'alac'];
+    case 'wv': return ['-c:a', 'wavpack'];
+    case 'tta': return ['-c:a', 'tta'];
+    case 'ac3': return ['-c:a', 'ac3', '-b:a', q.ac3];
+    case 'eac3': return ['-c:a', 'eac3', '-b:a', q.ac3];
+    // MP2 在低采样率（≤24kHz）下只允许 ≤160k 码率，统一重采样 44.1kHz 规避非法参数
+    case 'mp2': return ['-c:a', 'mp2', '-ar', '44100', '-b:a', q.mp2];
+    case 'spx': return ['-c:a', 'libspeex', '-q:a', q.speex];
+    case 'au': return ['-c:a', 'pcm_s16be'];
+    case 'w64': return ['-c:a', 'pcm_s16le'];
+    case 'ra': return ['-c:a', 'real_144'];
+    default: return ['-c:a', 'libmp3lame', '-b:a', q.mp3];
+  }
+}
