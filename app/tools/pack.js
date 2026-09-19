@@ -372,6 +372,43 @@ if (!zipped) {
 }
 if (zipped) log(`压缩包已生成：${zipPath}（${mb(fs.statSync(zipPath).size)}）`);
 
+// —— 8b) 同步桌面快捷方式（用户要求：每次换版本必须同步，且必须在删旧版之前） ——
+// 教训 v2.2.0：桌面「番茄图片混淆 桌面版.lnk」的「目标/起始位置」指向了新版 exe，但「图标位置」
+// 仍指向已删除的 v2.1.1 旧目录，导致桌面图标变白。此处一次性把 TargetPath / WorkingDirectory /
+// IconLocation 全部指向本次产物并读回验证，根除该复发问题。
+log('步骤8b：同步桌面快捷方式');
+{
+  const psQuote = (s) => `'${s.replace(/'/g, "''")}'`;
+  const exePath = path.join(outDir, exeName);
+  const desktopLnkName = '番茄图片混淆 桌面版.lnk';
+  const script = [
+    `$ws = New-Object -ComObject WScript.Shell`,
+    `$desktop = [Environment]::GetFolderPath('Desktop')`,
+    `$lnkPath = Join-Path $desktop ${psQuote(desktopLnkName)}`,
+    `if (Test-Path $lnkPath) {`,
+    `  $lnk = $ws.CreateShortcut($lnkPath)`,
+    `  $lnk.TargetPath = ${psQuote(exePath)}`,
+    `  $lnk.WorkingDirectory = ${psQuote(outDir)}`,
+    `  $lnk.IconLocation = ${psQuote(`${exePath},0`)}`,
+    `  $lnk.Save()`,
+    `  $v = $ws.CreateShortcut($lnkPath)`,
+    `  if ($v.TargetPath -eq ${psQuote(exePath)} -and $v.WorkingDirectory -eq ${psQuote(outDir)} -and $v.IconLocation -eq ${psQuote(`${exePath},0`)}) { Write-Output 'LNK_OK' } else { Write-Output 'LNK_MISMATCH' }`,
+    `} else { Write-Output 'LNK_NOT_FOUND' }`
+  ].join('\n');
+  try {
+    const result = execFileSync('powershell', ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-Command', script], { encoding: 'utf8' }).trim();
+    if (result.includes('LNK_OK')) {
+      log('桌面快捷方式已指向本次版本并读回验证（含图标位置）');
+    } else if (result.includes('LNK_NOT_FOUND')) {
+      log('未在桌面找到「番茄图片混淆 桌面版.lnk」，跳过快捷方式同步');
+    } else {
+      log(`警告：快捷方式已写入但读回不一致（${result}），请手动检查图标`);
+    }
+  } catch (err) {
+    log(`快捷方式同步失败（不影响本次产物）：${err.message}`);
+  }
+}
+
 // —— 9) 清理旧版本产物（用户要求：只保留最新版本，避免拿错） ——
 // 只在本次打包产出成功后执行；只删本软件的旧版文件夹/压缩包，不动其它文件。
 log('步骤9：清理旧版本产物');
