@@ -9,6 +9,7 @@ import imgConvert from '../tools/convert/index.js';
 import videoConvert from '../tools/video-convert/index.js';
 import sticker from '../tools/sticker/index.js';
 import audioConvert from '../tools/audio-convert/index.js';
+import transcribe from '../tools/transcribe/index.js';
 
 /**
  * 左侧导航分组（按此顺序显示；工具声明里的 group 对应这里的 id）。
@@ -31,5 +32,6 @@ export const TOOLS = [
   imgConvert,
   videoConvert,
   sticker,
-  audioConvert
+  audioConvert,
+  transcribe
 ];

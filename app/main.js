@@ -41,13 +41,19 @@ const audioTest = process.argv.includes('--audio-test');
 // 音频工具界面自动测试：`electron . --audio-ui-test` 像真人一样切工具、选格式、点按钮走完整流程并截图
 const audioUiTest = process.argv.includes('--audio-ui-test');
 
+// 语音转文字自检：`electron . --asr-test` 离线合成中文语音夹具 → 真实识别 → 校验文本与字幕产物
+const asrTest = process.argv.includes('--asr-test');
+
+// 语音转文字界面自动测试：`electron . --asr-ui-test` 切工具 → 添加 → 识别 → 校验产物并截图
+const asrUiTest = process.argv.includes('--asr-ui-test');
+
 // 测试模式下关闭硬件加速：保证截图（capturePage）在任何机器上都能稳定拿到画面
-if (uiTest || pdfUiTest || mediaUiTest || audioUiTest) {
+if (uiTest || pdfUiTest || mediaUiTest || audioUiTest || asrUiTest) {
   app.disableHardwareAcceleration();
 }
 
 /** 是否处于任一自动测试模式：此时系统对话框一律换成本地测试文件（避免测试卡在弹窗上） */
-const testMode = () => uiTest || pdfUiTest || mediaTest || mediaUiTest || audioTest || audioUiTest;
+const testMode = () => uiTest || pdfUiTest || mediaTest || mediaUiTest || audioTest || audioUiTest || asrTest || asrUiTest;
 
 /** 自动测试模式下：从测试目录取指定扩展名的文件（对话框桩用；扩展名带不带点都能匹配） */
 async function testDirFiles(exts, { startWith, exact } = {}) {
@@ -335,6 +341,36 @@ function createMainWindow() {
         writeResult({ ok: !!result.pass, at: new Date().toISOString(), result });
       } catch (err) {
         console.log(`AUDIO_UI_TEST_FAIL ${err.message}\n${err.stack}`);
+        try { writeResult({ ok: false, at: new Date().toISOString(), error: err.message, stack: err.stack }); } catch { /* 结果写不进去也要退出 */ }
+      } finally {
+        // app.quit() 必须在 finally：曾因 catch 里二次抛错跳过退出，留下常驻进程（测试窗口不关、干扰后续测试）
+        app.quit();
+      }
+    });
+  }
+
+  if (asrTest) {
+    mainWindow.webContents.once('did-finish-load', async () => {
+      try {
+        const { runAsrTest } = require('./tests/asr-test.js');
+        const result = await runAsrTest(mainWindow);
+        console.log(`ASR_TEST ${JSON.stringify(result)}`);
+      } catch (err) {
+        console.log(`ASR_TEST_FAIL ${err.message}\n${err.stack}`);
+      }
+      app.quit();
+    });
+  }
+
+  if (asrUiTest) {
+    const { runAsrUiTest, writeResult } = require('./tests/asr-ui-test.js');
+    mainWindow.webContents.once('did-finish-load', async () => {
+      try {
+        const result = await runAsrUiTest(mainWindow);
+        console.log(`ASR_UI_TEST ${JSON.stringify(result)}`);
+        writeResult({ ok: !!result.pass, at: new Date().toISOString(), result });
+      } catch (err) {
+        console.log(`ASR_UI_TEST_FAIL ${err.message}\n${err.stack}`);
         try { writeResult({ ok: false, at: new Date().toISOString(), error: err.message, stack: err.stack }); } catch { /* 结果写不进去也要退出 */ }
       } finally {
         // app.quit() 必须在 finally：曾因 catch 里二次抛错跳过退出，留下常驻进程（测试窗口不关、干扰后续测试）
@@ -818,6 +854,17 @@ ipcMain.handle('dialog:open-audios', async () => {
   return result.canceled ? [] : result.filePaths;
 });
 
+// 音频与视频（语音转文字工具；测试模式下取「测试语音*」夹具，避免与音频转换工具的夹具相互污染）
+ipcMain.handle('dialog:open-speech', async () => {
+  if (testMode()) return testDirFiles([...AUDIO_EXTS, ...VIDEO_EXTS], { startWith: '测试语音' });
+  const result = await dialog.showOpenDialog(mainWindow, {
+    title: '选择音频或视频',
+    properties: ['openFile', 'multiSelections'],
+    filters: [{ name: '音频与视频（视频自动提取声音）', extensions: [...AUDIO_EXTS, ...VIDEO_EXTS] }]
+  });
+  return result.canceled ? [] : result.filePaths;
+});
+
 // —— ffmpeg 加装包（视频格式转换 / 动图与视频互转 工具；见 spec/modules/video-convert.md） ——
 // 位置约定 = 软件目录/addons/ffmpeg/ffmpeg.exe（随包分发，见 pack.js 步骤 5c）；缺失时视频类工具显示放置说明。
 const FFMPEG_ADDON_PATH = path.join(PORTABLE_DIR, 'addons', 'ffmpeg', 'ffmpeg.exe');
@@ -1116,6 +1163,163 @@ ipcMain.handle('ai:upscale', async (event, options) => {
     return { ok: true, bytes, ms: Date.now() - t0, scale, model, width: size.width, height: size.height };
   } finally {
     await fs.rm(workDir, { recursive: true, force: true }).catch(() => {});
+  }
+});
+
+// —— FunASR 语音识别加装包（「语音转文字」；见 spec/modules/transcribe.md） ——
+// 位置约定 = 软件目录/addons/asr/（随包分发，见 pack.js 步骤 5e）；缺失时工具显示放置说明。
+// 说明：识别前统一把输入转成 16kHz 单声道 wav（视频自动提取音轨）——实测 exe 直读 m4a/ogg 会静默空输出，
+//       统一转码是唯一稳妥路径；识别结果以 SRT 形式返回，纯文本由界面层去时间戳推导（不重复跑模型）。
+const ASR_ADDON_DIR = path.join(PORTABLE_DIR, 'addons', 'asr');
+const ASR_EXE = path.join(ASR_ADDON_DIR, 'llama-funasr-sensevoice.exe');
+const ASR_MODEL = path.join(ASR_ADDON_DIR, 'models', 'sensevoice-small-q8.gguf');
+const ASR_VAD = path.join(ASR_ADDON_DIR, 'models', 'fsmn-vad.gguf');
+
+function findAsr() {
+  if (fsSync.existsSync(ASR_EXE) && fsSync.existsSync(ASR_MODEL) && fsSync.existsSync(ASR_VAD)) {
+    return { found: true };
+  }
+  return { found: false };
+}
+
+ipcMain.handle('asr:status', async () => {
+  const asr = findAsr();
+  const ff = findFfmpeg();
+  return { found: asr.found, ffmpeg: !!ff.found };
+});
+
+/** 正在运行的语音识别任务（jobId → child），供「取消」使用 */
+const asrJobs = new Map();
+
+/**
+ * 语音识别（文件 → 文本）：先转 16kHz 单声道 wav，再跑 SenseVoice（输出 SRT）。
+ * options: { inputPath, jobId? }
+ * 返回：{ok, srtText} 或 {ok:false, message}（本接口不落盘；保存由 asr:save 完成）
+ */
+ipcMain.handle('asr:transcribe', async (event, options) => {
+  const opt = options || {};
+  const inputPath = opt.inputPath;
+  if (!inputPath) return { ok: false, message: '缺少输入文件' };
+  if (!findAsr().found) return { ok: false, message: '未检测到语音识别加装包（把 addons/asr 放回软件目录后重开本工具）' };
+  if (!findFfmpeg().found) return { ok: false, message: '未检测到 ffmpeg（识别前需要它处理音频；把加装包解压到软件目录的 addons/ffmpeg）' };
+
+  const jobId = opt.jobId;
+  const send = (payload) => {
+    if (event.sender && !event.sender.isDestroyed()) event.sender.send('asr:progress', { jobId, ...payload });
+  };
+  const workRoot = path.join(PORTABLE_DIR, 'userdata', 'tmp');
+  const workDir = path.join(workRoot, `asr-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`);
+  await fs.mkdir(workDir, { recursive: true });
+  // 顺手清理 24 小时前的遗留任务目录（异常退出时可能残留）
+  try {
+    const now = Date.now();
+    for (const name of await fs.readdir(workRoot)) {
+      if (!name.startsWith('asr-')) continue;
+      const full = path.join(workRoot, name);
+      const st = await fs.stat(full).catch(() => null);
+      if (st && now - st.mtimeMs > 24 * 3600 * 1000) await fs.rm(full, { recursive: true, force: true }).catch(() => {});
+    }
+  } catch { /* 清理失败不影响识别 */ }
+  const wavPath = path.join(workDir, 'in16k.wav');
+
+  try {
+    send({ percent: 3, phase: '准备音频' });
+    // 统一转 16kHz 单声道；视频（-vn）顺带提取音轨
+    const conv = await runFfmpeg(['-hide_banner', '-nostdin', '-y', '-i', inputPath, '-vn', '-ac', '1', '-ar', '16000', wavPath], {
+      timeoutMs: 30 * 60 * 1000
+    });
+    if (conv.code !== 0 || !fsSync.existsSync(wavPath)) {
+      const tail = (conv.stderr || '').trim().split(/\r?\n/).slice(-2).join(' ｜ ').slice(0, 200);
+      return { ok: false, message: `音频处理失败：${tail || '无法读取该文件'}` };
+    }
+    if (event.sender && event.sender.isDestroyed()) return { ok: false, message: '已取消' };
+
+    // 识别（--srt：直接拿到带时间戳的字幕；阶段进度从 stderr 解析）
+    const phaseMap = [
+      [/loading model metadata/, 15], [/model ready/, 25], [/loading audio/, 30],
+      [/audio ready/, 35], [/running VAD/, 42], [/VAD ready/, 55],
+      [/building graph/, 62], [/compute starting/, 70], [/compute complete/, 95]
+    ];
+    const res = await new Promise((resolve) => {
+      // 关键：模型/音频都传「相对 ASCII 路径」+ cwd=软件目录——含中文也安全（cwd 由系统按 Unicode 解析）
+      const relArgs = [
+        '-m', path.relative(PORTABLE_DIR, ASR_MODEL),
+        '--vad', path.relative(PORTABLE_DIR, ASR_VAD),
+        '-a', path.relative(PORTABLE_DIR, wavPath),
+        '--srt'
+      ];
+      const child = spawn(ASR_EXE, relArgs, { windowsHide: true, cwd: PORTABLE_DIR });
+      if (jobId) asrJobs.set(jobId, child);
+      let stdout = '';
+      let stderr = '';
+      const timer = setTimeout(() => killConvertTree(child), 2 * 3600 * 1000);
+      child.stdout.on('data', (d) => { stdout += d.toString(); });
+      child.stderr.on('data', (d) => {
+        const s = d.toString();
+        stderr += s;
+        if (stderr.length > 200000) stderr = stderr.slice(-100000);
+        for (const [re, percent] of phaseMap) {
+          if (re.test(s)) send({ percent, phase: '识别中' });
+        }
+      });
+      child.on('error', (err) => {
+        clearTimeout(timer);
+        if (jobId) asrJobs.delete(jobId);
+        resolve({ code: -1, stdout, stderr: String((err && err.message) || err) });
+      });
+      child.on('close', (code) => {
+        clearTimeout(timer);
+        if (jobId) asrJobs.delete(jobId);
+        resolve({ code, stdout, stderr });
+      });
+    });
+
+    const srtText = String(res.stdout || '').replace(/^\uFEFF/, '').trim();
+    if (res.code !== 0) {
+      const tail = (res.stderr || '').trim().split(/\r?\n/).slice(-2).join(' ｜ ').slice(0, 200);
+      return { ok: false, message: `识别失败（退出码 ${res.code}）${tail ? `｜${tail}` : ''}` };
+    }
+    if (!srtText) {
+      return { ok: false, message: '未识别到语音内容（可能是纯音乐或没有人声）' };
+    }
+    send({ percent: 100, phase: '完成' });
+    return { ok: true, srtText };
+  } finally {
+    await fs.rm(workDir, { recursive: true, force: true }).catch(() => {});
+  }
+});
+
+// 取消正在处理的语音识别任务（结束整棵进程树）
+ipcMain.handle('asr:cancel', async (_event, jobId) => {
+  const child = asrJobs.get(jobId);
+  if (!child) return { ok: false, message: '任务已结束或不存在' };
+  killConvertTree(child);
+  return { ok: true };
+});
+
+/**
+ * 保存识别产物（.txt / .srt；重名自动加序号，绝不覆盖已有文件）
+ * options: { targetDir, baseName, files: [{ext, text}] }
+ */
+ipcMain.handle('asr:save', async (_event, options) => {
+  const opt = options || {};
+  const dir = opt.targetDir;
+  const base = opt.baseName || '识别结果';
+  const files = Array.isArray(opt.files) ? opt.files : [];
+  if (!dir || files.length === 0) return { ok: false, message: '缺少保存参数' };
+  try {
+    await fs.mkdir(dir, { recursive: true });
+    const paths = [];
+    for (const f of files) {
+      const ext = String(f.ext || '.txt');
+      const target = uniqueTargetPath(dir, base, ext);
+      // UTF-8 带 BOM：Windows 记事本/字幕工具双击即正常显示中文
+      await fs.writeFile(target, `\uFEFF${String(f.text == null ? '' : f.text)}`, 'utf8');
+      paths.push(target);
+    }
+    return { ok: true, paths };
+  } catch (err) {
+    return { ok: false, message: `保存失败：${err.message}` };
   }
 });
 

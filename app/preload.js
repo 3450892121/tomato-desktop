@@ -33,6 +33,7 @@ contextBridge.exposeInMainWorld('desktop', {
   openVideos: () => ipcRenderer.invoke('dialog:open-videos'),
   openMedia: () => ipcRenderer.invoke('dialog:open-media'),
   openAudios: () => ipcRenderer.invoke('dialog:open-audios'),
+  openSpeech: () => ipcRenderer.invoke('dialog:open-speech'),
 
   // ffmpeg 加装包（视频/动图工具；见 spec/modules/video-convert.md）
   ffmpegStatus: () => ipcRenderer.invoke('ffmpeg:status'),
@@ -54,6 +55,17 @@ contextBridge.exposeInMainWorld('desktop', {
     const handler = (_event, data) => callback(data);
     ipcRenderer.on('ai:progress', handler);
     return () => ipcRenderer.removeListener('ai:progress', handler);
+  },
+
+  // FunASR 语音识别加装包（「语音转文字」；见 spec/modules/transcribe.md）
+  asrStatus: () => ipcRenderer.invoke('asr:status'),
+  asrTranscribe: (options) => ipcRenderer.invoke('asr:transcribe', options),
+  asrSave: (options) => ipcRenderer.invoke('asr:save', options),
+  asrCancel: (jobId) => ipcRenderer.invoke('asr:cancel', jobId),
+  asrOnProgress: (callback) => {
+    const handler = (_event, data) => callback(data);
+    ipcRenderer.on('asr:progress', handler);
+    return () => ipcRenderer.removeListener('asr:progress', handler);
   },
 
   // PDF 工具：专用文件对话框与 LibreOffice 加装包

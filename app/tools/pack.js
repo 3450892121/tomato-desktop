@@ -78,6 +78,11 @@ fs.copyFileSync(path.join(appRoot, 'tests', 'pdf-test.js'), path.join(appTarget,
 fs.copyFileSync(path.join(appRoot, 'tests', 'pdf-ui-test.js'), path.join(appTarget, 'tests', 'pdf-ui-test.js'));
 fs.copyFileSync(path.join(appRoot, 'tests', 'media-test.js'), path.join(appTarget, 'tests', 'media-test.js'));
 fs.copyFileSync(path.join(appRoot, 'tests', 'media-ui-test.js'), path.join(appTarget, 'tests', 'media-ui-test.js'));
+// 说明：v1.6.0 曾漏拷音频测试文件（打包产物跑不了 --audio-test/--audio-ui-test）；本次补齐，并带上语音转文字测试
+fs.copyFileSync(path.join(appRoot, 'tests', 'audio-test.js'), path.join(appTarget, 'tests', 'audio-test.js'));
+fs.copyFileSync(path.join(appRoot, 'tests', 'audio-ui-test.js'), path.join(appTarget, 'tests', 'audio-ui-test.js'));
+fs.copyFileSync(path.join(appRoot, 'tests', 'asr-test.js'), path.join(appTarget, 'tests', 'asr-test.js'));
+fs.copyFileSync(path.join(appRoot, 'tests', 'asr-ui-test.js'), path.join(appTarget, 'tests', 'asr-ui-test.js'));
 
 // —— 4b) 复制 PDF 工具运行时依赖（纯 JS，界面进程按相对路径直接引用） ——
 // 说明：本项目没有打包器，工具代码里写的是 ../../../../node_modules/pdfjs-dist/... 这样的
@@ -168,6 +173,17 @@ if (fs.existsSync(path.join(aiAddon, 'realesrgan-ncnn-vulkan.exe'))) {
   copyTree(aiAddon, path.join(outDir, 'addons', 'realesrgan'));
 } else {
   log('警告：未发现 app/addons/realesrgan —— 产物中「AI 放大」将不可用（其余功能不受影响）');
+}
+
+// —— 5e) FunASR 语音识别加装包（「语音转文字」必需，随主包分发） ——
+// 说明：单文件 exe + SenseVoice q8 + FSMN-VAD（约 246MB，MIT 许可），放在 app/addons/asr/（不进 git）。
+//      缺失时工具会提示「未检测到语音识别加装包」，其余工具不受影响。
+const asrAddon = path.join(appRoot, 'addons', 'asr');
+if (fs.existsSync(path.join(asrAddon, 'llama-funasr-sensevoice.exe'))) {
+  log('步骤5e：复制 FunASR 语音识别加装包（约 246MB）…');
+  copyTree(asrAddon, path.join(outDir, 'addons', 'asr'));
+} else {
+  log('警告：未发现 app/addons/asr —— 产物中「语音转文字」将不可用（其余工具不受影响）');
 }
 
 // —— 6) 设置 exe 图标与版本信息（需要 build/rcedit.exe，缺失则跳过） ——

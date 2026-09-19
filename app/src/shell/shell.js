@@ -68,6 +68,7 @@ const ctx = {
   openVideos: () => window.desktop.openVideos(),
   openMedia: () => window.desktop.openMedia(),
   openAudios: () => window.desktop.openAudios(),
+  openSpeech: () => window.desktop.openSpeech(),
   // ffmpeg 加装包（视频/动图工具）
   ffmpegStatus: () => window.desktop.ffmpegStatus(),
   ffmpegProbe: (filePath) => window.desktop.ffmpegProbe(filePath),
