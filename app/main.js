@@ -47,13 +47,17 @@ const asrTest = process.argv.includes('--asr-test');
 // 语音转文字界面自动测试：`electron . --asr-ui-test` 切工具 → 添加 → 识别 → 校验产物并截图
 const asrUiTest = process.argv.includes('--asr-ui-test');
 
+// OCR 引擎可用性闸门：`electron . --ocr-poc` 验证 OCR 引擎能在本软件里纯离线跑通中文扫描件
+// （P0 闸门，见 .trae/documents/番茄工具箱-功能扩展方案.md；正式工具开发前必须先跑通）
+const ocrPoc = process.argv.includes('--ocr-poc');
+
 // 测试模式下关闭硬件加速：保证截图（capturePage）在任何机器上都能稳定拿到画面
 if (uiTest || pdfUiTest || mediaUiTest || audioUiTest || asrUiTest) {
   app.disableHardwareAcceleration();
 }
 
 /** 是否处于任一自动测试模式：此时系统对话框一律换成本地测试文件（避免测试卡在弹窗上） */
-const testMode = () => uiTest || pdfUiTest || mediaTest || mediaUiTest || audioTest || audioUiTest || asrTest || asrUiTest;
+const testMode = () => uiTest || pdfUiTest || mediaTest || mediaUiTest || audioTest || audioUiTest || asrTest || asrUiTest || ocrPoc;
 
 /** 自动测试模式下：从测试目录取指定扩展名的文件（对话框桩用；扩展名带不带点都能匹配） */
 async function testDirFiles(exts, { startWith, exact } = {}) {
@@ -376,6 +380,19 @@ function createMainWindow() {
         // app.quit() 必须在 finally：曾因 catch 里二次抛错跳过退出，留下常驻进程（测试窗口不关、干扰后续测试）
         app.quit();
       }
+    });
+  }
+
+  if (ocrPoc) {
+    const { runOcrPoc } = require('./tests/ocr-poc.js');
+    mainWindow.webContents.once('did-finish-load', async () => {
+      try {
+        const result = await runOcrPoc(mainWindow);
+        console.log(`OCR_POC ${JSON.stringify(result)}`);
+      } catch (err) {
+        console.log(`OCR_POC_FAIL ${err.message}\n${err.stack}`);
+      }
+      app.quit();
     });
   }
 
