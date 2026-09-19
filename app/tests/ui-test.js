@@ -431,18 +431,42 @@ async function runUiTest(win) {
   result.steps.afterClear = await evalJs('document.getElementById("statusText").textContent');
   result.checks.clearedThumbs = await evalJs('document.querySelectorAll("#thumbList .thumb").length');
 
-  // 14) LRU 回收：切过 5 个以上工具后，最久没用过的页面会被释放（当前页不释放）
-  //     做法：给图片混淆重新载入图片 → 依次切 5 个别的工具（保活页数超上限）→ 切回来
-  //     期望：图片列表已被释放（回到空状态 + 提示「已自动释放」），说明内存被回收了
+  // 14) 保活回收的两条规则（用户反馈：只是点开看看不能把别处用过的东西挤掉）
+  //     14a) 纯浏览（一个字都没动）不占保活额度：来回切一圈工具后切回，图片列表必须原样还在、不提示「已释放」
+  //     14b) 只有「动过」的页超过上限才回收：在这 5 个工具里各动一下 → 最久没用过的图片混淆被释放并提示
   await evalJs('document.getElementById("btnAddFirst").click()');
   await wait(3000);
-  result.checks.lruRelease = JSON.parse(await evalJs(`(async () => {
+  result.checks.browseKeepsState = JSON.parse(await evalJs(`(async () => {
     const wait = (ms) => new Promise((r) => setTimeout(r, ms));
     const nav = (id) => [...document.querySelectorAll('#toolNav .tool-item')].find((b) => b.dataset.toolId === id);
     const before = { thumbs: document.querySelectorAll('#thumbList .thumb').length };
     for (const id of ['compress', 'enhance', 'img-convert', 'video-convert', 'audio-convert']) {
       nav(id).click();
       await wait(600);
+    }
+    nav('obfuscate').click();
+    await wait(800);
+    const after = {
+      thumbs: document.querySelectorAll('#thumbList .thumb').length,
+      status: document.getElementById('statusText').textContent
+    };
+    return JSON.stringify({
+      ok: before.thumbs > 0 && after.thumbs === before.thumbs && !after.status.includes('自动释放'),
+      before, after
+    });
+  })()`));
+  await shot('12a-纯浏览后状态仍在');
+
+  result.checks.lruRelease = JSON.parse(await evalJs(`(async () => {
+    const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+    const nav = (id) => [...document.querySelectorAll('#toolNav .tool-item')].find((b) => b.dataset.toolId === id);
+    const before = { thumbs: document.querySelectorAll('#thumbList .thumb').length };
+    // 逐个切过去并在页里点一下（= 用户动过这页）：5 个工具 + 图片混淆 = 6 个「动过」的页，超过保活上限
+    for (const id of ['compress', 'enhance', 'img-convert', 'video-convert', 'audio-convert']) {
+      nav(id).click();
+      await wait(600);
+      document.querySelector('.tool-page.is-active').click();
+      await wait(200);
     }
     nav('obfuscate').click();
     await wait(800);
@@ -498,6 +522,7 @@ async function runUiTest(win) {
     result.steps.batchSave20.includes('成功 20 张') &&
     result.steps.batchSavedFiles >= 20 &&
     c.clearedThumbs === 0 &&
+    c.browseKeepsState.ok === true &&
     c.lruRelease.ok === true;
 
   return result;

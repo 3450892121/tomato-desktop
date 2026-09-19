@@ -12,7 +12,7 @@
 - `artifacts/`：测试证据（截图等，不进 git）。
 - `app/`：Electron 应用源码：
   - `main.js` / `preload.js`：主进程与安全桥（窗口、文件对话框等系统能力）。
-  - `src/shell/`：工具箱框架（工具页容器、左侧导航、`registry.js` 工具注册表、`theme.css` 设计令牌、`components.css` 通用组件库）。**工具页保活**：切换工具不销毁页面，切回时列表/输入/预览/滚动位置与顶栏提示全部保留（保活上限 5 页，超出按 LRU 回收最久没用过的那页，当前页不回收）；工具里的全局交互要用 `ctx.isActive()` 让位，被回收时会走 `unmount()` 清理。
+  - `src/shell/`：工具箱框架（工具页容器、左侧导航、`registry.js` 工具注册表、`theme.css` 设计令牌、`components.css` 通用组件库）。**工具页保活（只保「动过」的页）**：切换工具不销毁页面，切回时列表/输入/预览/滚动位置与顶栏提示全部保留；没动过的页（只是点开看看）切走即静默释放、不占额度，免得「随便看看」挤掉别处用过的东西；动过的页上限 5 页，超出按 LRU 回收最久没用过的那页（当前页不回收，回收时提示「已自动释放」）；工具里的全局交互要用 `ctx.isActive()` 让位，被释放/回收时会走 `unmount()` 清理。
   - `src/tools/<工具名>/`：各工具自包含目录（声明 + 界面 + 逻辑 + 样式）。现有：`obfuscate` 图片混淆、`pdf-convert` PDF 转格式、`compress` 图片压缩、`enhance` 图片变清晰、`img-convert` 图片格式转换、`batch-rename` 批量重命名、`watermark` 加水印、`stitch` 长图拼接、`grid-slice` 九宫格切图、`video-convert` 视频格式转换、`video-compress` 视频压缩、`sticker` 动图与视频互转、`audio-convert` 音频格式转换、`audio-edit` 音频剪辑、`transcribe` 语音转文字、`pdf-edit` PDF 编辑整理、`ocr` 文字识别；`_template` 为新工具模板。
   - `src/shared/`：跨工具复用能力（图片读写、ffmpeg 封装与编码参数、文件封装、设置）。
   - `addons/`：随包加装包（不进 git）：`libreoffice/`（PDF→Word 与高保真 Office→PDF，可选）、`ffmpeg/`（视频/动图工具必需，单文件 83MB，GPL v3）、`realesrgan/`（「图片变清晰」的 AI 放大，约 50MB，BSD 3-Clause，需 Vulkan 显卡）、`asr/`（「语音转文字」的 FunASR·SenseVoice 识别引擎，约 246MB，MIT，纯 CPU）、`ocr/`（「文字识别」的 PP-OCRv5 mobile ONNX 模型，约 20MB，Apache-2.0 模型 + MIT 运行时，纯 CPU）；许可与来源见各自目录的 LICENSE/说明.txt。

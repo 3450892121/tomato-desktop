@@ -210,30 +210,42 @@ const ctx = {
   appInfo: () => window.desktop.appInfo()
 };
 
-// —— 工具页保活（切走不销毁，切回来原样） ——
+// —— 工具页保活（切走不销毁，切回来原样；只保「动过」的页） ——
 
 /**
- * 已挂载的工具页：toolId → { el, status, info, mounted, scrollTop, lastUsed }。
+ * 已挂载的工具页：toolId → { el, status, info, mounted, scrollTop, lastUsed, touched }。
  * 每个工具一个 .tool-page 容器：首次进入时挂载；切走时整页从文档里取下（DOM 与工具内部状态都留在内存里，
  * 不销毁、不重挂）；切回来原样放回，所以列表、当前图、输入内容、滚动位置、顶栏提示都不会重置。
  * 取下而不只是隐藏的原因：同一时刻文档里只有当前工具的页面，工具与自动化测试用
  * document.querySelector 找元素时不会误抓到别的页面。
  *
- * 保活不等于永远留着：各工具的内存（尤其是已选图片的像素数据）会随着切过的工具越来越多而堆高，
+ * 只有「动过」的页才值得保活（用户反馈）：只是点开看一眼、什么都没做的页没有内容可保，
+ * 切走时就静默释放（不提示、下次进去重新挂载），也不算保活额度 —— 免得「随便看看有什么功能」
+ * 就把别处正在用的页面挤掉、上次的内容被清空。
+ *
+ * 保活不等于永远留着：动过的页（尤其是已选图片的像素数据）会随着用过的工具越来越多而堆高，
  * 所以给了上限，超过就按 LRU 回收最久没用过的那页（见 evictPages）。
  */
 const pages = new Map();
 
 /**
- * 同时保活的工具页上限：超过就淘汰最久没用过的（LRU）。当前页永不淘汰。
+ * 「动过」的判定：用户在这一页里点按 / 打字 / 拖入过文件，才算在这页做过事。
+ * 只是切过来看一眼（含滚动查看）不算 —— 没动过的页不占保活额度，也就不会挤掉别处做过的事。
+ */
+const TOUCH_EVENTS = ['pointerdown', 'click', 'keydown', 'input', 'change', 'drop', 'paste'];
+
+/**
+ * 同时保活的「动过」页上限：超过就淘汰最久没用过的（LRU）。当前页永不淘汰。
  * 取值考虑：日常最多同时在几个工具之间来回（图片混淆 + 一两个转换工具），5 页足够顺手；
  * 被回收的工具再进去时会重新挂载，并在状态栏说明「上次的内容已自动释放」，不会让人以为文件丢了。
  */
 const MAX_ALIVE_PAGES = 5;
-/** 页面访问序号：每次切入自增记到 lastUsed，回收时挑最小的那个（最久未用） */
+/** 页面访问序号：每次切入 / 每次动过都自增记到 lastUsed，回收时挑最小的那个（最久未用） */
 let pageTick = 0;
 /** 被 LRU 回收过的工具：下次进入时提示一句「内容已自动释放」 */
 const releasedTools = new Set();
+/** 回收进行中：回收时工具 unmount 引发的连锁事件不再递归触发回收 */
+let evicting = false;
 
 function pageFor(tool) {
   let page = pages.get(tool.id);
@@ -241,7 +253,15 @@ function pageFor(tool) {
     const el = document.createElement('div');
     el.className = 'tool-page';
     el.dataset.toolId = tool.id;
-    page = { el, status: `${tool.name} 已打开`, info: {}, mounted: false, scrollTop: 0, lastUsed: 0 };
+    page = { el, status: `${tool.name} 已打开`, info: {}, mounted: false, scrollTop: 0, lastUsed: 0, touched: false };
+    // 捕获阶段监听：工具里 stopPropagation 也拦不住这次「动过」判定
+    const markTouched = () => {
+      if (page.touched) return;
+      page.touched = true;
+      page.lastUsed = ++pageTick;
+      evictPages(); // 刚变成「动过」就校验一次额度，保证动过的页始终不超上限
+    };
+    for (const type of TOUCH_EVENTS) el.addEventListener(type, markTouched, true);
     pages.set(tool.id, page);
   }
   page.lastUsed = ++pageTick; // 记一次访问，供 LRU 判断谁最久没用过
@@ -249,7 +269,7 @@ function pageFor(tool) {
 }
 
 /** 释放一个工具页：先让工具自己清理（事件、进度订阅、后台任务），再丢掉 DOM 与记录 */
-function disposePage(toolId, page) {
+function disposePage(toolId, page, { silent = false } = {}) {
   const tool = TOOLS.find((t) => t.id === toolId);
   if (tool && typeof tool.unmount === 'function') {
     try {
@@ -261,23 +281,36 @@ function disposePage(toolId, page) {
   page.el.remove();
   page.el.innerHTML = '';
   pages.delete(toolId);
-  releasedTools.add(toolId); // 下次进来时说明一下，免得用户以为文件丢了
+  if (!silent) releasedTools.add(toolId); // 下次进来时说明一下，免得用户以为文件丢了
 }
 
-/** LRU 回收：保活的页超过上限时，淘汰最久没用过的那页（当前页除外） */
+/**
+ * LRU 回收：额度只按「动过」的页算 —— 点开看一眼就走的不占额度，也不会挤掉别处做过的事（用户反馈）。
+ * - 「动过」的页超过 MAX_ALIVE_PAGES：淘汰最久没用过的那页，下次进入时提示「已自动释放」；
+ * - 「没动过」的页没有内容可丢：正常在切走时就已静默释放，这里只兜底清理（绝不因此淘汰动过的页）。
+ * 当前页永不淘汰。
+ */
 function evictPages() {
-  while (pages.size > MAX_ALIVE_PAGES) {
-    let victimId = null;
-    let victim = null;
-    for (const [id, page] of pages) {
-      if (activeTool && activeTool.id === id) continue; // 当前页永不淘汰
-      if (!victim || page.lastUsed < victim.lastUsed) {
-        victimId = id;
-        victim = page;
+  if (evicting) return; // 回收期间工具 unmount 引发的连锁事件不再递归进来
+  evicting = true;
+  try {
+    for (;;) {
+      let touchedCount = 0;
+      for (const page of pages.values()) if (page.touched) touchedCount++;
+      // 兜底：没动过的页正常不驻留（切走即释放），总页数也不该无限涨
+      if (touchedCount <= MAX_ALIVE_PAGES && pages.size <= MAX_ALIVE_PAGES + 1) return;
+      const others = [...pages].filter(([id]) => !(activeTool && activeTool.id === id));
+      if (!others.length) return; // 只剩当前页：当前页永不淘汰
+      const idle = others.filter(([, page]) => !page.touched);
+      const pool = idle.length ? idle : others;
+      let victim = pool[0];
+      for (const entry of pool) {
+        if (entry[1].lastUsed < victim[1].lastUsed) victim = entry;
       }
+      disposePage(victim[0], victim[1], { silent: !victim[1].touched });
     }
-    if (!victim) break; // 只剩当前页也超限（理论上不会）：留着，别把自己也回收了
-    disposePage(victimId, victim);
+  } finally {
+    evicting = false;
   }
 }
 
@@ -492,8 +525,8 @@ function renderNav() {
  * 切换到指定工具：只切换「显示哪个页面」，不销毁其它页面。
  * 首次进入某工具时才 mount；之后每次切回只是显示出来，页面内容与数据原样保留（用户要求）。
  * 生命周期：mount（首次进入一次）→ 反复 activate / deactivate（每次切入/切出）；
- *          unmount（页面被 LRU 回收、或将来别的销毁时机）——被回收的工具下次进入会重新 mount。
- * 保活页数有上限（MAX_ALIVE_PAGES），超出时淘汰最久没用过的那页，避免内存一直涨。
+ *          unmount（切走时它「没动过」、或动过的页被 LRU 回收、或将来别的销毁时机）——下次进入会重新 mount。
+ * 保活只保「动过」的页：动过的超出 MAX_ALIVE_PAGES 时淘汰最久没用过的那页（见 evictPages）。
  */
 function switchTool(id) {
   const tool = TOOLS.find((t) => t.id === id);
@@ -502,7 +535,7 @@ function switchTool(id) {
   const prev = activeTool;
   if (prev) {
     const prevPage = pages.get(prev.id);
-    if (prevPage) {
+    if (prevPage && prevPage.touched) {
       prevPage.scrollTop = prevPage.el.scrollTop; // 先记滚动位置：脱离文档后它会归零
       prevPage.el.classList.remove('is-active');
       prevPage.el.remove();
@@ -513,6 +546,11 @@ function switchTool(id) {
       } catch (err) {
         console.error('[shell] 工具 deactivate 失败', err);
       }
+    }
+    if (prevPage && !prevPage.touched) {
+      // 没动过的页：只是被点开看了一眼，没有内容可保 —— 就静默释放（不占额度、不提示），
+      // 下次进来重新 mount（与首次进入一模一样，用户察觉不到）；也就不会挤掉别处做过的事
+      disposePage(prev.id, prevPage, { silent: true });
     }
   }
 
@@ -536,7 +574,7 @@ function switchTool(id) {
     page.el.scrollTop = page.scrollTop;
     // 恢复这一页上次的提示与参数信息（不是清空）；若是被 LRU 回收后重新挂载的，说明一句原因
     const wasReleased = releasedTools.delete(tool.id);
-    setStatus(wasReleased ? `${page.status}（较长时间未使用，上次的内容已自动释放）` : page.status);
+    setStatus(wasReleased ? `${page.status}（用过的工具较多，上次的内容已自动释放）` : page.status);
     setInfo(page.info);
     evictPages(); // 新页进来后再回收，保证「当前页永不淘汰」
   } catch (err) {

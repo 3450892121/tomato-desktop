@@ -4,6 +4,7 @@
 //   1) 顶栏「任务」按钮存在；没有任务时徽标不显示；
 //   2) 用「视频压缩」真跑一批（真实 ffmpeg 转码）；
 //   3) **核心断言**：把工具页切走（并让它被 LRU 回收 → unmount），任务仍然跑完、产物存在、队列状态为 done；
+//      （保活额度只按「动过」的页算，所以中途要在每个切过去的工具页里点一下，凑够 6 页才能真的触发回收）
 //   4) 任务中心面板能打开、能看到任务与最近完成记录、能取消排队中的任务、能清空已完成；
 //   5) 截图 shot-queue-*.png 落在 %TEMP%\tomato-uitest。
 // 结果写 %TEMP%/tomato-queue-ui-test.json，pass:true 为通过。
@@ -239,6 +240,8 @@ async function runQueueUiTest(win) {
   await wait(300);
 
   // —— 5) 核心断言：切走工具页（并让 LRU 把它回收 → unmount），任务照跑完 ——
+  //     注意：保活额度只按「动过」的页算（只是切过去看一眼不算），所以切过去后要在页里点一下，
+  //     才能把这 5 个工具也变成「动过」的页、凑够 6 页触发 video-compress 的回收。
   result.checks.switchedAway = JSON.parse(await evalJs(`(async () => {
     const wait = (ms) => new Promise((r) => setTimeout(r, ms));
     const nav = (id) => [...document.querySelectorAll('#toolNav .tool-item')].find((b) => b.dataset.toolId === id);
@@ -246,6 +249,8 @@ async function runQueueUiTest(win) {
     for (const id of ['compress', 'img-convert', 'video-convert', 'sticker', 'enhance']) {
       nav(id).click();
       await wait(700);
+      document.querySelector('.tool-page.is-active').click(); // 在页里点一下 = 用户「动过」这页
+      await wait(200);
     }
     const badge = document.getElementById('taskBadge');
     return JSON.stringify({
