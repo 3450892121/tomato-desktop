@@ -2,6 +2,36 @@
 
 本项目遵循语义化版本（x.y.z）：修 bug → z+1；加功能 → y+1；重要改动 → x+1。
 
+## v1.10.0（2026-09-19）深色模式 + OCR 引擎可用性闸门
+
+> 说明：这是「工具箱大扩展（→ v2.0.0）」的第一步，后续还有视频压缩/音频剪辑、图片批量工具、PDF 编辑整理、文字识别、跨工具任务队列。中间版本只跑源码级测试，最终一次性打包交付。
+
+**新增：外观主题（浅色 / 深色 / 跟随系统，用户要求）**
+- 三个档位：`system`（跟随系统，默认）/ `light` / `dark`，存于 `settings.theme`，重开软件仍生效。
+- 两处切换入口，都立即生效、无需重启：顶栏右上角胶囊按钮（三态循环，按钮上显示当前档位）、设置弹窗新增的「外观」下拉框。
+- 实现方式：`theme.css` 末尾加 `[data-theme="dark"]`，**只覆盖同名变量、不新增变量名**——所有工具（含已有的 9 个）**零改动**自动适配。
+- 跟随系统用 `matchMedia('(prefers-color-scheme: dark)')`，系统切换时实时跟随；深色块内设 `color-scheme: dark`，滚动条与原生控件一并跟随。
+- 不闪白：启动瞬间先同步按系统偏好上色，设置读回后再纠正；主进程建窗时的 `backgroundColor` 也按用户档位（或系统偏好）取色。
+- 纸张语义区域不参与反色：Office 降级打印页（`pdf-convert/preview/office-print.css`）是「纸面」，必须永远白底黑字，其色值刻意写死并加注释说明。
+
+**新增：OCR 引擎可用性闸门（P0，为后续「文字识别」工具探路）**
+- 新增 `--ocr-poc` 自检：界面进程用 canvas 现画中文扫描件夹具（灰底 / 噪声 / ±3° 倾斜），主进程用本地模型识别，做字符级召回比对。
+- 判据：3 张中至少 2 张召回 ≥ 80%、单张 ≤ 8 秒、全程 0 次网络请求。**实测 3/3 召回 100%，单张 281~570 ms，init 275 ms，`fetchCalls = 0`**。
+- 技术结论：`ppu-paddle-ocr`（MIT）+ PP-OCRv5 mobile ONNX 本地模型（`app/addons/ocr/`，约 20 MB，不进 git）+ `onnxruntime-node`（N-API，ABI 稳定）。
+- **与原方案的关键偏差（更优）**：引擎跑在**主进程**而非渲染进程。主进程没有 CSP 限制，因此**不必**为 WASM 放宽 `script-src 'self'`（加 `wasm-unsafe-eval`）、也不必加 `worker-src blob:` / `connect-src blob:`，更不用把模型搬成 blob URL。链路更短、风险更低，CSP 保持原样不动。
+
+**工程**
+- `app/src/shell/theme.css` 新增深色变量块；`app/src/shell/shell.css` 新增 `.topbar-theme` 胶囊按钮样式；`app/src/shell/index.html` 顶栏加按钮；`app/src/shell/shell.js` 新增 `resolveTheme/applyTheme/setTheme`、系统偏好监听、设置面板「外观」项。
+- `app/src/shared/settings.js` 新增 `theme` 默认值（`'system'`）。
+- `app/main.js` 新增 `--ocr-poc` / `--theme-test` 开关与 `windowBackgroundColor()`。
+- 新增测试 `app/tests/theme-test.js`（`--theme-test`）、`app/tests/ocr-poc.js`（`--ocr-poc`）；`pack.js` 步骤 4 同步拷贝这两个测试文件。
+- spec：新增 `spec/modules/theme.md`；`00-overview.md` 加 v1.6 更新记录与模块表；`acceptance.md` 新增 A27（外观主题）、A28（OCR 闸门）。
+
+**验证**
+- `--theme-test`：`pass:true`（三态循环、深浅两套色值 rgb 断言、落盘断言、9 个工具深色下 0 个浅色容器、结束后恢复用户原档位）+ 截图人工过目。
+- `--ocr-poc`：`ok:true`（3/3 召回 100%，零网络请求）。
+- 回归：算法测试 55/55、冒烟（`tools=9 options=6`，元素完整、按钮可点无报错）、图片混淆界面自动测试 `pass:true`。
+
 ## v1.9.0（2026-09-19）保活页 LRU 回收（切太多工具时自动释放最久没用过的页面）
 
 **交付物**：`app/release/番茄图片混淆-桌面版-v1.9.0-win64/`（免安装文件夹）与同名 `.zip`。

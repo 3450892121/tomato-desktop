@@ -33,6 +33,10 @@
       <header class="topbar">
         <div class="topbar-status" id="statusText">欢迎使用</div>
         <div class="topbar-info" id="infoText">分辨率: --- x --- ｜ 耗时: --- ms</div>
+        <!-- 外观切换：浅色 / 深色 / 跟随系统（三态循环，当前状态在按钮上显示） -->
+        <button class="topbar-theme" id="btnTheme" type="button" title="切换外观（浅色 / 深色 / 跟随系统）">
+          <span id="themeIcon">🌗</span><span id="themeLabel">跟随系统</span>
+        </button>
       </header>
       <section class="tool-host" id="toolHost"><!-- 工具界面挂载点 --></section>
     </main>

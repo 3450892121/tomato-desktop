@@ -83,6 +83,9 @@ fs.copyFileSync(path.join(appRoot, 'tests', 'audio-test.js'), path.join(appTarge
 fs.copyFileSync(path.join(appRoot, 'tests', 'audio-ui-test.js'), path.join(appTarget, 'tests', 'audio-ui-test.js'));
 fs.copyFileSync(path.join(appRoot, 'tests', 'asr-test.js'), path.join(appTarget, 'tests', 'asr-test.js'));
 fs.copyFileSync(path.join(appRoot, 'tests', 'asr-ui-test.js'), path.join(appTarget, 'tests', 'asr-ui-test.js'));
+// v1.10.0 起：外观主题自检；OCR 引擎 POC 闸门（P0，验证加装包与引擎可用）
+fs.copyFileSync(path.join(appRoot, 'tests', 'theme-test.js'), path.join(appTarget, 'tests', 'theme-test.js'));
+fs.copyFileSync(path.join(appRoot, 'tests', 'ocr-poc.js'), path.join(appTarget, 'tests', 'ocr-poc.js'));
 
 // —— 4b) 复制 PDF 工具运行时依赖（纯 JS，界面进程按相对路径直接引用） ——
 // 说明：本项目没有打包器，工具代码里写的是 ../../../../node_modules/pdfjs-dist/... 这样的

@@ -12,7 +12,11 @@ export const DEFAULT_SETTINGS = {
   // 左侧导航被收起的分组 id 列表（见 spec/modules/toolkit.md）：
   //   null = 用户没设置过 → 用默认行为「全部分组收起，只显示分类标题」；
   //   数组 = 用户明确点过的状态（[] 表示用户把所有分组都展开了）
-  collapsedGroups: null
+  collapsedGroups: null,
+  // 外观主题（见 spec/modules/theme.md）：
+  //   'system' = 跟随系统深浅色（默认，对非技术用户最省心）
+  //   'light' / 'dark' = 用户明确指定
+  theme: 'system'
 };
 
 let current = { ...DEFAULT_SETTINGS };

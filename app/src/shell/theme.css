@@ -75,3 +75,53 @@
   --transition-collapse: 220ms cubic-bezier(0.22, 0.61, 0.36, 1); /* 收起/展开 */
   --ease-out: cubic-bezier(0.22, 0.61, 0.36, 1);
 }
+
+/* ============================================================
+   深色主题
+   规则：**只覆盖上面同名的变量，绝不新增变量名**。
+   这样所有工具（tools/*）只要按约定引用变量，就自动适配深色，无需改任何工具代码。
+   切换方式：给 <html> 加 data-theme="dark"（见 shell.js applyTheme）；
+   留空或不设 data-theme 即浅色（浅色值就是上面的 :root）。
+   ============================================================ */
+[data-theme="dark"] {
+  /* 让原生滚动条、下拉框、日期选择等跟随深色（否则浅色控件会突兀地亮一块） */
+  color-scheme: dark;
+
+  /* 颜色 —— 基础 */
+  --color-bg: #16181d;
+  --color-surface: #1e2126;
+  --color-surface-soft: #23262c;
+  --color-border: #2e3238;
+  --color-border-strong: #3b4149;
+
+  /* 颜色 —— 左侧工具列表 */
+  --color-sidebar-bg: #1a1d22;
+  --color-sidebar-active-bg: #3a2320;
+  --color-sidebar-active-text: #ff8478;
+
+  /* 颜色 —— 文字 */
+  --color-text: #e8eaed;
+  --color-text-secondary: #9aa2ad;
+  --color-text-inverse: #ffffff;
+
+  /* 颜色 —— 语义（按钮）：深色底上整体提亮一档，保证对比度 */
+  --color-primary: #ff6a5e;
+  --color-primary-hover: #ff8276;
+  --color-primary-active: #f05446;
+  --color-deobfuscate: #4f96f5;
+  --color-deobfuscate-hover: #6aa8f8;
+  --color-save: #2bb96a;
+  --color-save-hover: #3acd7a;
+  --color-neutral: #2b2f36;
+  --color-neutral-hover: #353a42;
+  --color-neutral-text: #c8cdd4;
+
+  /* 颜色 —— 状态 */
+  --color-success: #2bb96a;
+  --color-warning: #e0912a;
+  --color-danger: #f0554a;
+
+  /* 阴影：深色下浅阴影看不见，改用更深的投影维持层次 */
+  --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.3), 0 2px 8px rgba(0, 0, 0, 0.35);
+  --shadow-btn: 0 1px 2px rgba(0, 0, 0, 0.35);
+}

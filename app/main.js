@@ -2,7 +2,7 @@
 // 职责：创建窗口、加载界面、提供文件对话框与本地设置读写等系统能力。
 'use strict';
 
-const { app, BrowserWindow, ipcMain, dialog, clipboard, nativeImage } = require('electron');
+const { app, BrowserWindow, ipcMain, dialog, clipboard, nativeImage, nativeTheme } = require('electron');
 const path = require('path');
 const fs = require('fs/promises');
 const fsSync = require('fs');
@@ -51,13 +51,16 @@ const asrUiTest = process.argv.includes('--asr-ui-test');
 // （P0 闸门，见 .trae/documents/番茄工具箱-功能扩展方案.md；正式工具开发前必须先跑通）
 const ocrPoc = process.argv.includes('--ocr-poc');
 
+// 深色主题自检：`electron . --theme-test` 验证外观三态切换、色值生效、落盘与深色下各工具页渲染
+const themeTest = process.argv.includes('--theme-test');
+
 // 测试模式下关闭硬件加速：保证截图（capturePage）在任何机器上都能稳定拿到画面
-if (uiTest || pdfUiTest || mediaUiTest || audioUiTest || asrUiTest) {
+if (uiTest || pdfUiTest || mediaUiTest || audioUiTest || asrUiTest || themeTest) {
   app.disableHardwareAcceleration();
 }
 
 /** 是否处于任一自动测试模式：此时系统对话框一律换成本地测试文件（避免测试卡在弹窗上） */
-const testMode = () => uiTest || pdfUiTest || mediaTest || mediaUiTest || audioTest || audioUiTest || asrTest || asrUiTest || ocrPoc;
+const testMode = () => uiTest || pdfUiTest || mediaTest || mediaUiTest || audioTest || audioUiTest || asrTest || asrUiTest || ocrPoc || themeTest;
 
 /** 自动测试模式下：从测试目录取指定扩展名的文件（对话框桩用；扩展名带不带点都能匹配） */
 async function testDirFiles(exts, { startWith, exact } = {}) {
@@ -179,13 +182,31 @@ const SELF_TEST_SCRIPT = `
   })()
 `;
 
+/**
+ * 窗口底色：与 theme.css 的 --color-bg 保持一致。
+ * 必须在这里定，因为窗口先于页面显示——若固定用浅色，深色主题下开窗瞬间会闪一下白底。
+ * 设置文件是同步小文件，直接同步读；读不到就按系统深浅色偏好。
+ */
+function windowBackgroundColor() {
+  const LIGHT = '#f5f6f8';
+  const DARK = '#16181d';
+  try {
+    const saved = JSON.parse(fsSync.readFileSync(SETTINGS_FILE, 'utf8'));
+    if (saved && saved.theme === 'dark') return DARK;
+    if (saved && saved.theme === 'light') return LIGHT;
+  } catch {
+    /* 没设置过或读取失败：按系统偏好 */
+  }
+  return nativeTheme.shouldUseDarkColors ? DARK : LIGHT;
+}
+
 function createMainWindow() {
   mainWindow = new BrowserWindow({
     width: 1180,
     height: 820,
     minWidth: 900,
     minHeight: 640,
-    backgroundColor: '#f5f6f8', // 与 theme.css 的 --color-bg 保持一致
+    backgroundColor: windowBackgroundColor(),
     title: `番茄图片混淆 桌面版 v${app.getVersion()}`,
     icon: path.join(__dirname, 'src', 'assets', 'icon.png'),
     autoHideMenuBar: true, // 默认隐藏菜单栏（按 Alt 显示），保持界面清爽
@@ -393,6 +414,23 @@ function createMainWindow() {
         console.log(`OCR_POC_FAIL ${err.message}\n${err.stack}`);
       }
       app.quit();
+    });
+  }
+
+  if (themeTest) {
+    const { runThemeTest, writeResult } = require('./tests/theme-test.js');
+    mainWindow.webContents.once('did-finish-load', async () => {
+      try {
+        const result = await runThemeTest(mainWindow);
+        console.log(`THEME_TEST ${JSON.stringify({ pass: result.pass, failures: result.failures })}`);
+        writeResult({ ok: !!result.pass, at: new Date().toISOString(), result });
+      } catch (err) {
+        console.log(`THEME_TEST_FAIL ${err.message}\n${err.stack}`);
+        try { writeResult({ ok: false, at: new Date().toISOString(), error: err.message, stack: err.stack }); } catch { /* 结果写不进去也要退出 */ }
+      } finally {
+        // app.quit() 必须在 finally：曾因 catch 里二次抛错跳过退出，留下常驻进程（干扰后续测试）
+        app.quit();
+      }
     });
   }
 

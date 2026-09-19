@@ -11,7 +11,10 @@ const els = {
   btnHelp: document.getElementById('btnHelp'),
   progressBar: document.getElementById('progressBar'),
   progressFill: document.getElementById('progressFill'),
-  progressText: document.getElementById('progressText')
+  progressText: document.getElementById('progressText'),
+  btnTheme: document.getElementById('btnTheme'),
+  themeIcon: document.getElementById('themeIcon'),
+  themeLabel: document.getElementById('themeLabel')
 };
 
 /** 当前活动的工具 */
@@ -20,6 +23,54 @@ let activeTool = null;
 let appInfo = null;
 /** 已加载过的工具样式（同一份只加载一次） */
 const loadedStyles = new Set();
+
+// —— 外观主题（浅色 / 深色 / 跟随系统） ——
+// 实现要点：只在 <html> 上切 data-theme，颜色全部由 theme.css 的变量覆盖决定，
+// 所以任何工具都不需要为深色改一行代码（前提是它按约定引用变量，见 AGENTS.md）。
+// 目标与规则见 spec/modules/theme.md。
+
+/** 外观档位 → 按钮上显示的图标与文字 */
+const THEME_MODES = [
+  { value: 'system', icon: '🌗', label: '跟随系统' },
+  { value: 'light', icon: '☀️', label: '浅色' },
+  { value: 'dark', icon: '🌙', label: '深色' }
+];
+/** 系统深浅色偏好（'system' 档据此决定实际用哪套） */
+const darkMedia = window.matchMedia('(prefers-color-scheme: dark)');
+/** 用户选择的档位（不是实际生效的主题；'system' 时实际主题随系统变化） */
+let themeMode = 'system';
+
+/** 把档位解析成实际主题：'system' 看系统偏好，其余原样返回 */
+function resolveTheme(mode) {
+  if (mode === 'light' || mode === 'dark') return mode;
+  return darkMedia.matches ? 'dark' : 'light';
+}
+
+/** 应用档位：切换 <html data-theme> 并刷新按钮上的提示 */
+function applyTheme(mode) {
+  themeMode = THEME_MODES.some((m) => m.value === mode) ? mode : 'system';
+  document.documentElement.dataset.theme = resolveTheme(themeMode);
+  const cur = THEME_MODES.find((m) => m.value === themeMode) || THEME_MODES[0];
+  if (els.themeIcon) els.themeIcon.textContent = cur.icon;
+  if (els.themeLabel) els.themeLabel.textContent = cur.label;
+  if (els.btnTheme) els.btnTheme.title = `当前外观：${cur.label}（点击切换）`;
+}
+
+/** 保存档位并立即生效 */
+async function setTheme(mode) {
+  applyTheme(mode);
+  await settings.updateSettings({ theme: themeMode });
+  setStatus(`外观已切换为「${(THEME_MODES.find((m) => m.value === themeMode) || {}).label}」`);
+}
+
+/** 系统深浅色变化时，只有「跟随系统」档需要跟着变 */
+function onSystemThemeChange() {
+  if (themeMode === 'system') applyTheme('system');
+}
+
+// 启动瞬间先按系统偏好上色：设置是异步从主进程读的，等它回来才上色的话，
+// 深色系统下会先闪一下白底（很扎眼）。这里同步按系统偏好先铺上，读回设置后再纠正。
+document.documentElement.dataset.theme = resolveTheme('system');
 
 // —— 框架通用能力（工具通过 ctx 调用，禁止工具直接操作这些 DOM） ——
 
@@ -455,6 +506,13 @@ function openSettings() {
     title: '设置',
     bodyHTML: `
       <div class="field">
+        <label class="field-label">外观</label>
+        <select class="select" id="setTheme">
+          ${THEME_MODES.map((m) => `<option value="${m.value}"${s.theme === m.value ? ' selected' : ''}>${m.icon} ${m.label}</option>`).join('')}
+        </select>
+        <div class="field-hint">默认「跟随系统」：系统是深色就用深色。也可在顶栏右上角一键切换。</div>
+      </div>
+      <div class="field">
         <label class="field-label">方块数（方块混淆 B 模式）</label>
         <input class="input" id="setBlockSize" type="number" min="2" max="256" step="1" value="${s.blockSize}" />
         <div class="field-hint">默认 32（与手机版一致）。改大更碎、改小更快。</div>
@@ -490,11 +548,13 @@ function openSettings() {
         onClick: async (backdrop) => {
           const d = await settings.resetSettings();
           // 只刷新当前弹窗里的值，不重开弹窗（避免闪烁与误操作）
+          backdrop.querySelector('#setTheme').value = d.theme;
           backdrop.querySelector('#setBlockSize').value = d.blockSize;
           backdrop.querySelector('#setJpegQuality').value = d.jpegQuality;
           backdrop.querySelector('#setDefaultKey').value = d.defaultDoubleKey;
           backdrop.querySelector('#setOutputDir').value = d.outputDir;
           backdrop.querySelector('#setAskSavePath').checked = d.askSavePath;
+          applyTheme(d.theme); // 外观恢复默认后要立即生效
           setStatus('已恢复默认设置');
           return true; // 保持弹窗打开
         }
@@ -507,6 +567,7 @@ function openSettings() {
         label: '保存',
         className: 'btn-save',
         onClick: async (backdrop) => {
+          const theme = backdrop.querySelector('#setTheme').value;
           const blockSize = parseInt(backdrop.querySelector('#setBlockSize').value, 10);
           const jpegQuality = parseInt(backdrop.querySelector('#setJpegQuality').value, 10);
           const defaultDoubleKey = backdrop.querySelector('#setDefaultKey').value.trim();
@@ -526,7 +587,8 @@ function openSettings() {
             setStatus('默认密钥需为 0 到 1 之间的小数');
             return true;
           }
-          await settings.updateSettings({ blockSize, jpegQuality, defaultDoubleKey, outputDir, askSavePath });
+          await settings.updateSettings({ theme, blockSize, jpegQuality, defaultDoubleKey, outputDir, askSavePath });
+          applyTheme(theme); // 保存后立即生效（不必重启）
           setStatus('设置已保存（下次处理与保存立即生效）');
           return false;
         }
@@ -601,6 +663,17 @@ async function init() {
       : GROUPS.map((g) => g.id)
   );
   renderNav();
+
+  // 外观：按用户档位上色（启动瞬间已按系统偏好铺过一次，这里纠正为用户的明确选择）
+  applyTheme(loadedSettings.theme);
+  darkMedia.addEventListener('change', onSystemThemeChange);
+  if (els.btnTheme) {
+    els.btnTheme.addEventListener('click', () => {
+      // 三态循环：跟随系统 → 浅色 → 深色 → 跟随系统
+      const i = THEME_MODES.findIndex((m) => m.value === themeMode);
+      setTheme(THEME_MODES[(i + 1) % THEME_MODES.length].value);
+    });
+  }
 
   // 版本号：异步补上即可，绝不能阻塞工具列表渲染（否则窗口刚打开时列表会短暂为空）
   window.desktop.appInfo()
