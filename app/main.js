@@ -116,6 +116,30 @@ const USER_DATA_DIR = path.join(PORTABLE_DIR, 'userdata');
 const SETTINGS_FILE = path.join(USER_DATA_DIR, 'settings.json');
 app.setPath('userData', USER_DATA_DIR);
 
+// —— 自动测试模式：用户的设置只读（启动留档 → 退出原样写回） ——
+// 为什么：界面自动测试会点分组标题、开设置弹窗，这些操作按设计会把状态落盘到 settings.json。
+// 若测试结束不还原，用户下次打开软件看到的就是「测试最后点出来的状态」——
+// 曾出现：测试把左侧分组全部点成展开并落盘，用户打开软件发现子项全展开，以为「默认折叠」没生效。
+// 原本没有这个文件（首次打包后的干净状态）时，还原＝把文件删掉，保证交付目录保持出厂态。
+const settingsSnapshot = (() => {
+  if (!testMode()) return null;
+  try {
+    return { existed: true, content: fsSync.readFileSync(SETTINGS_FILE, 'utf8') };
+  } catch {
+    return { existed: false, content: '' };
+  }
+})();
+
+app.on('will-quit', () => {
+  if (!settingsSnapshot) return;
+  try {
+    if (settingsSnapshot.existed) fsSync.writeFileSync(SETTINGS_FILE, settingsSnapshot.content, 'utf8');
+    else fsSync.rmSync(SETTINGS_FILE, { force: true });
+  } catch (err) {
+    console.error('[main] 测试模式还原设置失败', err);
+  }
+});
+
 const argValue = (flag) => {
   const i = process.argv.indexOf(flag);
   return i >= 0 ? process.argv[i + 1] : null;

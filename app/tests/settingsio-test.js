@@ -8,6 +8,7 @@
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
+const { app } = require('electron');
 
 const TEST_DIR = path.join(os.tmpdir(), 'tomato-uitest');
 const RESULT_FILE = path.join(os.tmpdir(), 'tomato-settingsio-test.json');
@@ -56,9 +57,24 @@ async function runSettingsIoTest(win) {
     return false;
   };
 
-  // 0) 记下用户原有设置，结束时恢复
+  // 0) 记下用户原有设置，结束时恢复。
+  // 同时记下配置文件的「原始样子」：出厂态（刚打包/首次运行）压根没有 settings.json，
+  // 这种情况下恢复＝把文件删掉——只写回 {} 是没用的（主进程写设置是「补丁合并进现有文件」，
+  // 文件不存在时合并结果仍是文件里的旧值），会把测试值留在用户配置里。
+  const settingsFile = path.join(
+    app.isPackaged ? path.dirname(process.execPath) : path.join(__dirname, '..'),
+    'userdata',
+    'settings.json'
+  );
+  let originalRaw = null;
+  try {
+    originalRaw = await fs.promises.readFile(settingsFile, 'utf8');
+  } catch {
+    originalRaw = null;
+  }
   const original = await readSettings();
   result.steps.original = original;
+  result.steps.originalFileExists = originalRaw !== null;
 
   // —— 1) 打开设置弹窗，确认两个按钮在 ——
   result.checks.buttonsExist = await evalJs(`(() => {
@@ -142,7 +158,11 @@ async function runSettingsIoTest(win) {
   await shot('02-导入后');
 
   // —— 7) 恢复用户原设置（关键：绝不能把使用者的偏好改成测试值）——
-  await evalJs(`window.desktop.settingsWrite(${JSON.stringify(original)})`);
+  if (originalRaw === null) {
+    await fs.promises.rm(settingsFile, { force: true }); // 出厂态本来没有配置文件：恢复＝删掉
+  } else {
+    await fs.promises.writeFile(settingsFile, originalRaw, 'utf8'); // 有就逐字节写回
+  }
   const restored = await readSettings();
   result.checks.restored = JSON.stringify(restored) === JSON.stringify(original);
   if (!result.checks.restored) {
