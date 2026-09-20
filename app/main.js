@@ -2,7 +2,7 @@
 // 职责：创建窗口、加载界面、提供文件对话框与本地设置读写等系统能力。
 'use strict';
 
-const { app, BrowserWindow, ipcMain, dialog, clipboard, nativeImage, nativeTheme, protocol } = require('electron');
+const { app, BrowserWindow, ipcMain, dialog, clipboard, nativeImage, nativeTheme, protocol, shell } = require('electron');
 const path = require('path');
 const fs = require('fs/promises');
 const fsSync = require('fs');
@@ -87,13 +87,17 @@ const archiveUiTest = process.argv.includes('--archive-ui-test');
 const playerTest = process.argv.includes('--player-test');
 const playerUiTest = process.argv.includes('--player-ui-test');
 
+// 文件藏图：引擎自检 / 界面自动测试（见 spec/modules/imghide.md）
+const imgHideTest = process.argv.includes('--imghide-test');
+const imgHideUiTest = process.argv.includes('--imghide-ui-test');
+
 // 测试模式下关闭硬件加速：保证截图（capturePage）在任何机器上都能稳定拿到画面
-if (uiTest || pdfUiTest || mediaUiTest || audioUiTest || asrUiTest || themeTest || avTest || imgbatchTest || settingsIoTest || pdfOcrTest || queueUiTest || archiveUiTest || playerUiTest) {
+if (uiTest || pdfUiTest || mediaUiTest || audioUiTest || asrUiTest || themeTest || avTest || imgbatchTest || settingsIoTest || pdfOcrTest || queueUiTest || archiveUiTest || playerUiTest || imgHideUiTest) {
   app.disableHardwareAcceleration();
 }
 
 /** 是否处于任一自动测试模式：此时系统对话框一律换成本地测试文件（避免测试卡在弹窗上） */
-const testMode = () => uiTest || pdfUiTest || mediaTest || mediaUiTest || audioTest || audioUiTest || asrTest || asrUiTest || ocrPoc || themeTest || avTest || imgbatchTest || settingsIoTest || pdfOcrTest || queueUiTest || archiveTest || archiveUiTest || playerTest || playerUiTest;
+const testMode = () => uiTest || pdfUiTest || mediaTest || mediaUiTest || audioTest || audioUiTest || asrTest || asrUiTest || ocrPoc || themeTest || avTest || imgbatchTest || settingsIoTest || pdfOcrTest || queueUiTest || archiveTest || archiveUiTest || playerTest || playerUiTest || imgHideTest || imgHideUiTest;
 
 /** 自动测试模式下：从测试目录取指定扩展名的文件（对话框桩用；扩展名带不带点都能匹配） */
 async function testDirFiles(exts, { startWith, exact } = {}) {
@@ -587,6 +591,36 @@ function createMainWindow() {
         writeResult({ ok: !!result.pass, at: new Date().toISOString(), result });
       } catch (err) {
         console.log(`ARCHIVE_UI_TEST_FAIL ${err.message}\n${err.stack}`);
+        writeResult({ ok: false, at: new Date().toISOString(), error: err.message, stack: err.stack });
+      } finally {
+        app.quit();
+      }
+    });
+  }
+
+  if (imgHideTest) {
+    mainWindow.webContents.once('did-finish-load', async () => {
+      try {
+        const { runImgHideTest } = require('./tests/imghide-test.js');
+        const result = await runImgHideTest({ portableDir: PORTABLE_DIR, mainWindow });
+        console.log(`IMGHIDE_TEST ${JSON.stringify({ ok: result.ok })}`);
+      } catch (err) {
+        console.log(`IMGHIDE_TEST_FAIL ${err.message}\n${err.stack}`);
+      } finally {
+        app.quit();
+      }
+    });
+  }
+
+  if (imgHideUiTest) {
+    const { runImgHideUiTest, writeResult } = require('./tests/imghide-ui-test.js');
+    mainWindow.webContents.once('did-finish-load', async () => {
+      try {
+        const result = await runImgHideUiTest(mainWindow, { portableDir: PORTABLE_DIR });
+        console.log(`IMGHIDE_UI_TEST ${JSON.stringify({ pass: result.pass, failures: result.failures })}`);
+        writeResult({ ok: !!result.pass, at: new Date().toISOString(), result });
+      } catch (err) {
+        console.log(`IMGHIDE_UI_TEST_FAIL ${err.message}\n${err.stack}`);
         writeResult({ ok: false, at: new Date().toISOString(), error: err.message, stack: err.stack });
       } finally {
         app.quit();
@@ -1642,6 +1676,126 @@ ipcMain.handle('dialog:open-archives', async () => {
     ]
   });
   return result.canceled ? [] : result.filePaths;
+});
+
+// —— 文件藏图（工具：imghide；见 spec/modules/imghide.md） ——
+// 逻辑全在 src/tools/imghide/core/engine.mjs（Node 侧：载荷拼装 / PNG·GIF 嵌入 / 密码 / 落盘）；
+// 这里只做接线与进度转发。格式与官方「图夹」V6 逐字节一致，双向互通（自检里用官方实现当裁判验证）。
+let imgHideEnginePromise = null;
+function loadImgHideEngine() {
+  if (!imgHideEnginePromise) imgHideEnginePromise = import('./src/tools/imghide/core/engine.mjs');
+  return imgHideEnginePromise;
+}
+
+/** 可作表图的扩展名（与 UI 的 COVER_EXTS 一致） */
+const HIDE_COVER_EXTS = ['png', 'gif', 'jpg', 'jpeg', 'webp', 'bmp', 'avif'];
+
+// 表图对话框（打包用）：测试模式只取「测试藏图表图封面」夹具，且排除产物（名字里带 _图夹 的）
+ipcMain.handle('dialog:open-hide-cover', async () => {
+  if (testMode()) {
+    return (await testDirFiles(HIDE_COVER_EXTS, { startWith: '测试藏图表图封面' }))
+      .filter((p) => !p.includes('_图夹'));
+  }
+  const result = await dialog.showOpenDialog(mainWindow, {
+    title: '选择表图（作为封面的图片）',
+    properties: ['openFile', 'multiSelections'],
+    filters: [{ name: '图片', extensions: HIDE_COVER_EXTS }]
+  });
+  return result.canceled ? [] : result.filePaths;
+});
+
+// 图夹图片对话框（解包用，与表图分开，免得把刚做的产物再当选表图）
+ipcMain.handle('dialog:open-hide-image', async () => {
+  if (testMode()) {
+    // 与其它界面对话框同一取舍：只认本工具的夹具/产物，避免误选到别的工具的图
+    const { TEST_DIR } = require('./tests/ui-test.js');
+    const entries = await fs.readdir(TEST_DIR, { withFileTypes: true }).catch(() => []);
+    return entries
+      .filter((e) => e.isFile() && /_图夹\.(png|gif)$/i.test(e.name))
+      .map((e) => path.join(TEST_DIR, e.name))
+      .sort();
+  }
+  const result = await dialog.showOpenDialog(mainWindow, {
+    title: '选择图夹图片（要取出文件的那张图）',
+    properties: ['openFile', 'multiSelections'],
+    filters: [{ name: '图片', extensions: HIDE_COVER_EXTS }]
+  });
+  return result.canceled ? [] : result.filePaths;
+});
+
+// 要藏进去的文件：任意类型；测试模式按夹具前缀取（不按扩展名过滤，与批量重命名同一做法）
+ipcMain.handle('dialog:open-hide-files', async () => {
+  if (testMode()) {
+    const { TEST_DIR } = require('./tests/ui-test.js');
+    const entries = await fs.readdir(TEST_DIR, { withFileTypes: true }).catch(() => []);
+    return entries
+      .filter((e) => e.isFile() && e.name.startsWith('测试藏图文件'))
+      .map((e) => path.join(TEST_DIR, e.name))
+      .sort();
+  }
+  const result = await dialog.showOpenDialog(mainWindow, {
+    title: '选择要藏进图片的文件（任意类型，可多选）',
+    properties: ['openFile', 'multiSelections'],
+    filters: [{ name: '全部文件', extensions: ['*'] }]
+  });
+  return result.canceled ? [] : result.filePaths;
+});
+
+ipcMain.handle('imghide:pack', async (event, options) => {
+  const opt = options || {};
+  if (!opt.coverPath && !opt.coverBytes) return { ok: false, message: '还没有选表图' };
+  if (!Array.isArray(opt.items) || opt.items.length === 0) return { ok: false, message: '还没有要藏进去的文件' };
+  const engine = await loadImgHideEngine();
+  try {
+    return await engine.packImage({
+      coverPath: opt.coverPath || undefined,
+      coverBytes: opt.coverBytes ? Buffer.from(opt.coverBytes) : undefined,
+      coverKind: opt.coverKind,
+      items: opt.items,
+      password: opt.password || '',
+      outputDir: opt.outputDir || undefined,
+      baseName: opt.baseName || undefined,
+      onProgress: (payload) => {
+        if (event.sender && !event.sender.isDestroyed()) event.sender.send('imghide:progress', payload);
+      }
+    });
+  } catch (err) {
+    return { ok: false, message: err.message };
+  }
+});
+
+ipcMain.handle('imghide:unpack', async (event, options) => {
+  const opt = options || {};
+  if (!opt.imagePath) return { ok: false, message: '还没有选图片' };
+  const engine = await loadImgHideEngine();
+  try {
+    return await engine.unpackImage({
+      imagePath: opt.imagePath,
+      password: opt.password || '',
+      outputDir: opt.outputDir || undefined,
+      onProgress: (payload) => {
+        if (event.sender && !event.sender.isDestroyed()) event.sender.send('imghide:progress', payload);
+      }
+    });
+  } catch (err) {
+    return { ok: false, message: err.message };
+  }
+});
+
+// 在资源管理器里打开产物（目录直接打开；文件则定位到它）
+ipcMain.handle('imghide:reveal', async (_event, targetPath) => {
+  if (!targetPath) return { ok: false, message: '缺少路径' };
+  try {
+    const st = await fs.stat(targetPath).catch(() => null);
+    if (st && st.isDirectory()) {
+      await shell.openPath(targetPath);
+    } else {
+      shell.showItemInFolder(targetPath);
+    }
+    return { ok: true };
+  } catch (err) {
+    return { ok: false, message: err.message };
+  }
 });
 
 // —— ffmpeg 加装包（视频格式转换 / 动图与视频互转 工具；见 spec/modules/video-convert.md） ——

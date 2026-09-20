@@ -53,6 +53,20 @@ contextBridge.exposeInMainWorld('desktop', {
   openArchives: () => ipcRenderer.invoke('dialog:open-archives'),
   // 视频播放器 专用对话框（打开单个视频）
   openPlayerVideos: () => ipcRenderer.invoke('dialog:open-player-videos'),
+  // 文件藏图 专用对话框（表图/图夹图片、要藏的文件）
+  openHideCover: () => ipcRenderer.invoke('dialog:open-hide-cover'),
+  openHideImage: () => ipcRenderer.invoke('dialog:open-hide-image'),
+  openHideFiles: () => ipcRenderer.invoke('dialog:open-hide-files'),
+
+  // 文件藏图（「文件藏图」工具；见 spec/modules/imghide.md）
+  hidePack: (options) => ipcRenderer.invoke('imghide:pack', options),
+  hideUnpack: (options) => ipcRenderer.invoke('imghide:unpack', options),
+  hideReveal: (targetPath) => ipcRenderer.invoke('imghide:reveal', targetPath),
+  imghideOnProgress: (callback) => {
+    const handler = (_event, data) => callback(data);
+    ipcRenderer.on('imghide:progress', handler);
+    return () => ipcRenderer.removeListener('imghide:progress', handler);
+  },
 
   // 视频播放器（「视频播放器」工具；见 spec/modules/player.md）
   // 播放走 tomato-media:// 协议（主进程按 Range 分块回传，见 main.js），这里只暴露缓存管理：

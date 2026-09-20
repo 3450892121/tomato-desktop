@@ -110,6 +110,10 @@ fs.copyFileSync(path.join(appRoot, 'tests', 'archive-ui-test.js'), path.join(app
 // v2.3.0 起：视频播放器（自检 + 界面自动测试）
 fs.copyFileSync(path.join(appRoot, 'tests', 'player-test.js'), path.join(appTarget, 'tests', 'player-test.js'));
 fs.copyFileSync(path.join(appRoot, 'tests', 'player-ui-test.js'), path.join(appTarget, 'tests', 'player-ui-test.js'));
+// v2.4.0 起：文件藏图（自检 + 界面自动测试；互通裁判是对方的代码，**不随包分发**，自检会如实标注 skipped）
+fs.copyFileSync(path.join(appRoot, 'tests', 'imghide-test.js'), path.join(appTarget, 'tests', 'imghide-test.js'));
+fs.copyFileSync(path.join(appRoot, 'tests', 'imghide-ui-test.js'), path.join(appTarget, 'tests', 'imghide-ui-test.js'));
+fs.copyFileSync(path.join(appRoot, 'tests', 'tujia-oracle.js'), path.join(appTarget, 'tests', 'tujia-oracle.js'));
 
 // —— 4b) 复制 PDF 工具运行时依赖（纯 JS，界面进程按相对路径直接引用） ——
 // 说明：本项目没有打包器，工具代码里写的是 ../../../../node_modules/pdfjs-dist/... 这样的

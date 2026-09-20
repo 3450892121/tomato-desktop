@@ -12,6 +12,7 @@ import batchRename from '../tools/batch-rename/index.js';
 import watermark from '../tools/watermark/index.js';
 import stitch from '../tools/stitch/index.js';
 import gridSlice from '../tools/grid-slice/index.js';
+import imgHide from '../tools/imghide/index.js';
 import player from '../tools/player/index.js';
 import videoConvert from '../tools/video-convert/index.js';
 import videoCompress from '../tools/video-compress/index.js';
@@ -47,6 +48,7 @@ export const TOOLS = [
   watermark,
   stitch,
   gridSlice,
+  imgHide,
   player,
   videoConvert,
   videoCompress,
