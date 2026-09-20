@@ -162,6 +162,11 @@ const ctx = {
   // 文件压缩与解压工具：专用对话框（待压缩的文件 / 压缩包）
   openArchiveFiles: () => window.desktop.openArchiveFiles(),
   openArchives: () => window.desktop.openArchives(),
+  // 视频播放器工具：专用对话框 + 播放缓存管理（播放本身走 tomato-media:// 协议，见 main.js）
+  openPlayerVideos: () => window.desktop.openPlayerVideos(),
+  playerCacheDir: () => window.desktop.playerCacheDir(),
+  playerCleanCache: () => window.desktop.playerCleanCache(),
+  playerPrepare: (options) => window.desktop.playerPrepare(options),
   // OCR 加装包（文字识别工具）
   ocrStatus: () => window.desktop.ocrStatus(),
   ocrRecognize: (options) => window.desktop.ocrRecognize(options),

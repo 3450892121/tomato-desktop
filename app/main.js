@@ -2,13 +2,23 @@
 // 职责：创建窗口、加载界面、提供文件对话框与本地设置读写等系统能力。
 'use strict';
 
-const { app, BrowserWindow, ipcMain, dialog, clipboard, nativeImage, nativeTheme } = require('electron');
+const { app, BrowserWindow, ipcMain, dialog, clipboard, nativeImage, nativeTheme, protocol } = require('electron');
 const path = require('path');
 const fs = require('fs/promises');
 const fsSync = require('fs');
 const os = require('os');
+const crypto = require('crypto');
+const { Readable } = require('stream');
 const { spawn, spawnSync } = require('child_process');
 const { pathToFileURL } = require('url');
+
+// 本地媒体协议（工具：视频播放器；见 spec/modules/player.md）
+// 为什么不用 file://：界面进程处于沙箱 + CSP（default-src 'self'），file:// 会被拦；
+// 且自定义协议能把「Range 分块 + Content-Type」握在自己手里，大视频才能边读边播、拖动进度。
+// 必须在 app ready 之前注册为特权协议：stream 让 <video> 走流式读取，supportFetchAPI 便于自检脚本 fetch 探针。
+protocol.registerSchemesAsPrivileged([
+  { scheme: 'tomato-media', privileges: { standard: true, secure: true, supportFetchAPI: true, stream: true } }
+]);
 
 /** @type {BrowserWindow | null} */
 let mainWindow = null;
@@ -73,13 +83,17 @@ const queueUiTest = process.argv.includes('--queue-ui-test');
 const archiveTest = process.argv.includes('--archive-test');
 const archiveUiTest = process.argv.includes('--archive-ui-test');
 
+// 视频播放器：自检 / 界面自动测试（见 spec/modules/player.md）
+const playerTest = process.argv.includes('--player-test');
+const playerUiTest = process.argv.includes('--player-ui-test');
+
 // 测试模式下关闭硬件加速：保证截图（capturePage）在任何机器上都能稳定拿到画面
-if (uiTest || pdfUiTest || mediaUiTest || audioUiTest || asrUiTest || themeTest || avTest || imgbatchTest || settingsIoTest || pdfOcrTest || queueUiTest || archiveUiTest) {
+if (uiTest || pdfUiTest || mediaUiTest || audioUiTest || asrUiTest || themeTest || avTest || imgbatchTest || settingsIoTest || pdfOcrTest || queueUiTest || archiveUiTest || playerUiTest) {
   app.disableHardwareAcceleration();
 }
 
 /** 是否处于任一自动测试模式：此时系统对话框一律换成本地测试文件（避免测试卡在弹窗上） */
-const testMode = () => uiTest || pdfUiTest || mediaTest || mediaUiTest || audioTest || audioUiTest || asrTest || asrUiTest || ocrPoc || themeTest || avTest || imgbatchTest || settingsIoTest || pdfOcrTest || queueUiTest || archiveTest || archiveUiTest;
+const testMode = () => uiTest || pdfUiTest || mediaTest || mediaUiTest || audioTest || audioUiTest || asrTest || asrUiTest || ocrPoc || themeTest || avTest || imgbatchTest || settingsIoTest || pdfOcrTest || queueUiTest || archiveTest || archiveUiTest || playerTest || playerUiTest;
 
 /** 自动测试模式下：从测试目录取指定扩展名的文件（对话框桩用；扩展名带不带点都能匹配） */
 async function testDirFiles(exts, { startWith, exact } = {}) {
@@ -556,6 +570,36 @@ function createMainWindow() {
     });
   }
 
+  if (playerTest) {
+    mainWindow.webContents.once('did-finish-load', async () => {
+      try {
+        const { runPlayerTest } = require('./tests/player-test.js');
+        const result = await runPlayerTest(mainWindow);
+        console.log(`PLAYER_TEST ${JSON.stringify({ ok: result.ok, failures: result.failures })}`);
+      } catch (err) {
+        console.log(`PLAYER_TEST_FAIL ${err.message}\n${err.stack}`);
+      } finally {
+        app.quit();
+      }
+    });
+  }
+
+  if (playerUiTest) {
+    const { runPlayerUiTest, writeResult } = require('./tests/player-ui-test.js');
+    mainWindow.webContents.once('did-finish-load', async () => {
+      try {
+        const result = await runPlayerUiTest(mainWindow);
+        console.log(`PLAYER_UI_TEST ${JSON.stringify({ pass: result.pass, failures: result.failures })}`);
+        writeResult({ ok: !!result.pass, at: new Date().toISOString(), result });
+      } catch (err) {
+        console.log(`PLAYER_UI_TEST_FAIL ${err.message}\n${err.stack}`);
+        writeResult({ ok: false, at: new Date().toISOString(), error: err.message, stack: err.stack });
+      } finally {
+        app.quit();
+      }
+    });
+  }
+
   if (makeSamplesDir) {
     mainWindow.webContents.once('did-finish-load', async () => {
       try {
@@ -584,6 +628,7 @@ function createMainWindow() {
 }
 
 app.whenReady().then(() => {
+  registerMediaProtocol(); // 视频播放器的本地媒体协议（tomato-media://，须在 ready 之后注册）
   createMainWindow();
 
   app.on('activate', () => {
@@ -1287,6 +1332,20 @@ ipcMain.handle('dialog:open-videos', async () => {
   return result.canceled ? [] : result.filePaths;
 });
 
+// 视频播放器（工具：player；测试模式下只取「测试播放*」夹具，避免与其它视频工具的夹具相互污染）
+ipcMain.handle('dialog:open-player-videos', async () => {
+  if (testMode()) return testDirFiles(VIDEO_EXTS, { startWith: '测试播放' });
+  const result = await dialog.showOpenDialog(mainWindow, {
+    title: '打开视频',
+    properties: ['openFile'],
+    filters: [
+      { name: '视频', extensions: VIDEO_EXTS },
+      { name: '全部文件', extensions: ['*'] }
+    ]
+  });
+  return result.canceled ? [] : result.filePaths;
+});
+
 // 动图与视频（动图与视频互转工具）
 ipcMain.handle('dialog:open-media', async () => {
   if (testMode()) return testDirFiles([...VIDEO_EXTS, ...ANIMATED_EXTS], { startWith: '测试' });
@@ -1896,6 +1955,163 @@ ipcMain.handle('ffmpeg:transform', async (_event, options) => {
   } finally {
     await fs.rm(workDir, { recursive: true, force: true }).catch(() => {});
   }
+});
+
+// —— 视频播放器（工具：player；见 spec/modules/player.md） ——
+// 播放的前提是「Chromium 能解码这个容器/编码」：本软件转出的 MP4/WebM 可直接播；
+// MKV/FLV 等容器或老编码（MPEG-4 ASP / WMV）先由 ffmpeg 准备一份可播放副本再播。
+// 副本落在软件目录的 userdata/player-cache（绿色版约定：不写系统 AppData），切走工具页即清理。
+
+/** 播放缓存目录：放「可播放副本」，用完即删，可随软件目录一起搬走 */
+const PLAYER_CACHE_DIR = path.join(USER_DATA_DIR, 'player-cache');
+
+/** 扩展名 → MIME：<video> 靠它决定走哪个解码器，缺失会让浏览器按下载/无法播放处理 */
+const PLAYER_MIME = {
+  '.mp4': 'video/mp4', '.m4v': 'video/mp4', '.mov': 'video/quicktime',
+  '.webm': 'video/webm', '.mkv': 'video/x-matroska', '.avi': 'video/x-msvideo',
+  '.flv': 'video/x-flv', '.wmv': 'video/x-ms-wmv', '.ts': 'video/mp2t',
+  '.mpg': 'video/mpeg', '.mpeg': 'video/mpeg', '.vob': 'video/mpeg',
+  '.3gp': 'video/3gpp', '.ogv': 'video/ogg', '.rmvb': 'application/vnd.rn-realmedia-vbr'
+};
+
+/**
+ * 本地媒体协议处理器：把本地文件按 HTTP 语义回给界面（支持 Range）。
+ * 不直接给 file:// 的原因见文件头的协议注册注释；这里额外做到：
+ *  - 只有真实存在的普通文件才回 200/206，其余 404（不暴露目录、不泄目录列表）；
+ *  - 带 Accept-Ranges + 206 + Content-Range：大视频才能边读边播、进度条可拖动；
+ *  - 边读边发（Node 读取流 → Web 流），不把整个文件读进内存（GB 级视频也不会爆内存）。
+ */
+async function handleMediaRequest(request) {
+  try {
+    const url = new URL(request.url);
+    const filePath = decodeURIComponent(url.pathname.replace(/^\//, ''));
+    if (!filePath) return new Response('Bad request', { status: 400 });
+    const stat = await fs.stat(filePath);
+    if (!stat.isFile()) return new Response('Not found', { status: 404 });
+
+    const mime = PLAYER_MIME[path.extname(filePath).toLowerCase()] || 'application/octet-stream';
+    const rangeHeader = request.headers.get('range');
+    if (rangeHeader) {
+      const m = /bytes=(\d*)-(\d*)/.exec(rangeHeader);
+      let start = m && m[1] ? Number(m[1]) : 0;
+      let end = m && m[2] ? Number(m[2]) : stat.size - 1;
+      if (!Number.isFinite(start) || start < 0) start = 0;
+      if (!Number.isFinite(end) || end > stat.size - 1) end = stat.size - 1;
+      if (start > end) {
+        return new Response('', { status: 416, headers: { 'Content-Range': `bytes */${stat.size}` } });
+      }
+      return new Response(Readable.toWeb(fsSync.createReadStream(filePath, { start, end })), {
+        status: 206,
+        headers: {
+          'Content-Type': mime,
+          'Content-Length': String(end - start + 1),
+          'Content-Range': `bytes ${start}-${end}/${stat.size}`,
+          'Accept-Ranges': 'bytes',
+          'Cache-Control': 'no-store'
+        }
+      });
+    }
+    return new Response(Readable.toWeb(fsSync.createReadStream(filePath)), {
+      status: 200,
+      headers: {
+        'Content-Type': mime,
+        'Content-Length': String(stat.size),
+        'Accept-Ranges': 'bytes',
+        'Cache-Control': 'no-store'
+      }
+    });
+  } catch {
+    return new Response('Not found', { status: 404 });
+  }
+}
+
+/** 注册媒体协议（必须在 app ready 之后调用；见 app.whenReady） */
+function registerMediaProtocol() {
+  protocol.handle('tomato-media', handleMediaRequest);
+}
+
+/** 缓存目录路径（界面进程不能拼路径，一律问主进程要） */
+ipcMain.handle('player:cache-dir', async () => {
+  await fs.mkdir(PLAYER_CACHE_DIR, { recursive: true });
+  return PLAYER_CACHE_DIR;
+});
+
+/**
+ * 清空播放缓存（切走工具页 / 打开新文件 / 进入工具页时调用）。
+ * 逐文件删并吞掉错误：正在播放的副本可能被系统占用（EBUSY），删不掉就留给下次清理，
+ * 绝不因为清理失败打断用户。
+ */
+ipcMain.handle('player:clean-cache', async () => {
+  let removed = 0;
+  let kept = 0;
+  const entries = await fs.readdir(PLAYER_CACHE_DIR).catch(() => []);
+  for (const name of entries) {
+    try {
+      await fs.rm(path.join(PLAYER_CACHE_DIR, name), { force: true, recursive: true });
+      removed += 1;
+    } catch {
+      kept += 1;
+    }
+  }
+  return { ok: true, removed, kept };
+});
+
+/**
+ * 准备「可播放副本」：把 Chromium 播不了的容器/编码转成 MP4 放缓存目录。
+ * options: { inputPath, mode:'remux'|'remux-audio'|'transcode', args[], durationMs?, jobId? }
+ * 返回：{ ok, path, size, ms, cached } —— cached=true 表示命中了上次的副本（秒开）
+ */
+ipcMain.handle('player:prepare', async (event, options) => {
+  const opt = options || {};
+  const inputPath = opt.inputPath;
+  if (!inputPath) return { ok: false, message: '缺少输入文件' };
+  const bin = findFfmpeg();
+  if (!bin.found) return { ok: false, message: '未检测到 ffmpeg（把加装包解压到软件目录的 addons/ffmpeg 后重开本工具）' };
+  const stat = await fs.stat(inputPath).catch(() => null);
+  if (!stat || !stat.isFile()) return { ok: false, message: '源文件不存在或不可读' };
+
+  await fs.mkdir(PLAYER_CACHE_DIR, { recursive: true });
+  // 副本名带「源路径 + 播放档位 + 大小 + 修改时间」的哈希：
+  // 同一文件重开直接命中缓存（秒开）；源文件被改过则自动换新副本（不会播到旧内容）。
+  const key = `${inputPath}|${opt.mode || 'transcode'}|${stat.size}|${Math.round(stat.mtimeMs)}`;
+  const hash = crypto.createHash('sha1').update(key).digest('hex').slice(0, 10);
+  const base = path.basename(inputPath, path.extname(inputPath))
+    .replace(/[\\/:*?"<>|\s]+/g, '_').replace(/^_+|_+$/g, '').slice(0, 40) || 'video';
+  const target = path.join(PLAYER_CACHE_DIR, `${base}-${hash}.mp4`);
+  const hit = fsSync.existsSync(target) && fsSync.statSync(target).size > 0;
+  if (hit) return { ok: true, path: target, size: fsSync.statSync(target).size, ms: 0, cached: true };
+
+  const durationMs = Number(opt.durationMs) || 0;
+  const limit = opt.timeoutMs || Math.min(6 * 3600 * 1000, Math.max(20 * 60 * 1000, durationMs * 20));
+  const args = ['-hide_banner', '-nostdin', '-y', '-progress', 'pipe:1', '-nostats',
+    '-i', inputPath, ...(opt.args || []), target];
+  const t0 = Date.now();
+  // 进度复用 ffmpeg:progress 通道（界面侧用 shared/ffmpeg.js 的 onMediaProgress 订阅）
+  const res = await runFfmpeg(args, {
+    jobId: opt.jobId,
+    timeoutMs: limit,
+    onStdout: (chunk) => {
+      if (!event.sender || event.sender.isDestroyed()) return;
+      for (const line of chunk.split(/\r?\n/)) {
+        const t = /^out_time_us=(\d+)/.exec(line);
+        if (t && durationMs > 0) {
+          const percent = Math.max(0, Math.min(99, (Number(t[1]) / 1000 / durationMs) * 100));
+          event.sender.send('ffmpeg:progress', { jobId: opt.jobId, percent, timeMs: Number(t[1]) / 1000 });
+        }
+        const s = /^speed=(.+)$/.exec(line);
+        if (s) event.sender.send('ffmpeg:progress', { jobId: opt.jobId, speed: s[1].trim() });
+      }
+    }
+  });
+
+  const produced = fsSync.existsSync(target) && fsSync.statSync(target).size > 0;
+  if (res.timedOut || res.code !== 0 || !produced) {
+    try { if (fsSync.existsSync(target)) fsSync.rmSync(target, { force: true }); } catch { /* 清理失败不影响结论 */ }
+    const detail = res.notFound ? '未检测到 ffmpeg' : res.timedOut ? '处理超时' : `ffmpeg 退出码 ${res.code}`;
+    const tail = (res.stderr || '').trim().split(/\r?\n/).slice(-3).join(' ｜ ').slice(0, 300);
+    return { ok: false, message: `无法准备可播放版本：${detail}${tail ? `｜${tail}` : ''}` };
+  }
+  return { ok: true, path: target, size: fsSync.statSync(target).size, ms: Date.now() - t0, cached: false };
 });
 
 // —— Real-ESRGAN 加装包（「图片变清晰」的 AI 放大 / 超分；见 spec/modules/image-enhance.md） ——

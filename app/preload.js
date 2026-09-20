@@ -51,6 +51,14 @@ contextBridge.exposeInMainWorld('desktop', {
   // 文件压缩与解压 专用对话框（待压缩的文件 / 压缩包）
   openArchiveFiles: () => ipcRenderer.invoke('dialog:open-archive-files'),
   openArchives: () => ipcRenderer.invoke('dialog:open-archives'),
+  // 视频播放器 专用对话框（打开单个视频）
+  openPlayerVideos: () => ipcRenderer.invoke('dialog:open-player-videos'),
+
+  // 视频播放器（「视频播放器」工具；见 spec/modules/player.md）
+  // 播放走 tomato-media:// 协议（主进程按 Range 分块回传，见 main.js），这里只暴露缓存管理：
+  playerCacheDir: () => ipcRenderer.invoke('player:cache-dir'),
+  playerCleanCache: () => ipcRenderer.invoke('player:clean-cache'),
+  playerPrepare: (options) => ipcRenderer.invoke('player:prepare', options),
 
   // 文件压缩与解压（「压缩 / 解压」工具；引擎为主进程里的 7zip 加装包）
   archiveStatus: () => ipcRenderer.invoke('archive:status'),

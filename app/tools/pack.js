@@ -107,6 +107,9 @@ fs.copyFileSync(path.join(appRoot, 'tests', 'queue-ui-test.js'), path.join(appTa
 // v2.2.0 起：文件压缩与解压（引擎自检 + 界面自动测试）
 fs.copyFileSync(path.join(appRoot, 'tests', 'archive-test.js'), path.join(appTarget, 'tests', 'archive-test.js'));
 fs.copyFileSync(path.join(appRoot, 'tests', 'archive-ui-test.js'), path.join(appTarget, 'tests', 'archive-ui-test.js'));
+// v2.3.0 起：视频播放器（自检 + 界面自动测试）
+fs.copyFileSync(path.join(appRoot, 'tests', 'player-test.js'), path.join(appTarget, 'tests', 'player-test.js'));
+fs.copyFileSync(path.join(appRoot, 'tests', 'player-ui-test.js'), path.join(appTarget, 'tests', 'player-ui-test.js'));
 
 // —— 4b) 复制 PDF 工具运行时依赖（纯 JS，界面进程按相对路径直接引用） ——
 // 说明：本项目没有打包器，工具代码里写的是 ../../../../node_modules/pdfjs-dist/... 这样的

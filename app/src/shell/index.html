@@ -2,8 +2,10 @@
 <html lang="zh-CN">
 <head>
   <meta charset="UTF-8" />
+  <!-- media-src 是为「视频播放器」开的：视频/音频走本地媒体协议 tomato-media://（主进程按 Range 分块回传），
+       拖拽文件与 canvas 录制的预览仍可能用 blob:，所以两者都放行；不放开 file:（界面进程拿不到本地路径） -->
   <meta http-equiv="Content-Security-Policy"
-        content="default-src 'self'; img-src 'self' data: blob:; style-src 'self'; script-src 'self'" />
+        content="default-src 'self'; img-src 'self' data: blob:; media-src 'self' blob: tomato-media:; style-src 'self'; script-src 'self'" />
   <title>番茄工具箱</title>
   <link rel="stylesheet" href="theme.css" />
   <!-- 通用组件库（按钮/输入/卡片/弹窗/进度 + 统一动效） -->

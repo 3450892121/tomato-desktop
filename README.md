@@ -3,9 +3,9 @@
 把安卓 App「番茄图片混淆」（`番茄图片混淆.apk`）的图片混淆 / 解混淆能力完整搬到 Windows 电脑上：
 **免安装绿色版、纯离线、与手机版互相兼容**，给身边人用的傻瓜化工具。
 
-软件按「工具箱」形态搭建：左侧按「图片 / 视频 / 音频 / 文档 / 压缩」分组列出全部 **18 个工具**——
+软件按「工具箱」形态搭建：左侧按「图片 / 视频 / 音频 / 文档 / 压缩」分组列出全部 **19 个工具**——
 - 图片：图片混淆、图片压缩、图片变清晰、图片格式转换、批量重命名、加水印、长图拼接、九宫格切图
-- 视频：视频格式转换、视频压缩、动图与视频互转
+- 视频：视频播放器、视频格式转换、视频压缩、动图与视频互转
 - 音频：音频格式转换、音频剪辑、语音转文字
 - 文档：PDF 转格式、PDF 编辑整理、文字识别
 - 压缩：压缩与解压
@@ -14,10 +14,11 @@
 
 ---
 
-## 当前状态（v2.2.0）
+## 当前状态（v2.3.0）
 
 | 项 | 状态 |
 |---|---|
+| **视频播放器（新）**：软件内直接播视频，MP4/WebM 直接播，MKV/FLV/TS 无损换封装，AVI/WMV 等老编码自动重编码 | ✅ 可用（8 种格式端到端实测：7 种夹具真实播放 + 界面全流程 `pass:true`；播放走 Range 分块，不动原文件，缓存用完即清） |
 | **压缩与解压（新）**：ZIP/7Z/TAR/GZIP + BZIP2/XZ/ZSTANDARD/BROTLI 双向、RAR 等仅解压 | ✅ 可用（13 种格式真实往返逐字节一致；密码 AES-256、分卷、免解压预览、zip-slip 防护） |
 | **跨工具任务队列 + 任务中心（新）** | ✅ 可用（顶栏「任务」按钮 + 未完成徽标；切走工具页任务照跑完，界面测试含 LRU 回收后仍跑完的核心断言） |
 | **PDF 编辑整理（新）**：压缩瘦身 / 文字水印 / 页码 / 旋转 / 重排 / 加密 / 解密 | ✅ 可用（七类操作均读回校验；压缩实测 1,052,712B → 170,874B 约 −84%） |
@@ -95,6 +96,8 @@ npm test                                                    # 算法测试 55 �
 .\node_modules\electron\dist\electron.exe . --queue-ui-test  # 任务中心（含「切走工具页后任务继续跑完」核心断言）
 .\node_modules\electron\dist\electron.exe . --archive-test   # 压缩与解压自检（13 种格式真实往返 + 密码 + 分卷 + 大文件 + 安全）
 .\node_modules\electron\dist\electron.exe . --archive-ui-test # 压缩与解压界面自动测试（压缩→预览→解压→密码→重复解压提示）
+.\node_modules\electron\dist\electron.exe . --player-test     # 视频播放器自检（协议 Range + 7 种格式端到端播放 + 缓存命中 + 无效文件）
+.\node_modules\electron\dist\electron.exe . --player-ui-test  # 视频播放器界面自动测试（直接播/换封装/重编码 + 控制条/全屏/快捷键 + 缓存清理）
 ```
 > 界面类测试结果同时写入 `%TEMP%\tomato-*.json`（如 `tomato-pdf-test.json`、`tomato-av-test.json`、`tomato-pdf-ocr-test.json`、`tomato-queue-ui-test.json`、`tomato-archive-test.json` 等），截图在 `%TEMP%\tomato-uitest`。
 > 媒体类自检需要 `app/addons/ffmpeg/ffmpeg.exe`；「文字识别」需要 `app/addons/ocr/`（模型 + 中文字体）；「压缩与解压」需要 `app/addons/7zip/`（引擎，约 2.4MB）。仓库内均已有、不进 git；缺失时相关检查会如实标注失败，其余功能不受影响（压缩工具的 ZSTANDARD/BROTLI 走 Node 内置引擎，无加装包也可用）。
@@ -162,6 +165,7 @@ electron . --verify-samples <目录> --key <密钥>
 - **PDF 转格式**（v1.1.0 新增）：PDF→图片（PNG/JPG、批量、选页、清晰度档位）、图片→PDF（JPG 直嵌/适应 A4）、PDF 合并/拆分/提取页；Word/Excel→PDF 无加装包时用内置方式（docx-preview + SheetJS + 打印引擎），PDF→Word 与高保真转换走可选的 LibreOffice 加装包。
 - **音频格式转换**（v1.6.0 新增）：21 种输出格式（MP3/M4A/WAV/FLAC/OGG/Opus/WMA/AMR/ALAC/AIFF/CAF/WavPack/TTA/AC3/EAC3/MP2/Speex/AU/W64/RealAudio）；APE/DSD/Musepack/TAK 可作输入；视频直接拖入自动提取声音；保留标题/歌手标签；复用 ffmpeg 加装包、零新增依赖。
 - **语音转文字**（v1.7.0 新增）：音频/视频识别成文字（中/英/日/韩/粤自动识别），输出纯文本 .txt、字幕 .srt 或两者；视频自动提取音轨；纯离线、纯 CPU（实测约 20 倍实时）；内核 FunASR·SenseVoice（加装包随包，约 246MB，MIT 许可）。
+- **视频播放器**（v2.3.0 新增）：软件内直接播视频，转完不用换软件。MP4/WebM 直接播；MKV/FLV/TS 自动「无损换封装」（画面声音不重编码，秒级）；AVI（MPEG-4）/WMV 等老编码自动重编码成 H.264（有进度、可取消）。播放/暂停、拖动进度、音量与静音、全屏、快捷键（空格 / ←→ / ↑↓ / M / F）齐全；播放走自定义协议 `tomato-media://` 按 Range 分块读取（大文件不占内存、进度可任意拖）；**只读原文件**，临时副本放 `userdata/player-cache/`，换文件与离开工具页即自动清理。
 - **压缩与解压**（v2.2.0 新增）：**13 种格式双向**——ZIP / 7Z / TAR / GZIP（主流）与 BZIP2 / XZ / ZSTANDARD / BROTLI 及其 TAR 复合（非主流，满足「≥2 种」）；RAR/RAR5、ISO、CAB、WIM、DEB 等**仅解压**（RAR 专有，免费工具无法创建，界面如实标注）；**密码**（7Z 用 AES-256 并加密文件名、ZIP 支持 AES-256/ZipCrypto，中文密码自动引导改用 7Z）；**分卷**（ZIP/7Z/TAR 切 .001，解压只给首卷）；**免解压预览**（列条目/大小/加密位）；**zip-slip 防护**；**绝不覆盖**（重名自动加序号）；大文件全程流式。引擎为随包 7-Zip 26.03（LGPL 2.1+，约 2.4MB），ZSTANDARD/BROTLI 走 Node 内置 zlib（无加装包也可用）。详见 `docs/压缩格式性能对比.md`。
 
 ## 已知限制
@@ -179,6 +183,10 @@ electron . --verify-samples <目录> --key <密钥>
   - **ZIP 的密码只能用英文/数字**（7-Zip 限制，中文密码会报错）；中文密码请改用 7Z。
   - **没有断点续传**——7-Zip 命令行中断不可续跑；改用「分卷 + 失败可重试」应对大文件。
   - 流式单文件格式（GZIP/BZIP2/XZ/ZSTANDARD/BROTLI）**只能压单个文件**，多文件请选 TAR.xxx / ZIP / 7Z。
+- **视频播放器**（v2.3.0）：
+  - 能不能「直接播」取决于系统解码器（尤其是 H.265/HEVC 与 4K 片源）：播不了会自动转码兜底，只是长片重编码需要时间（界面有进度，可取消）。
+  - 不支持网络地址播放（本软件全离线），也不做字幕、多音轨切换、倍速与播放列表。
+  - 临时副本约等于源文件大小（重编码档位通常更小），换文件 / 切走工具页即清理；万一被系统占用删不掉，会留给下次进入工具页时清理。
 - 拖拽与剪贴板未纳入自动化测试（原因：会覆盖使用者剪贴板），需人工抽测。
 
 ## 隐私
