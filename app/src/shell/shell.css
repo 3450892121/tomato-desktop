@@ -74,6 +74,9 @@ body {
   flex: 1 1 auto;
   min-height: 0;
   overflow-y: auto;
+  /* 横向彻底禁掉：只写 overflow-y 的话，横向会被算成 auto ——
+     内容一旦越界（例如悬停位移）列表就能左右晃动，还带出一条横向滚动条。 */
+  overflow-x: hidden;
   padding: var(--space-1) var(--space-2);
 }
 /* 细滚动条：不抢视觉，深浅色都看得见 */
@@ -98,15 +101,25 @@ body {
   transition: background var(--transition-fast), color var(--transition-fast),
               transform var(--transition-base), box-shadow var(--transition-base);
 }
-.tool-item:hover { background: var(--color-surface-soft); transform: translateX(2px); }
-/* 当前工具（v2.1.0 强化）：染色块 + 主色描边环 + 投影，切换时弹簧式弹一下。
-   用户反馈原来「淡红底 + 红字」太淡，看不出选中的是哪个，所以这里给足对比。 */
+.tool-item:hover { background: var(--color-surface-soft); }
+/* 当前工具（本次改动）：磨砂玻璃块 —— 半透明白玻璃底 + 背景模糊 + 顶部内高光 + 主色细描边。
+   相比 v2.1.0 的番茄红染色块更清爽高级（用户反馈「染色块颜色不好看，想要玻璃效果」）。
+   关键：背景 / 描边 / 内高光全部 inset 落地，绝不外溢 —— 分组容器 overflow:hidden 会把外投影裁掉，
+   看起来就像选中框右边被切掉一块。悬停位移也去掉了，避免选中块左右晃动。 */
 .tool-item.is-active {
-  background: var(--color-select-bg);
+  background: var(--color-sidebar-active-bg);
+  background-image: var(--glass-sheen); /* 左上斜向高光：玻璃与「半透明色块」的关键区别 */
+  backdrop-filter: blur(var(--glass-blur-strong)) saturate(var(--glass-saturate));
   color: var(--color-sidebar-active-text);
   font-weight: 600;
-  box-shadow: var(--shadow-select);
-  animation: select-pop var(--transition-spring);
+  box-shadow: var(--shadow-sidebar-select);
+  animation: nav-select-in var(--transition-base);
+}
+/* 选中「亮起来」：导航专用，刻意不回弹 —— 分组容器是 overflow: hidden，
+   回弹曲线会把方块放大到 1 以上，多出来的边会被裁掉（看着又像选中框被切了一角）。 */
+@keyframes nav-select-in {
+  from { transform: scale(0.96); opacity: 0.55; }
+  to { transform: none; opacity: 1; }
 }
 /* 当前工具的左侧标记：切换时从中间「长出来」，比整块背景变化更柔和（加粗加长，一眼能看到） */
 .tool-item::before {

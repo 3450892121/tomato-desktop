@@ -24,6 +24,13 @@ const CYCLE = ['system', 'light', 'dark'];
 
 const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
+/** 从 rgb()/rgba() 字符串里取 alpha（无 alpha 视为 1，解析不了返回 null） */
+function alphaOfCss(color) {
+  const m = /rgba?\(\d+,\s*\d+,\s*\d+(?:,\s*([\d.]+))?\)/.exec(color || '');
+  if (!m) return null;
+  return m[1] === undefined ? 1 : Number(m[1]);
+}
+
 function writeResult(payload) {
   try {
     require('fs').writeFileSync(RESULT_FILE, JSON.stringify(payload, null, 2), 'utf8');
@@ -73,13 +80,24 @@ const GLASS_PROBE = `(() => {
   const active = document.querySelector('.tool-item.is-active');
   const sidebarStyle = sidebar ? getComputedStyle(sidebar) : null;
   const cardBg = card ? getComputedStyle(card).backgroundColor : '';
+  // 选中框是否被裁 / 列表能否横向晃动（用户反馈：选中框右边被切、还能左右挪一点）
+  const nav = document.getElementById('toolNav');
+  const activeRect = active ? active.getBoundingClientRect() : null;
+  const navRect = nav ? nav.getBoundingClientRect() : null;
+  const navStyle = nav ? getComputedStyle(nav) : null;
+  const padRight = navStyle ? parseFloat(navStyle.paddingRight) || 0 : 0;
   return {
     sidebarBlur: sidebarStyle ? (sidebarStyle.backdropFilter || 'none') : 'none',
     sidebarAlpha: sidebarStyle ? alphaOf(sidebarStyle.backgroundColor) : null,
     aurora: getComputedStyle(document.body).backgroundImage !== 'none',
     cardBg,
     cardAlpha: alphaOf(cardBg),
-    activeShadow: active ? getComputedStyle(active).boxShadow : ''
+    activeShadow: active ? getComputedStyle(active).boxShadow : '',
+    activeBg: active ? getComputedStyle(active).backgroundColor : '',
+    activeBlur: active ? (getComputedStyle(active).backdropFilter || 'none') : 'none',
+    navOverflowX: nav ? nav.scrollWidth - nav.clientWidth : null, // >0 = 能左右晃
+    // 选中框右边缘到列表内容区右边缘的距离（<0 = 越界被裁）
+    activeRightGap: (activeRect && navRect) ? Math.round(navRect.right - padRight - activeRect.right) : null
   };
 })()`;
 
@@ -172,6 +190,15 @@ async function runThemeTest(win) {
   if (!result.checks.glass) result.failures.push(`磨砂玻璃未生效：${JSON.stringify(glass)}`);
   result.checks.selectVisible = !!glass.activeShadow && glass.activeShadow !== 'none';
   if (!result.checks.selectVisible) result.failures.push(`当前工具的选中态没有高亮：${JSON.stringify(glass.activeShadow)}`);
+  // 3c) 选中块必须是玻璃（半透明底 + 背景模糊），且不能被列表裁掉、列表也不能左右晃
+  result.checks.selectGlass = glass.activeBlur !== 'none' &&
+    glass.activeBg !== null && alphaOfCss(glass.activeBg) !== null && alphaOfCss(glass.activeBg) < 1;
+  if (!result.checks.selectGlass) result.failures.push(`选中块不是玻璃：bg=${glass.activeBg} blur=${glass.activeBlur}`);
+  result.checks.selectNotClipped = glass.activeRightGap !== null && glass.activeRightGap >= 0 &&
+    glass.navOverflowX !== null && glass.navOverflowX <= 0;
+  if (!result.checks.selectNotClipped) {
+    result.failures.push(`选中框被裁或列表能横向晃动：右边缘余量=${glass.activeRightGap}px 横向溢出=${glass.navOverflowX}px`);
+  }
 
   // 4) 深色档：外壳色值必须是深色那套
   await clickUntil('dark');

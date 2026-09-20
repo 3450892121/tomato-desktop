@@ -14,10 +14,17 @@
   --color-border: #e7e9ee;
   --color-border-strong: #d8dbe2;
 
-  /* 颜色 —— 左侧工具列表 */
+  /* 颜色 —— 左侧工具列表
+     选中项改成「磨砂玻璃块」：半透明玻璃底 + 背景模糊 + 顶部内高光 + 主色细描边，
+     不再用番茄红染色块（用户反馈「颜色不好看，想要玻璃效果」）。 */
   --color-sidebar-bg: rgba(255, 255, 255, 0.34);
-  --color-sidebar-active-bg: rgba(255, 90, 78, 0.14);
+  --color-sidebar-active-bg: rgba(255, 255, 255, 0.72);
   --color-sidebar-active-text: #d93a2e;
+  /* 选中框的描边与内高光：**全部用 inset 绘制**，绝不外溢 ——
+     外投影会被分组容器的 overflow: hidden 裁掉，看起来就像选中框右边被切掉一块（用户反馈）。 */
+  --shadow-sidebar-select: inset 0 0 0 1px var(--color-select-ring),
+                           var(--glass-inner-highlight),
+                           inset 0 -14px 26px -20px rgba(217, 58, 46, 0.55);
 
   /* 颜色 —— 文字 */
   --color-text: #1f2329;
@@ -131,10 +138,14 @@
   --color-border: #2e3238;
   --color-border-strong: #3b4149;
 
-  /* 颜色 —— 左侧工具列表 */
+  /* 颜色 —— 左侧工具列表
+     深色玻璃面必须是「深色 rgb + alpha」，不能沿用白色玻璃值（否则深色下会发灰、且被浅色残留扫描误判）。 */
   --color-sidebar-bg: rgba(24, 27, 33, 0.44);
-  --color-sidebar-active-bg: rgba(255, 106, 94, 0.22);
+  --color-sidebar-active-bg: rgba(58, 64, 74, 0.62);
   --color-sidebar-active-text: #ff8478;
+  --shadow-sidebar-select: inset 0 0 0 1px var(--color-select-ring),
+                           var(--glass-inner-highlight),
+                           inset 0 -14px 26px -20px rgba(255, 106, 94, 0.45);
 
   /* 颜色 —— 文字 */
   --color-text: #e8eaed;
