@@ -1,8 +1,8 @@
 // 导航手动排序·纯逻辑单测（npm test 连跑；也可单独 `node tests/navorder.test.mjs`）
-// 被测对象：src/shell/navsort.js 的 computeNavPlan —— settings.navOrder 的净化与渲染顺序计算。
+// 被测对象：src/shell/navsort.js 的 computeNavPlan（净化与渲染顺序）与 pickStartupTool（启动默认工具）。
 // 重点盯「用户手改 settings.json 也不能弄丢工具 / 走私跨组 / 弄崩渲染」。
 
-import { computeNavPlan } from '../src/shell/navsort.js';
+import { computeNavPlan, pickStartupTool } from '../src/shell/navsort.js';
 
 let pass = 0;
 let fail = 0;
@@ -109,6 +109,17 @@ const DEFAULT_GROUPS = ['image', 'video', 'audio'];
     tools: Object.fromEntries(once.filter((g) => g.id !== 'other').map((g) => [g.id, g.tools.map((t) => t.id)]))
   });
   check('round-trip 幂等', JSON.stringify(once) === JSON.stringify(again));
+}
+
+// ⑪ 启动默认工具（v2.7.1，用户要求）：排在最前的非空分组的第一个工具
+{
+  check('null→启动工具=默认第一组的第一个', (pickStartupTool(computeNavPlan(GROUPS, TOOLS, null)) || {}).id === 'img-a');
+  const s = computeNavPlan(GROUPS, TOOLS, { groups: ['video', 'image', 'audio'], tools: { video: ['vid-b', 'vid-a'] } });
+  check('排第一的组→启动工具=该组第一个', (pickStartupTool(s) || {}).id === 'vid-b');
+  // 空分组跳过：只有其它组有工具时，启动工具取「其它」里的（不返回 undefined 炸掉启动）
+  const pEmpty = computeNavPlan([{ id: 'image', name: '图片', icon: '🖼️' }], [{ id: 'odd', order: 5 }], null);
+  check('空分组被跳过', pickStartupTool(pEmpty) !== null && pickStartupTool(pEmpty).id === 'odd');
+  check('一个工具都没有→null', pickStartupTool(computeNavPlan(GROUPS, [], null)) === null);
 }
 
 console.log(`\n导航排序逻辑：通过 ${pass} / 共 ${pass + fail}${fail ? `（失败 ${fail}）` : ''}`);

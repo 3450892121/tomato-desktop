@@ -1,6 +1,6 @@
 // 导航手动排序（v2.6.0，见 spec/modules/toolkit.md「导航手动排序」）
 // 分两部分：
-//  ① 纯逻辑（computeNavPlan / readNavOrderFromDOM 的数据净化）——不依赖 DOM，node 单测直接跑；
+//  ① 纯逻辑（computeNavPlan / pickStartupTool / readNavOrderFromDOM 的数据净化）——不依赖 DOM，node 单测直接跑；
 //  ② 排序模式交互（createNavSort）——Pointer Events 自绘拖拽：
 //     被拖条目升起玻璃卡跟随指针，同级兄弟用 transform 平滑让位，松手按视觉序重排 DOM 后落盘。
 //
@@ -93,6 +93,21 @@ export function computeNavPlan(groups, tools, saved) {
   // 「其它」组固定最后：由未声明（或声明了未知）group 的工具自动聚合，不参与分组排序，但组内可排序
   plan.push({ id: 'other', name: '其它', icon: '📁', tools: orderTools('other', byGroup.get('other')) });
   return plan;
+}
+
+/**
+ * 挑「启动默认打开的工具」：排在最前的非空分组的第一个工具（v2.7.1，用户要求）。
+ * 语义：用户把某组拖到第一位＝最常用，启动就直接进它的第一个工具；
+ * 届时只有它所在分组被「切工具自动展开」规则展开，其余分组按用户偏好显示。
+ * 从没排过序（navOrder=null）时等于默认序的第一个分组（图片 → 图片混淆），与旧版一致。
+ * @param plan computeNavPlan 的输出
+ * @returns 工具声明对象；一个工具都没有时返回 null
+ */
+export function pickStartupTool(plan) {
+  for (const group of plan) {
+    if (group.tools.length > 0) return group.tools[0];
+  }
+  return null;
 }
 
 /**

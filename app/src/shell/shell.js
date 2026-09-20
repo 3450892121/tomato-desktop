@@ -1,6 +1,6 @@
 // 工具箱框架：左侧工具列表渲染、工具挂载/卸载、通用能力上下文（ctx）、设置与帮助弹窗
 import { TOOLS, GROUPS } from './registry.js';
-import { computeNavPlan, createNavSort } from './navsort.js';
+import { computeNavPlan, pickStartupTool, createNavSort } from './navsort.js';
 import * as settings from '../shared/settings.js';
 import { createQueue } from '../shared/taskqueue.js';
 import { createTaskCenter } from './taskcenter.js';
@@ -951,15 +951,20 @@ async function init() {
   if (els.btnTasks) els.btnTasks.addEventListener('click', () => taskCenter.toggle());
   refreshTaskBadge();
 
-  const sorted = [...TOOLS].sort((a, b) => (a.order || 0) - (b.order || 0));
-  if (sorted.length > 0) {
-    switchTool(sorted[0].id);
+  // 启动默认打开「排序里最前面的分组」的第一个工具（v2.7.1，用户要求）：
+  // 排第一 = 最常用——启动直接进它的第一个工具，只展开这一个分组，其余分组按用户偏好显示。
+  // 从没排过序（navOrder=null）时 = 默认序的第一个分组（图片 → 图片混淆），与旧版行为一致。
+  // 背景（用户反馈）：旧版固定打开「图片混淆」，它所在分组会被「切工具自动展开所在分组」
+  // 规则重新打开——用户把它收起来过也没用，看起来像设置失效。
+  const startupTool = pickStartupTool(computeNavPlan(GROUPS, TOOLS, loadedSettings.navOrder));
+  if (startupTool) {
+    switchTool(startupTool.id);
   } else {
     setStatus('还没有任何工具');
   }
 }
 
-// 先把左侧工具列表渲染出来，再等设置加载后切到第一个工具。
+// 先把左侧工具列表渲染出来，再等设置加载后切到启动默认工具（排最前分组的第一个，见 init 末尾）。
 // 背景：设置读取是异步的，原先要等它回来才渲染列表，窗口刚打开时会有一瞬空白侧栏
 //      （自动化测试也可能在这一瞬点不到工具）。列表渲染不依赖设置，提前渲染即可。
 renderNav();

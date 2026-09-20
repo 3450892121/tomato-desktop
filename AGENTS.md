@@ -70,7 +70,8 @@
 - 文件藏图界面自动测试：`cd app` → `.\node_modules\electron\dist\electron.exe . --imghide-ui-test`（切工具→随机表图→加文件→打包→产物校验与解码→解包比对→自定义表图+水印→图夹 PRO+密码往返（错误密码被拒）→体积提示两模式→清空；截图 `shot-imghide-*.png` 落 `%TEMP%\tomato-uitest`，结果写 `%TEMP%\tomato-imghide-ui-test.json`，`pass:true` 为通过）。
 - 交付前必须全绿：算法测试 + 冒烟自检 + 端到端自检 + 界面自动测试 + PDF 工具自检 + PDF 工具界面自动测试 + 媒体工具自检 + 媒体工具界面自动测试 + 音频工具自检 + 音频工具界面自动测试 + 语音转文字自检 + 语音转文字界面自动测试 + 外观主题自检 + OCR 引擎闸门 + 媒体工具（A 批）自检 + 图片批量工具（B 批）自检 + 设置导入导出自检 + C 批工具自检 + 视频播放器自检 + 视频播放器界面自动测试 + 文件藏图自检 + 文件藏图界面自动测试，且截图人工过目一遍；打包产物需再跑一次冒烟与各界面自测。
 - 生成图标：`cd app` → `npm run icon`（产出 `src/assets/icon.png` 与 `build/icon.ico`）。
-- 打包免安装版：`cd app` → `npm run pack`（产物：`app/release/番茄图片混淆-桌面版-v<版本>-win64/` 免安装文件夹 + 同名 `.zip`；exe 图标与版本信息由 `build/rcedit.exe` 写入，缺失则跳过）。
+- 打包免安装版：`cd app` → `npm run pack`（产物：`app/release/番茄图片混淆-桌面版-v<版本>-win64/` 免安装文件夹 + 同名 `.zip`；exe 图标与版本信息由 `build/rcedit.exe` 写入，缺失则跳过）。打包顺序：步骤 8b 同步桌面快捷方式 → **步骤 8c 迁移上一版的用户设置**（`userdata/settings.json`，升级不丢排序/折叠偏好）→ 步骤 9 删旧版。
+  - 重复打包**同一版本号**会先清空产物目录，此时 8c 找不到旧版目录可迁移（旧版已被步骤 9 删掉）——需要在 pack 前把上一步备份的用户设置放回一个旧版本命名的目录（本机实测流程见 CHANGELOG v2.7.1），或 pack 后手工放回新产物的 `userdata/`。
 - 兼容性样本工具（锁定 variants.js 用）：
   - 造样本：`electron . --make-samples <目录> --mode <模式> [--key <密钥>]`
   - 验样本：`electron . --verify-samples <目录> --key <密钥>` → 输出 `verdict`，`meanDiff` 接近 0 即为手机版所用的模式与变体。

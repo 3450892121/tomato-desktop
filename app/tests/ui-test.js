@@ -30,6 +30,15 @@ async function runUiTest(win) {
 
   await fs.mkdir(TEST_DIR, { recursive: true });
 
+  // 本测试会改动 settings.json（画质 / 输出目录 / 折叠 / 排序 / 恢复默认）；
+  // 产物 userdata 里可能放着用户自己的设置（打包时从上一版迁移过来的），先在内存里留一份原文，收尾原样写回。
+  const settingsFile = path.join(
+    app.isPackaged ? path.dirname(process.execPath) : path.join(__dirname, '..'),
+    'userdata',
+    'settings.json'
+  );
+  const settingsBefore = await fs.readFile(settingsFile, 'utf8').catch(() => null);
+
   // 清理上次运行留下的测试图片，保证重复运行结果干净
   // 注意：要清掉「所有」以 测试原图 开头的文件（不限扩展名）——媒体工具测试会留下 .webp 等，
   //       它们同样会被「添加图片」选中，导致张数校验失败（踩过一次）。
@@ -69,6 +78,19 @@ async function runUiTest(win) {
   // 0) 初始界面
   await shot('01-初始');
   result.steps.initialStatus = await evalJs('document.getElementById("statusText").textContent');
+
+  // 0b) 归位到「图片混淆」页（v2.7.1）：启动默认工具可能不是它——用户排过序时启动打开的是
+  //     「排最前分组的第一个工具」（见 spec/modules/toolkit.md「启动默认工具」）。
+  //     本测试的界面检查与主流程都以图片混淆为主工具，先切回来，避免受用户排序影响。
+  result.steps.startupPage = await evalJs(`(() => {
+    const active = document.querySelector('.tool-item.is-active');
+    const id = active ? active.dataset.toolId : '';
+    const btn = [...document.querySelectorAll('#toolNav .tool-item')].find((b) => b.dataset.toolId === 'obfuscate');
+    if (id !== 'obfuscate' && btn) btn.click();
+    return id;
+  })()`);
+  await wait(600);
+
   // 元素显隐自检：进度遮罩必须默认隐藏（曾因 CSS 覆盖 hidden 导致整屏发白）
   result.checks.initialVisibility = await evalJs(`(() => {
     const shown = (sel) => {
@@ -484,11 +506,6 @@ async function runUiTest(win) {
     return document.querySelector('#setOutputDir').value + '｜' + document.getElementById('statusText').textContent;
   })()`);
 
-  const settingsFile = path.join(
-    app.isPackaged ? path.dirname(process.execPath) : path.join(__dirname, '..'),
-    'userdata',
-    'settings.json'
-  );
   result.steps.settingsSave = await evalJs(`(async () => {
     document.querySelector('#setJpegQuality').value = '90';
     [...document.querySelectorAll('.modal-actions .btn')].find((b) => b.textContent === '保存').click();
@@ -641,6 +658,14 @@ async function runUiTest(win) {
     });
   })()`));
   await shot('12-LRU回收后');
+
+  // 收尾：把测试前读到的设置原文写回——产物 userdata 里可能是用户自己的设置（打包时从上一版迁移来的），
+  // 不能被测试改动/「恢复默认」抹掉；开发环境首次跑时没有原文，维持现状即可。
+  try {
+    if (settingsBefore !== null) await fs.writeFile(settingsFile, settingsBefore, 'utf8');
+  } catch (err) {
+    result.checks.settingsRestore = { error: err.message };
+  }
 
   // 汇总判定
   const c = result.checks;

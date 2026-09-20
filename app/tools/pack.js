@@ -425,6 +425,36 @@ log('步骤8b：同步桌面快捷方式');
   }
 }
 
+// —— 8c) 迁移上一版的用户设置（升级不丢偏好，必须在删旧版之前执行） ——
+// 背景：用户偏好（工具排序 navOrder、分组折叠、输出目录等）写在软件目录的 userdata/settings.json 里；
+//       步骤 9 会把旧版目录整个删掉。不搬这一份，升级后用户排的顺序与折叠习惯全部回默认，
+//       用户会以为「说好改好的行为没生效」（与「快捷方式指向旧目录」同一类教训）。
+// 规则：只搬 settings.json 这一个小文件；本版目录已有 settings.json（例如用户已在新版里改过）时不覆盖；
+//       失败不影响本次产物（用户将在新版里从默认设置开始）。
+log('步骤8c：迁移上一版用户设置');
+try {
+  const newSettingsPath = path.join(outDir, 'userdata', 'settings.json');
+  if (fs.existsSync(newSettingsPath)) {
+    log('本版目录已有 settings.json，跳过迁移（不覆盖）');
+  } else {
+    // 在 release 里找全部旧版本目录的 settings.json，取修改时间最新的那一份（通常只有一个旧版本）
+    const candidates = fs.readdirSync(releaseRoot, { withFileTypes: true })
+      .filter((e) => e.isDirectory() && e.name.startsWith('番茄图片混淆-桌面版-v') && e.name.endsWith('-win64') && e.name !== folderName)
+      .map((e) => path.join(releaseRoot, e.name, 'userdata', 'settings.json'))
+      .filter((p) => fs.existsSync(p))
+      .map((p) => ({ p, t: fs.statSync(p).mtimeMs }))
+      .sort((a, b) => b.t - a.t);
+    if (candidates.length) {
+      fs.copyFileSync(candidates[0].p, newSettingsPath);
+      log(`已把上一版的用户设置迁移到本版：${candidates[0].p}`);
+    } else {
+      log('没有可迁移的旧版设置（首次打包或旧版没生成过设置）');
+    }
+  }
+} catch (err) {
+  log(`用户设置迁移失败（不影响本次产物，用户将从默认设置开始）：${err.message}`);
+}
+
 // —— 9) 清理旧版本产物（用户要求：只保留最新版本，避免拿错） ——
 // 只在本次打包产出成功后执行；只删本软件的旧版文件夹/压缩包，不动其它文件。
 log('步骤9：清理旧版本产物');

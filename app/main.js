@@ -295,6 +295,16 @@ function createMainWindow() {
             return document.querySelectorAll('#toolNav .tool-item').length;
           })()
         `);
+        // 启动默认工具随用户排序变化（v2.7.1，见 spec/modules/toolkit.md「启动默认工具」）：
+        // 下面的界面检查以「图片混淆」页为对象，先切到它，冒烟自检不受用户设置影响。
+        await mainWindow.webContents.executeJavaScript(`
+          (async () => {
+            const btn = [...document.querySelectorAll('#toolNav .tool-item')].find((b) => b.dataset.toolId === 'obfuscate');
+            if (btn) btn.click();
+            await new Promise((r) => setTimeout(r, 300));
+            return true;
+          })()
+        `);
         const optionCount = await mainWindow.webContents.executeJavaScript(
           'document.querySelectorAll("#modeSelect option").length'
         );
