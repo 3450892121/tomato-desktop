@@ -405,7 +405,12 @@ log('步骤8b：同步桌面快捷方式');
     `} else { Write-Output 'LNK_NOT_FOUND' }`
   ].join('\n');
   try {
-    const result = execFileSync('powershell', ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-Command', script], { encoding: 'utf8' }).trim();
+    // powershell 走绝对路径解析，不依赖 PATH：曾因环境 PATH 不完整导致 `spawnSync powershell ENOENT`，
+    // 结果快捷方式没同步、而步骤 9 又把旧版删了 → 桌面图标指向已删除目录，用户双击打不开（教训）。
+    const sysRoot = process.env.SystemRoot || 'C:\\Windows';
+    const psAbs = path.join(sysRoot, 'System32', 'WindowsPowerShell', 'v1.0', 'powershell.exe');
+    const psExe = fs.existsSync(psAbs) ? psAbs : 'powershell';
+    const result = execFileSync(psExe, ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-Command', script], { encoding: 'utf8' }).trim();
     if (result.includes('LNK_OK')) {
       log('桌面快捷方式已指向本次版本并读回验证（含图标位置）');
     } else if (result.includes('LNK_NOT_FOUND')) {
@@ -414,7 +419,9 @@ log('步骤8b：同步桌面快捷方式');
       log(`警告：快捷方式已写入但读回不一致（${result}），请手动检查图标`);
     }
   } catch (err) {
-    log(`快捷方式同步失败（不影响本次产物）：${err.message}`);
+    // 同步失败时旧版可能已被步骤 9 删除：必须说清后果与要改成什么，别让用户双击到已删除的目录
+    log(`警告：桌面快捷方式同步失败（${err.message}）`);
+    log(`      请手动把「番茄图片混淆 桌面版.lnk」指向：${exePath}（起始位置 ${outDir}，图标同路径）`);
   }
 }
 

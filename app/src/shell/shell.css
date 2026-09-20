@@ -201,14 +201,16 @@ body {
 .tool-group-items .tool-item { padding-left: var(--space-5); } /* 略微缩进，体现层级 */
 
 /* ============================================================
-   导航手动排序（v2.6.0，交互逻辑见 navsort.js）
-   - 进入排序模式：全部分组展开、条目亮出抓手、点击让位给拖拽；
+   导航手动排序（v2.6.0；v2.7.0 起进入排序默认全收起、可点标题按需展开）
+   - 进入排序模式：分组全部收起（一屏标题，整洁），点标题展开某组再排它的内部工具；
    - 拖拽：被拖条目升起玻璃卡跟随指针，同级兄弟用 transform 平滑让位；
    - 松手：按视觉序重排 DOM，被拖条目从松手位置平滑滑进插槽。
    ============================================================ */
 
-/* 折叠动画要 overflow:hidden，但排序时折叠已禁用——放开才能让玻璃卡的外阴影/放大不被裁 */
-.tool-nav.is-sorting .tool-group-items { overflow: visible; }
+/* 折叠动画靠 overflow:hidden，所以默认不放开；只在「拖拽进行中」放开——
+   否则被拖条目升起的玻璃卡外阴影、以及兄弟让位的位移会被组容器裁掉。
+   （被收起的分组其内容是 visibility:hidden，放开也不会露出来。） */
+.tool-nav.is-sorting.is-drag-active .tool-group-items { overflow: visible; }
 /* 可抓取的条目：浅玻璃底 + grab 光标；触屏拖拽不被浏览器接管成滚动 */
 .tool-nav.is-sorting .tool-item,
 .tool-nav.is-sorting .tool-group-head {
@@ -221,8 +223,14 @@ body {
   background: var(--color-surface-soft);
   box-shadow: inset 0 0 0 1px var(--color-border);
 }
+/* 展开中的那一组：标题铺一层浅玻璃底 —— 一眼分清「哪一组是打开着、可以拖内部工具的」 */
+.tool-nav.is-sorting .tool-group:not(.is-collapsed) > .tool-group-head {
+  background: var(--color-surface-soft);
+  box-shadow: inset 0 0 0 1px var(--color-border);
+  color: var(--color-text);
+}
 /* 抓手（六点）：工具条目画在 24px 缩进区内（不挤文字、不与 4px 选中标记条重叠）；
-   分组头用同一图形替换折叠箭头的位置（排序期间折叠让位）。颜色随条目文字色。 */
+   分组头画在最左侧（折叠箭头已让位到右侧，见下）。颜色随条目文字色。 */
 .tool-nav.is-sorting .tool-item::after,
 .tool-nav.is-sorting .tool-group-head::after {
   content: '';
@@ -235,11 +243,30 @@ body {
   background-size: 3px 5px;
   opacity: 0.55;
   pointer-events: none;
+  transition: opacity var(--transition-fast);
 }
 .tool-nav.is-sorting .tool-item::after { left: 9px; }
 .tool-nav.is-sorting .tool-group-head { position: relative; }
 .tool-nav.is-sorting .tool-group-head::after { left: 3px; }
-.tool-nav.is-sorting .tool-group-chevron { visibility: hidden; }
+/* 悬停时抓手变清楚：暗示「这里可以抓」 */
+.tool-nav.is-sorting .tool-item:hover::after,
+.tool-nav.is-sorting .tool-group-head:hover::after { opacity: 0.95; }
+
+/* 折叠箭头移到标题右侧：轻点标题＝展开/收起这一组（拖动＝整组移动），
+   箭头朝向即当前状态（▸ 收起 / ▾ 展开），让「哪一组能点开去排内部」一眼可见。 */
+.tool-nav.is-sorting .tool-group-chevron {
+  position: absolute;
+  right: var(--space-3);
+  top: 50%;
+  margin: 0;
+  transform: translateY(-50%) rotate(45deg);
+}
+.tool-nav.is-sorting .tool-group.is-collapsed .tool-group-chevron {
+  transform: translateY(-50%) rotate(-45deg);
+}
+.tool-nav.is-sorting .tool-group-count { margin-right: var(--space-4); } /* 给右侧箭头让位 */
+.tool-nav.is-sorting .tool-group:not(.is-collapsed) > .tool-group-head:hover,
+.tool-nav.is-sorting .tool-item:hover { background: var(--glass-bg-strong); }
 
 /* 同级兄弟让位：transform 由 navsort.js 内联驱动，这里只负责平滑过渡
    （被拖条目 .is-dragging 例外——跟随指针必须逐帧，见下）。 */
@@ -272,18 +299,32 @@ body {
   z-index: 20;
   cursor: grabbing;
   transition: none;
-  background: var(--glass-bg-soft);
+  background: var(--glass-bg-strong);
+  background-image: var(--glass-sheen);
+  backdrop-filter: blur(var(--glass-blur-strong)) saturate(var(--glass-saturate));
   border-radius: var(--radius-md);
   box-shadow: var(--shadow-card), inset 0 0 0 1px var(--glass-border);
 }
+/* 拖拽中：其余条目轻微淡出，视线集中在被拖的那一块（排序状态指示） */
+.tool-nav.is-sorting.is-drag-active .tool-item:not(.is-dragging),
+.tool-nav.is-sorting.is-drag-active .tool-group:not(.is-dragging) > .tool-group-head { opacity: 0.82; }
 
-/* 排序模式的 footer：提示行 + 完成按钮（主色强调） */
+/* 排序模式的 footer：提示条 + 完成按钮（主色强调） */
 .sort-hint {
-  padding: 0 var(--space-2);
-  color: var(--color-text-secondary);
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-1);
+  margin-bottom: var(--space-1);
+  padding: var(--space-2);
+  border-radius: var(--radius-sm);
+  /* 主色浅底 + 主色描边：一眼看出「现在处于排序模式」 */
+  background: var(--color-select-bg);
+  box-shadow: inset 0 0 0 1px var(--color-select-ring);
+  color: var(--color-text);
   font-size: var(--font-size-xs);
   line-height: 1.6;
 }
+.sort-hint::before { content: '⇅'; flex: none; color: var(--color-primary); }
 .side-btn-accent { color: var(--color-primary); font-weight: 600; }
 .side-btn-accent:hover { background: var(--color-select-bg); }
 

@@ -522,7 +522,9 @@ function renderNav() {
       + `<span class="tool-group-count">${tools.length}</span>`;
     // 以「眼睛看到的当前状态」为准取反：自动展开过的分组，点一下就是收起
     head.addEventListener('click', () => {
-      if (navSort.isActive()) return; // 排序模式中折叠让位给拖拽（整组拖动）
+      // 排序模式中：轻点标题的展开/收起由 navsort 的 pointerup 分支处理（要区分拖动＝整组移动），
+      // 这里直接让位，避免同一次轻点被处理两遍。
+      if (navSort.isActive()) return;
       setGroupCollapsed(group.id, !wrap.classList.contains('is-collapsed'));
     });
     wrap.appendChild(head);
@@ -540,28 +542,57 @@ function renderNav() {
     renderGroup(group, group.tools);
   }
 
-  // 重建后当前工具所在的分组必须仍是展开的（瞬时展开，不播动画）
-  ensureGroupExpanded(activeTool && activeTool.group);
+  if (navSort.isActive()) {
+    // 排序模式中重建（如「恢复默认顺序」）：按本次排序的折叠状态瞬时复位，
+    // 别把用户刚展开、正要排内部工具的那一组收回去（会话状态见 sortSessionCollapsed）。
+    applySortSessionView(true);
+  } else {
+    // 重建后当前工具所在的分组必须仍是展开的（瞬时展开，不播动画）
+    ensureGroupExpanded(activeTool && activeTool.group);
+  }
 }
 
-// —— 导航手动排序（v2.6.0；纯逻辑与拖拽交互见 navsort.js） ——
+// —— 导航手动排序（v2.6.0；v2.7.0 起进入排序默认全收起、可在排序中按需展开）——
 // 分组与组内工具各自独立排序；顺序存 settings.navOrder（null = 默认序）。
+// 排序会话的折叠状态只作用于「这一次排序」：进入时全部收起（用户要求：一屏标题、整洁有序），
+// 点标题可展开某一组去排它的内部工具；**不写进用户偏好**，退出排序时按 collapsedGroups 原样恢复。
+let sortSessionCollapsed = new Set();
+
+/** 把「排序会话的折叠状态」刷到当前导航（instant=瞬时：用于进入/重渲染后复位，避免一串动画） */
+function applySortSessionView(instant) {
+  for (const groupId of navGroups.keys()) {
+    applyGroupVisual(groupId, sortSessionCollapsed.has(groupId), instant);
+  }
+}
+
+/** 排序模式下点分组标题：展开/收起这一组（只改本次排序的视图，不写设置、不改用户偏好） */
+function toggleGroupInSort(groupId) {
+  if (!groupId || !navGroups.has(groupId)) return;
+  const collapsed = !sortSessionCollapsed.has(groupId);
+  if (collapsed) sortSessionCollapsed.add(groupId);
+  else sortSessionCollapsed.delete(groupId);
+  applyGroupVisual(groupId, collapsed);
+}
+
 const navSort = createNavSort({
   nav: els.nav,
   persist: (order) => settings.updateSettings({ navOrder: order }).then(() => setStatus('工具顺序已保存')),
   resetOrder: async () => {
     await settings.updateSettings({ navOrder: null });
-    renderNav(); // 排序模式保持开启，列表回默认顺序可继续拖
+    renderNav(); // 排序模式保持开启，列表回默认顺序可继续拖（会话折叠状态由 renderNav 复位）
     setStatus('已恢复默认顺序');
   },
-  expandAllGroups: () => {
-    for (const [groupId, entry] of navGroups) {
-      if (entry.wrap.classList.contains('is-collapsed')) applyGroupVisual(groupId, false);
-    }
+  enterView: () => {
+    // 进入排序：全部收起（一屏标题、整洁），要排某组内部工具时点标题展开
+    sortSessionCollapsed = new Set(navGroups.keys());
+    applySortSessionView(false); // 带动画收起，切换柔和
   },
-  restoreCollapsed: () => {
+  exitView: () => {
+    // 退出排序：丢掉会话状态，恢复用户自己的展开/折叠偏好
+    sortSessionCollapsed.clear();
     for (const groupId of navGroups.keys()) applyGroupVisual(groupId, collapsedGroups.has(groupId));
   },
+  onGroupHeadTap: toggleGroupInSort,
   onStatus: setStatus
 });
 

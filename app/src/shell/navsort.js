@@ -14,6 +14,12 @@
 //      k < 原位：兄弟下标 ∈ [k, 原位) 下移（+shift）；
 //      其余不动。k == 原位时无偏移，抓起来不会跳。
 //  - pointerup 后浏览器仍会派发 click，切换工具/折叠分组的守卫在 shell.js 的 click 入口（不能只靠阈值）。
+//
+// 排序会话的展开/折叠（v2.7.0，用户反馈「排序时全部展开太乱」）：
+//  - 进入排序默认**全部收起**（一屏标题，整洁）；点分组标题可随时展开某一组去排它的内部工具；
+//  - 会话内的展开/收起状态由 shell 的 sortSessionCollapsed 持有（不写用户偏好）：
+//    重渲染（如「恢复默认顺序」）后按会话状态复位，用户展开的组不会被收回去；
+//  - 退出排序时丢掉会话状态，按 settings.collapsedGroups 原样恢复用户自己的偏好。
 
 /** 是不是「非数组的普通对象」 */
 function isPlainObject(v) {
@@ -112,12 +118,13 @@ export function readNavOrderFromDOM(navEl) {
  *   - nav：.tool-nav 元素（拖拽发生在它内部，滚动跟随它）
  *   - persist(order)：拖放成功后落盘（shell 传 settings.updateSettings）
  *   - resetOrder()：恢复默认顺序（清 navOrder + 重渲染；排序模式保持开启）
- *   - expandAllGroups()：进入排序模式时展开全部分组
- *   - restoreCollapsed()：退出时恢复用户的折叠偏好
+ *   - enterView()：进入排序时的视图准备（shell 传「全部收起」——保持整洁；要排某组内部再点标题展开）
+ *   - exitView()：退出时恢复用户自己的折叠偏好（并丢掉排序会话的折叠状态）
+ *   - onGroupHeadTap(groupId)：排序中「轻点分组标题」（拖动＝整组移动，轻点＝展开/收起这一组）
  *   - onStatus(text)：状态栏反馈（可选）
  * @returns { isActive, toggle, exit, cancelDrag }
  */
-export function createNavSort({ nav, persist, resetOrder, expandAllGroups, restoreCollapsed, onStatus }) {
+export function createNavSort({ nav, persist, resetOrder, enterView, exitView, onGroupHeadTap, onStatus }) {
   const btnSort = document.getElementById('btnSort');
   const btnSortDone = document.getElementById('btnSortDone');
   const btnSortReset = document.getElementById('btnSortReset');
@@ -142,9 +149,11 @@ export function createNavSort({ nav, persist, resetOrder, expandAllGroups, resto
     nav.classList.add('is-sorting');
     btnSort.hidden = btnSettings.hidden = btnHelp.hidden = true;
     sortHint.hidden = btnSortDone.hidden = btnSortReset.hidden = false;
-    if (typeof expandAllGroups === 'function') expandAllGroups();
+    // 进入排序的视图准备：默认把分组全部收起（用户要求：一屏标题、整洁有序），
+    // 想排某一组内部工具时点它的标题展开即可（见 onGroupHeadTap）。
+    if (typeof enterView === 'function') enterView();
     document.addEventListener('keydown', onKeydown);
-    if (typeof onStatus === 'function') onStatus('排序模式：拖动条目调整顺序（分组与工具各自独立排序），Esc 退出');
+    if (typeof onStatus === 'function') onStatus('排序模式：拖标题移动整个分组，点标题展开后可拖动组内工具（Esc 退出）');
   }
 
   function exit() {
@@ -155,7 +164,8 @@ export function createNavSort({ nav, persist, resetOrder, expandAllGroups, resto
     btnSort.hidden = btnSettings.hidden = btnHelp.hidden = false;
     sortHint.hidden = btnSortDone.hidden = btnSortReset.hidden = true;
     document.removeEventListener('keydown', onKeydown);
-    if (typeof restoreCollapsed === 'function') restoreCollapsed();
+    // 退出排序：丢掉本次会话的折叠状态，回到用户自己的展开/折叠偏好
+    if (typeof exitView === 'function') exitView();
     if (typeof onStatus === 'function') onStatus('已完成排序');
   }
 
@@ -177,6 +187,7 @@ export function createNavSort({ nav, persist, resetOrder, expandAllGroups, resto
     const d = drag;
     drag = null;
     stopAutoScroll();
+    nav.classList.remove('is-drag-active'); // 交还给 CSS：组容器恢复 overflow:hidden（折叠动画要用）
     nav.removeEventListener('scroll', onNavScroll);
     for (const m of d.sibMeta) m.el.style.transform = '';
     d.el.classList.remove('is-dragging');
@@ -196,7 +207,8 @@ export function createNavSort({ nav, persist, resetOrder, expandAllGroups, resto
     else if (head) { el = head.closest('.tool-group'); kind = 'group'; } // 分组头：整组拖
     if (!el || !nav.contains(el)) return;
     event.preventDefault(); // 防文本选中；click 守卫在 shell.js 的 click 入口（这里拦不住 click）
-    pending = { el, kind, pointerId: event.pointerId, x: event.clientX, y: event.clientY };
+    // isHead：轻点（未越过阈值就松手）时用来区分「点标题＝展开/收起这一组」与「点工具条目＝什么都不做」
+    pending = { el, kind, isHead: !!head, groupId: el.dataset.groupId, pointerId: event.pointerId, x: event.clientX, y: event.clientY };
     window.addEventListener('pointermove', onWindowMove);
     window.addEventListener('pointerup', onWindowUp);
     window.addEventListener('pointercancel', onWindowCancel);
@@ -219,9 +231,12 @@ export function createNavSort({ nav, persist, resetOrder, expandAllGroups, resto
 
   function onWindowUp(event) {
     if (pending && !drag) {
-      // 没拖起来的点击：交给 click 守卫处理，这里只清理
+      // 没拖起来的「轻点」：分组标题＝展开/收起这一组（排序中要排某组内部工具，就得先点开它）；
+      // 工具条目＝什么都不做（切换工具的 click 由 shell.js 的守卫挡掉）。拖动才是排序，见 beginDrag。
+      const p = pending;
       detachWindowListeners();
       pending = null;
+      if (p.isHead && typeof onGroupHeadTap === 'function') onGroupHeadTap(p.groupId);
       return;
     }
     if (!drag) return;
@@ -265,6 +280,8 @@ export function createNavSort({ nav, persist, resetOrder, expandAllGroups, resto
     };
     pending = null;
     el.classList.add('is-dragging');
+    // 拖拽期间放开组容器的 overflow：玻璃卡的外阴影与兄弟让位的位移不被裁（CSS 见 shell.css）
+    nav.classList.add('is-drag-active');
     try { nav.setPointerCapture(event.pointerId); } catch { /* 合成事件/异常环境没有真指针：不依赖它 */ }
     nav.addEventListener('scroll', onNavScroll, { passive: true });
     applyTransform(event);
@@ -301,6 +318,7 @@ export function createNavSort({ nav, persist, resetOrder, expandAllGroups, resto
     const d = drag;
     drag = null;
     stopAutoScroll();
+    nav.classList.remove('is-drag-active'); // 拖完交还给 CSS：组容器恢复 overflow:hidden
     nav.removeEventListener('scroll', onNavScroll);
     detachWindowListeners();
 
