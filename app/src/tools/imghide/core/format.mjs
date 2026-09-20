@@ -388,6 +388,216 @@ export function uniqueEntryName(usedNames, name) {
   return fallback;
 }
 
+// —— 动态混淆（极速）容器：官方「动态混淆」用的另一套格式 ——
+//
+// 实测教训（用户反馈「网站的工具说要密码」）：官方有两套容器 ——
+//   ① 动态混淆（极速）：载荷是**明文分隔符格式**，直接追加在图片尾部，靠全文件字节扫描定位；
+//      不解压、不需密码、多大文件都能开（官方 `handleLegacyDecrypt` 就是全文件里找 `DYNAMIC_V2_`）。
+//   ② 图夹 PRO（防查）：就是上面的 V6（含 16 字节指纹 + 可选密码）；官方客户端一看到指纹就弹密码框。
+// 我们第一版只做了 ②，所以官方客户端把我们打的图当 PRO、要密码。两套都支持才叫真互通。
+//
+// 布局（与官方解析器逐条对齐）：
+//   DYNAMIC_V2_ + <分隔符> + [<分隔符>filename<分隔符> + base64(UTF-8 文件名) +
+//     <分隔符>filename<分隔符> + <分隔符>file<分隔符> + 原始数据] ...（最后一项数据一直到文件尾）
+// 其中分隔符形如 `|||xxxxxx|||`（必须以 ||| 结尾，长度 > 3）。
+// 另兼容更老的固定分隔符版本：`|||ENCRYPT_DELIMITER|||` / `|||FILENAME_DELIMITER|||` / `|||FILE_DELIMITER|||`。
+
+/** 动态格式的固定前缀（官方 DYNAMIC_DELIMITER_PREFIX_V2） */
+export const DYNAMIC_PREFIX_TEXT = 'DYNAMIC_V2_';
+export const DYNAMIC_PREFIX = new TextEncoder().encode(DYNAMIC_PREFIX_TEXT);
+/** 老版固定分隔符（官方 OLD_DELIMITER 等常量） */
+export const OLD_DELIMITER_TEXT = '|||ENCRYPT_DELIMITER|||';
+export const OLD_FILENAME_DELIMITER_TEXT = '|||FILENAME_DELIMITER|||';
+export const OLD_FILE_DELIMITER_TEXT = '|||FILE_DELIMITER|||';
+
+/**
+ * 生成一个随机分隔符：随机串 + `|||`（**必须以 ||| 结尾、整体长度 > 3**）。
+ * 注意不能写成 `|||xxxx|||`：官方解析器是从 `DYNAMIC_V2_` 之后取到「第一个 ||| 为止」作为分隔符，
+ * 那样只会取到 `|||`（长度 3）而被判为「非图夹」（实测踩过）。
+ */
+export function makeDynamicDelimiter(rand = Math.random) {
+  const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+  let mid = '';
+  for (let i = 0; i < 10; i += 1) mid += alphabet[Math.floor(rand() * alphabet.length)] || 'x';
+  return `${mid}|||`;
+}
+
+function bytesOf(text) {
+  return new TextEncoder().encode(text);
+}
+
+/** 在字节流里找子串（朴素扫描；分隔符只有几十字节，够用且无依赖） */
+export function indexOfBytes(haystack, needle, from = 0) {
+  if (needle.length === 0 || haystack.length < needle.length) return -1;
+  const first = needle[0];
+  const last = haystack.length - needle.length;
+  for (let i = Math.max(0, from); i <= last; i += 1) {
+    if (haystack[i] !== first) continue;
+    let k = 1;
+    while (k < needle.length && haystack[i + k] === needle[k]) k += 1;
+    if (k === needle.length) return i;
+  }
+  return -1;
+}
+
+const B64_ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
+const B64_LOOKUP = (() => {
+  const table = new Int16Array(256).fill(-1);
+  for (let i = 0; i < B64_ALPHABET.length; i += 1) table[B64_ALPHABET.charCodeAt(i)] = i;
+  return table;
+})();
+
+/** base64 → 字节（自己实现，渲染进程/Node 都能用） */
+export function base64ToBytes(text) {
+  const clean = String(text).replace(/[^A-Za-z0-9+/=]/g, '');
+  const out = [];
+  let buffer = 0;
+  let bits = 0;
+  for (const ch of clean) {
+    if (ch === '=') break;
+    const value = B64_LOOKUP[ch.charCodeAt(0)];
+    if (value < 0) continue;
+    buffer = (buffer << 6) | value;
+    bits += 6;
+    if (bits >= 8) {
+      bits -= 8;
+      out.push((buffer >> bits) & 0xff);
+    }
+  }
+  return new Uint8Array(out);
+}
+
+/** 字节 → base64（同样自己实现） */
+export function bytesToBase64(bytes) {
+  let out = '';
+  for (let i = 0; i < bytes.length; i += 3) {
+    const b0 = bytes[i];
+    const b1 = bytes[i + 1];
+    const b2 = bytes[i + 2];
+    out += B64_ALPHABET[b0 >> 2];
+    out += B64_ALPHABET[((b0 & 3) << 4) | ((b1 || 0) >> 4)];
+    out += b1 === undefined ? '=' : B64_ALPHABET[((b1 & 15) << 2) | ((b2 || 0) >> 6)];
+    out += b2 === undefined ? '=' : B64_ALPHABET[b2 & 63];
+  }
+  return out;
+}
+
+/**
+ * 生成「动态混淆（极速）」载荷
+ * @param {{name: string, bytes: Uint8Array}[]} files
+ * @param {string} [delimiter]
+ */
+export function buildDynamicPayload(files, delimiter = makeDynamicDelimiter()) {
+  const parts = [bytesOf(DYNAMIC_PREFIX_TEXT + delimiter)];
+  const fnDelim = bytesOf(`${delimiter}filename${delimiter}`);
+  const fileDelim = bytesOf(`${delimiter}file${delimiter}`);
+  for (const file of files) {
+    // 名字走 base64（官方要求的形态）；必须转成字节再拼，直接塞字符串会被 Uint8Array.set 按字符码写坏（踩过）
+    const nameB64Bytes = bytesOf(bytesToBase64(bytesOf(String(file.name || UNNAMED))));
+    parts.push(fnDelim, nameB64Bytes, fnDelim, fileDelim, file.bytes);
+  }
+  return concatBytes(parts);
+}
+
+/**
+ * 解析「动态混淆」载荷（与官方 handleLegacyDecrypt 的判定顺序一致：先 V2，再老版固定分隔符）
+ * @param {Uint8Array} bytes 图片文件字节（官方就是拿整份文件字节来找前缀）
+ * @returns {{files: {name: string, bytes: Uint8Array}[], dynamic: boolean, delimiter: string} | null}
+ */
+export function parseDynamicPayload(bytes) {
+  let delimiter = '';
+  let dynamic = false;
+  let start = -1;
+
+  const prefixIndex = indexOfBytes(bytes, DYNAMIC_PREFIX);
+  if (prefixIndex !== -1) {
+    const delimiterStart = prefixIndex + DYNAMIC_PREFIX.length;
+    const marker = bytesOf('|||');
+    const markerIndex = indexOfBytes(bytes, marker, delimiterStart);
+    if (markerIndex === -1) return null;
+    delimiter = new TextDecoder().decode(bytes.subarray(delimiterStart, markerIndex + marker.length));
+    if (delimiter.length <= 3) return null;
+    dynamic = true;
+    start = prefixIndex;
+  } else {
+    const oldIndex = indexOfBytes(bytes, bytesOf(OLD_DELIMITER_TEXT));
+    if (oldIndex === -1) return null;
+    delimiter = OLD_DELIMITER_TEXT;
+    start = oldIndex;
+  }
+
+  const fnDelim = bytesOf(dynamic ? `${delimiter}filename${delimiter}` : OLD_FILENAME_DELIMITER_TEXT);
+  const fileDelim = bytesOf(dynamic ? `${delimiter}file${delimiter}` : OLD_FILE_DELIMITER_TEXT);
+  const delimiterBytes = bytesOf(delimiter);
+
+  let offset = start + delimiterBytes.length;
+  const files = [];
+  while (offset < bytes.length) {
+    const nameStart = indexOfBytes(bytes, fnDelim, offset);
+    if (nameStart === -1) break;
+    offset = nameStart + fnDelim.length;
+    const nameEnd = indexOfBytes(bytes, fnDelim, offset);
+    if (nameEnd === -1) break;
+    const rawName = bytes.subarray(offset, nameEnd);
+    const name = dynamic
+      ? new TextDecoder('utf-8').decode(base64ToBytes(new TextDecoder().decode(rawName)))
+      : new TextDecoder('utf-8').decode(rawName);
+    offset = nameEnd + fnDelim.length;
+    const dataStart = indexOfBytes(bytes, fileDelim, offset);
+    if (dataStart === -1) break;
+    offset = dataStart + fileDelim.length;
+    let nextFile = indexOfBytes(bytes, fnDelim, offset);
+    if (nextFile === -1) nextFile = bytes.length;
+    files.push({ name, bytes: bytes.subarray(offset, nextFile) });
+    offset = nextFile;
+  }
+  if (files.length === 0) return null;
+  return { files, dynamic, delimiter };
+}
+
+/** 把动态载荷追加到图片尾部（官方就是靠全文件扫描定位，放尾部最稳） */
+export function appendDynamicPayload(imageBytes, payload) {
+  return concatBytes([imageBytes, payload]);
+}
+
+// —— 体积提示（用户实测教训：788MB 的图夹在网站/手机端根本打不开） ——
+
+/** 贴吧等平台的建议上限（官方口径：表图控制在 3MB 以内更好发） */
+export const PLATFORM_HINT_BYTES = 3 * 1024 * 1024;
+/** 网页版/手机端的安全线：超过这个体积，浏览器一页里放不下（实测解 788MB 的图要 2.3GB 内存） */
+export const WEB_SAFE_BYTES = 50 * 1024 * 1024;
+
+/**
+ * 按「要藏的文件合计体积」给一条如实提示
+ * @param {number} totalBytes 要藏进去的文件合计
+ * @returns {{level: 'ok'|'hint'|'warn', text: string}}
+ */
+export function sizeWarning(totalBytes, coverBytes = 0, mode = 'fast') {
+  const total = Number(totalBytes) || 0;
+  const product = total + (Number(coverBytes) || 0);
+  if (total > WEB_SAFE_BYTES && mode === 'pro') {
+    // 只有 PRO（V6）那条路才要把整张图解压出来，网页版/手机端扛不住
+    return {
+      level: 'warn',
+      text: `合计 ${humanBytes(total)}：太大了 —— 「防查」格式要整张图解压，网页版/手机 APP 多半打不开；`
+        + '建议改用「极速」格式，或分批藏。'
+    };
+  }
+  if (total > WEB_SAFE_BYTES) {
+    return {
+      level: 'hint',
+      text: `合计 ${humanBytes(total)}：文件很大 —— 「极速」格式网站和手机都能解，但微信/QQ 传不动，建议用网盘或当面拷。`
+    };
+  }
+  if (product > PLATFORM_HINT_BYTES) {
+    return {
+      level: 'hint',
+      text: `预计产物约 ${humanBytes(product)}：微信/QQ 要按「文件」发送，贴吧要用原图链接（平台建议 3MB 以内更稳）。`
+    };
+  }
+  return { level: 'ok', text: '' };
+}
+
 /** 人类可读体积（界面与结果行共用；与既有工具同一口径） */
 export function humanBytes(size) {
   const n = Number(size) || 0;

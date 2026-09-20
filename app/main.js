@@ -1711,7 +1711,7 @@ ipcMain.handle('dialog:open-hide-image', async () => {
     const { TEST_DIR } = require('./tests/ui-test.js');
     const entries = await fs.readdir(TEST_DIR, { withFileTypes: true }).catch(() => []);
     return entries
-      .filter((e) => e.isFile() && /_图夹\.(png|gif)$/i.test(e.name))
+      .filter((e) => e.isFile() && /_图夹(\(\d+\))?\.(png|gif|jpe?g|webp|bmp|avif)$/i.test(e.name))
       .map((e) => path.join(TEST_DIR, e.name))
       .sort();
   }
@@ -1748,12 +1748,16 @@ ipcMain.handle('imghide:pack', async (event, options) => {
   const engine = await loadImgHideEngine();
   try {
     return await engine.packImage({
+      mode: opt.mode === 'pro' ? 'pro' : 'fast',
       coverPath: opt.coverPath || undefined,
       coverBytes: opt.coverBytes ? Buffer.from(opt.coverBytes) : undefined,
       coverKind: opt.coverKind,
       items: opt.items,
       password: opt.password || '',
-      outputDir: opt.outputDir || undefined,
+      // 自定义表图：默认落在表图旁边；随机表图（没有源文件）落在系统「图片」文件夹
+      // （自动测试模式下一律落测试目录，别往使用者的「图片」文件夹里写东西）
+      outputDir: opt.outputDir || (opt.coverPath ? undefined : (testMode() ? require('./tests/ui-test.js').TEST_DIR : app.getPath('pictures'))),
+      outputPath: opt.outputPath || undefined,
       baseName: opt.baseName || undefined,
       onProgress: (payload) => {
         if (event.sender && !event.sender.isDestroyed()) event.sender.send('imghide:progress', payload);

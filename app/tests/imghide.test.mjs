@@ -16,7 +16,10 @@ import {
   embedPayloadInGif, extractPayloadFromGif,
   parsePngChunks, pngInfo, pngCompatError, concatIdatData,
   extractPayloadFromInflatedPng, writePngWithIdat, buildFingerprintChunk,
-  safeEntryName, uniqueEntryName, humanBytes
+  safeEntryName, uniqueEntryName, humanBytes, sizeWarning, WEB_SAFE_BYTES,
+  makeDynamicDelimiter, buildDynamicPayload, parseDynamicPayload, appendDynamicPayload,
+  base64ToBytes, bytesToBase64, OLD_DELIMITER_TEXT, OLD_FILENAME_DELIMITER_TEXT, OLD_FILE_DELIMITER_TEXT,
+  indexOfBytes, DYNAMIC_PREFIX
 } from '../src/tools/imghide/core/format.mjs';
 import { encryptPayload, decryptPayload } from '../src/tools/imghide/core/crypto.mjs';
 import { packImage, unpackImage, uniqueTargetPath, uniqueTargetDir } from '../src/tools/imghide/core/engine.mjs';
@@ -311,6 +314,76 @@ test('密码：同一口令两次加密的 IV 不同（不会出现相同密文�
   assert.deepEqual([...decryptPayload(a, 'pw')], [...decryptPayload(b, 'pw')]);
 });
 
+// —— 五之二、动态混淆（极速）容器 ——
+
+test('动态格式：分隔符必须「以 ||| 结尾且长度 > 3」（照抄官方解析器的硬要求）', () => {
+  const delimiter = makeDynamicDelimiter(() => 0.5);
+  assert.ok(delimiter.endsWith('|||'), delimiter);
+  assert.ok(delimiter.length > 3, delimiter);
+  assert.ok(!delimiter.startsWith('|||'), `不能以 ||| 开头（那样官方只会取到 |||、长度 3、判为非图夹）：${delimiter}`);
+});
+
+test('动态格式：载荷往返（中文名 / 空文件 / 多文件）', () => {
+  const files = [
+    { name: '中文名字.txt', bytes: new TextEncoder().encode('动态混淆的内容') },
+    { name: 'empty.bin', bytes: new Uint8Array(0) },
+    { name: 'sub/路径.bin', bytes: new Uint8Array([9, 8, 7]) }
+  ];
+  const payload = buildDynamicPayload(files, 'AbCd1234Ef|||');
+  const back = parseDynamicPayload(payload);
+  assert.ok(back, '应能解析');
+  assert.equal(back.dynamic, true);
+  assert.equal(back.delimiter, 'AbCd1234Ef|||');
+  assert.deepEqual(back.files.map((f) => f.name), ['中文名字.txt', 'empty.bin', 'sub/路径.bin']);
+  assert.equal(new TextDecoder().decode(back.files[0].bytes), '动态混淆的内容');
+  assert.equal(back.files[1].bytes.length, 0);
+});
+
+test('动态格式：整文件（图片 + 尾部载荷）也能解析，且表图前缀零改动', () => {
+  const cover = fakeCover('png');
+  const payload = buildDynamicPayload([{ name: 'a.txt', bytes: new TextEncoder().encode('x') }]);
+  const whole = appendDynamicPayload(cover, payload);
+  assert.deepEqual([...whole.subarray(0, cover.length)], [...cover], '表图字节必须零改动');
+  const parsed = parseDynamicPayload(whole);
+  assert.ok(parsed);
+  assert.equal(parsed.files[0].name, 'a.txt');
+  // 官方就是拿整份文件字节来找前缀：载荷可以不在文件最末尾，也能被找到
+  const withTail = concatBytes([whole, new Uint8Array(1024)]);
+  assert.equal(parseDynamicPayload(withTail).files[0].name, 'a.txt');
+});
+
+test('动态格式：非图夹文件返回 null，损坏载荷不崩', () => {
+  assert.equal(parseDynamicPayload(fakeCover('png')), null);
+  assert.equal(parseDynamicPayload(new Uint8Array(0)), null);
+  const broken = concatBytes([new TextEncoder().encode('DYNAMIC_V2_'), new Uint8Array([1, 2, 3])]);
+  assert.equal(parseDynamicPayload(broken), null, '没有分隔符就该判非图夹');
+});
+
+test('动态格式：兼容更老的固定分隔符版本（OLD_DELIMITER）', () => {
+  const enc = (s) => new TextEncoder().encode(s);
+  const payload = concatBytes([
+    enc(OLD_DELIMITER_TEXT),
+    enc(OLD_FILENAME_DELIMITER_TEXT),
+    enc('老格式.txt'),
+    enc(OLD_FILENAME_DELIMITER_TEXT),
+    enc(OLD_FILE_DELIMITER_TEXT),
+    enc('old-content')
+  ]);
+  const parsed = parseDynamicPayload(payload);
+  assert.ok(parsed);
+  assert.equal(parsed.dynamic, false);
+  assert.equal(parsed.files[0].name, '老格式.txt');
+  assert.equal(new TextDecoder().decode(parsed.files[0].bytes), 'old-content');
+});
+
+test('动态格式：base64 工具自洽（含中文与填充）', () => {
+  for (const text of ['a', 'ab', 'abc', '中文名字.txt', 'x'.repeat(50)]) {
+    const bytes = new TextEncoder().encode(text);
+    const back = base64ToBytes(bytesToBase64(bytes));
+    assert.equal(new TextDecoder().decode(back), text);
+  }
+});
+
 // —— 六、条目名净化与命名 ——
 
 test('条目名净化：剥掉路径、只留 basename（防路径穿越）', () => {
@@ -350,7 +423,60 @@ test('humanBytes 三档单位', () => {
   assert.equal(humanBytes(5 * 1024 * 1024), '5.00 MB');
 });
 
+test('体积提示：按门槛给出如实提醒（用户实测：788MB 的图网站打不开）', () => {
+  const tiny = sizeWarning(200 * 1024, 100 * 1024);
+  assert.equal(tiny.level, 'ok');
+  assert.equal(tiny.text, '');
+
+  const platform = sizeWarning(2 * 1024 * 1024, 2 * 1024 * 1024);
+  assert.equal(platform.level, 'hint');
+  assert.ok(/3MB|文件/.test(platform.text), platform.text);
+
+  // 「防查」才需要整张图解压 → 超大文件警告它；「极速」只是提醒传输不便
+  const web = sizeWarning(60 * 1024 * 1024, 512 * 1024, 'pro');
+  assert.equal(web.level, 'warn');
+  assert.ok(/打不开/.test(web.text), web.text);
+  const fast = sizeWarning(60 * 1024 * 1024, 512 * 1024, 'fast');
+  assert.equal(fast.level, 'hint');
+  assert.ok(/网盘|传不动/.test(fast.text), fast.text);
+
+  // 门槛：50MB 整不算超（与实现口径一致）
+  assert.equal(sizeWarning(WEB_SAFE_BYTES, 0, 'pro').level, 'hint');
+  assert.equal(sizeWarning(WEB_SAFE_BYTES + 1, 0, 'pro').level, 'warn');
+});
+
 // —— 七、引擎端到端（直接调 Node 侧引擎，不经界面） ——
+
+await testAsync('引擎：极速模式（动态混淆）任意格式表图都能打包 → 解包逐字节一致', async () => {
+  await fsp.rm(WORK, { recursive: true, force: true });
+  await fsp.mkdir(WORK, { recursive: true });
+  const item = path.join(WORK, 'fast.txt');
+  const content = new TextEncoder().encode('极速模式的内容');
+  await fsp.writeFile(item, content);
+
+  // PNG 表图
+  const coverPng = path.join(WORK, 'fast-cover.png');
+  await fsp.writeFile(coverPng, fakeCover('png'));
+  const packedPng = await packImage({ mode: 'fast', coverPath: coverPng, items: [{ path: item }], outputDir: WORK });
+  assert.ok(packedPng.path.endsWith('_图夹.png'), packedPng.path);
+  const pngBytes = new Uint8Array(await fsp.readFile(packedPng.path));
+  assert.deepEqual([...pngBytes.subarray(0, (await fsp.readFile(coverPng)).length)], [...await fsp.readFile(coverPng)], '表图零改动');
+  assert.ok(indexOfBytes(pngBytes, DYNAMIC_PREFIX) !== -1, '尾部应有 DYNAMIC_V2_ 前缀');
+  const outPng = await unpackImage({ imagePath: packedPng.path, outputDir: path.join(WORK, 'fast-out-png') });
+  assert.equal(outPng.files.length, 1);
+  assert.deepEqual([...await fsp.readFile(outPng.files[0].path)], [...content]);
+
+  // 「其它格式」的表图（用字节冒充 JPG 头即可：极速模式不解码表图）
+  const coverJpg = path.join(WORK, 'fast-cover.jpg');
+  await fsp.writeFile(coverJpg, new Uint8Array([0xff, 0xd8, 0xff, 0xe0, 1, 2, 3, 4, 5]));
+  const packedJpg = await packImage({ mode: 'fast', coverPath: coverJpg, items: [{ path: item }], outputDir: WORK });
+  assert.ok(packedJpg.path.endsWith('_图夹.jpg'), `应保留表图扩展名：${packedJpg.path}`);
+  const outJpg = await unpackImage({ imagePath: packedJpg.path, outputDir: path.join(WORK, 'fast-out-jpg') });
+  assert.deepEqual([...await fsp.readFile(outJpg.files[0].path)], [...content]);
+
+  // 极速文件里不该有 PRO 指纹（否则网页版会弹密码框）
+  assert.equal(indexOfBytes(new Uint8Array(await fsp.readFile(packedPng.path)), FINGERPRINT), -1);
+});
 
 await testAsync('引擎：PNG 表图 打包 → 解包 逐字节一致', async () => {
   await fsp.rm(WORK, { recursive: true, force: true });
@@ -365,6 +491,7 @@ await testAsync('引擎：PNG 表图 打包 → 解包 逐字节一致', async (
   await fsp.writeFile(item2, payload2);
 
   const packed = await packImage({
+    mode: 'pro',
     coverPath: cover,
     items: [{ path: item1 }, { path: item2 }],
     outputDir: WORK
@@ -390,7 +517,7 @@ await testAsync('引擎：GIF 表图 打包 → 解包 逐字节一致，且原 
   const item = path.join(WORK, 'a.txt');
   await fsp.writeFile(item, new TextEncoder().encode('gif 里的小秘密'));
 
-  const packed = await packImage({ coverPath: cover, items: [{ path: item }], outputDir: WORK });
+  const packed = await packImage({ mode: 'pro', coverPath: cover, items: [{ path: item }], outputDir: WORK });
   assert.ok(packed.path.endsWith('_图夹.gif'), packed.path);
   const packedBytes = await fsp.readFile(packed.path);
   assert.deepEqual([...packedBytes.subarray(0, gifBytes.length)], [...gifBytes]);
@@ -408,7 +535,7 @@ await testAsync('引擎：带密码往返成功，错误密码给「密码错误
   const item = path.join(WORK, 's.txt');
   await fsp.writeFile(item, new TextEncoder().encode('secret'));
 
-  const packed = await packImage({ coverPath: cover, items: [{ path: item }], password: 'pw123', outputDir: WORK });
+  const packed = await packImage({ mode: 'pro', coverPath: cover, items: [{ path: item }], password: 'pw123', outputDir: WORK });
   const okOut = path.join(WORK, 'ok');
   const ok = await unpackImage({ imagePath: packed.path, password: 'pw123', outputDir: okOut });
   assert.equal(ok.encrypted, true);
@@ -437,7 +564,7 @@ await testAsync('引擎：非图夹图 / 损坏文件都给可读错误', async 
 
   const jpeg = path.join(WORK, 'photo.jpg');
   await fsp.writeFile(jpeg, new Uint8Array([0xff, 0xd8, 0xff, 0xe0, 1, 2, 3, 4]));
-  await assert.rejects(() => unpackImage({ imagePath: jpeg }), /不是 PNG \/ GIF 图夹/);
+  await assert.rejects(() => unpackImage({ imagePath: jpeg }), /不是图夹图/);
 
   const broken = path.join(WORK, 'broken.png');
   await fsp.writeFile(broken, fakeCover('png').subarray(0, 30));
@@ -463,14 +590,40 @@ await testAsync('引擎：里图带路径穿越名 → 落盘时已被净化在�
   assert.ok(!fs.existsSync(path.join(WORK, '逃逸.txt')));
 });
 
+await testAsync('引擎：随机表图路径（只给 coverBytes，没有源文件）也能打包落盘', async () => {
+  await fsp.rm(WORK, { recursive: true, force: true });
+  await fsp.mkdir(WORK, { recursive: true });
+  const item = path.join(WORK, 'random.txt');
+  await fsp.writeFile(item, new TextEncoder().encode('随机表图路径下的内容'));
+
+  const packed = await packImage({
+    coverBytes: fakeCover('png'),      // 界面进程生成的封面（内存里，没有磁盘来源）
+    coverKind: 'png',
+    items: [{ path: item }],
+    outputDir: WORK,
+    baseName: '随机表图-测试'
+  });
+  assert.equal(packed.ok, true);
+  assert.ok(packed.path.endsWith('随机表图-测试_图夹.png'), packed.path);
+  const out = await unpackImage({ imagePath: packed.path, outputDir: path.join(WORK, 'out-random') });
+  assert.equal(await fsp.readFile(out.files[0].path, 'utf8'), '随机表图路径下的内容');
+
+  // outputPath：给死路径时按用户选的位置写（保存对话框场景）
+  const exact = path.join(WORK, '指定位置.png');
+  const packed2 = await packImage({ coverBytes: fakeCover('png'), coverKind: 'png', items: [{ path: item }], outputPath: exact });
+  assert.equal(packed2.path, exact);
+  assert.ok(fs.existsSync(exact));
+});
+
 await testAsync('引擎：没有里图时报错，表图非 PNG/GIF 时报错', async () => {
   await fsp.rm(WORK, { recursive: true, force: true });
   await fsp.mkdir(WORK, { recursive: true });
   const cover = path.join(WORK, 'c.png');
   await fsp.writeFile(cover, fakeCover('png'));
   await assert.rejects(() => packImage({ coverPath: cover, items: [], outputDir: WORK }), /还没有要藏进去的文件/);
+  // 「防查」模式才限制表图格式；「极速」什么格式都行（数据追加在尾部）
   await assert.rejects(
-    () => packImage({ coverBytes: new Uint8Array([0xff, 0xd8, 0xff]), items: [{ path: cover }], outputDir: WORK }),
+    () => packImage({ mode: 'pro', coverBytes: new Uint8Array([0xff, 0xd8, 0xff]), items: [{ path: cover }], outputDir: WORK }),
     /只支持 PNG \/ GIF/
   );
 });

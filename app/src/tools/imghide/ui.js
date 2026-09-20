@@ -2,13 +2,15 @@
 // 分层：本文件只做界面与流程编排；容器格式/载荷在 core/format.mjs，密码在 core/crypto.mjs，
 //       Node 侧引擎（打包/解包/落盘）在 core/engine.mjs，由主进程经 IPC 调用。
 // 规格：spec/modules/imghide.md
-import { detectCoverKind, pngInfo, pngCompatError, humanBytes } from './core/format.mjs';
+import { detectCoverKind, pngInfo, pngCompatError, humanBytes, sizeWarning } from './core/format.mjs';
 import { decodeImageFromBytes, encodeImageToBytes } from '../../shared/imageio.js';
 
 /** 可以作为「表图」的扩展名（都是内核能解码的位图；SVG/ICO 不做表图，避免解码差异） */
 const COVER_EXTS = ['png', 'gif', 'jpg', 'jpeg', 'webp', 'bmp', 'avif'];
 /** 一次最多收多少个里图（防御误拖整个文件夹） */
 const MAX_ITEMS = 500;
+/** 随机表图的尺寸（够大又不至于让产物太肥） */
+const RANDOM_COVER_SIZE = 1024;
 
 const MARKUP = `
   <div class="ih-tool" id="ihRoot">
@@ -24,15 +26,16 @@ const MARKUP = `
       <section class="card ih-card">
         <div class="ih-row">
           <span class="control-label">表图</span>
-          <button class="btn btn-primary" id="ihPickCover" type="button" data-pick="cover">选择表图</button>
+          <button class="btn btn-primary" id="ihRandomCover" type="button" data-pick="random">随机表图</button>
+          <button class="btn btn-plain" id="ihPickCover" type="button" data-pick="cover">选择图片</button>
           <button class="btn btn-ghost" id="ihClearCover" type="button" data-clear="cover">清空</button>
-          <span class="ih-drop-hint" id="ihCoverHint">PNG / GIF 原样写入；JPG、WebP 等会自动转成 PNG</span>
+          <span class="ih-drop-hint">PNG / GIF 原样写入；JPG、WebP 等会自动转成 PNG</span>
         </div>
         <div class="ih-cover" id="ihCoverBox">
           <img class="ih-cover-thumb" id="ihCoverThumb" alt="表图预览" hidden />
           <div class="ih-cover-meta" id="ihCoverMeta">
             <span>还没选表图</span>
-            <span class="ih-sub">表图 = 最终发给别人的那张图（文件就藏在它里面）</span>
+            <span class="ih-sub">表图 = 最终发给别人的那张图（文件就藏在它里面）；也可以点「随机表图」让软件生成一张</span>
           </div>
         </div>
       </section>
@@ -45,13 +48,25 @@ const MARKUP = `
         </div>
         <ul class="ih-list" id="ihItems"></ul>
         <div class="ih-note" id="ihItemsEmpty">还没有要藏的文件</div>
+        <div class="ih-note" id="ihSizeNote"></div>
       </section>
 
       <section class="card ih-card">
         <div class="ih-row">
+          <span class="control-label">算法选择</span>
+          <label class="ih-radio"><input type="radio" name="ihAlgo" id="ihAlgoFast" value="fast" checked /> 动态混淆（极速）</label>
+          <label class="ih-radio"><input type="radio" name="ihAlgo" id="ihAlgoPro" value="pro" /> 图夹 PRO（防查）</label>
+        </div>
+        <div class="ih-note" id="ihAlgoNote"></div>
+        <div class="ih-row">
           <span class="control-label">密码</span>
-          <input class="input ih-w-md" id="ihPassword" type="text" placeholder="留空 = 不加密（对方打开就能解）" />
-          <span class="ih-drop-hint">设了密码，对方要用同一密码才能取出文件</span>
+          <input class="input ih-w-md" id="ihPassword" type="text" placeholder="不加密（对方打开就能解）" disabled />
+          <span class="ih-drop-hint" id="ihPasswordHint">选「防查」才能设密码</span>
+        </div>
+        <div class="ih-row">
+          <span class="control-label">水印文字</span>
+          <input class="input ih-w-md" id="ihWatermark" type="text" placeholder="可选，例如：图夹" />
+          <span class="ih-drop-hint">填了水印会把表图重编码成 PNG 输出（GIF 表图不重编码，加不上字）</span>
         </div>
         <div class="ih-note" id="ihPackNote">提示：微信 / QQ 里请以「文件」方式发送这张图；直接发图会被平台压缩，藏在里面的数据会丢。</div>
       </section>
@@ -59,6 +74,7 @@ const MARKUP = `
       <div class="ih-actions">
         <button class="btn btn-primary" id="ihRunPack" type="button" data-run="pack">开始打包</button>
         <button class="btn btn-plain" id="ihClearPack" type="button" data-clear="pack">清空</button>
+        <button class="btn btn-ghost" id="ihOpenProduct" type="button" data-open="product" hidden>打开文件夹</button>
         <div class="ih-result" id="ihPackResult"></div>
       </div>
     </section>
@@ -134,6 +150,79 @@ function extLabel(name) {
   return ext && ext !== name.toLowerCase() ? ext.toUpperCase() : '文件';
 }
 
+/** 时间戳（随机表图产物的默认名字） */
+function stamp() {
+  const d = new Date();
+  const p = (n) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}${p(d.getMonth() + 1)}${p(d.getDate())}-${p(d.getHours())}${p(d.getMinutes())}${p(d.getSeconds())}`;
+}
+
+// —— 随机表图与加水印（都在界面进程用画布做，不引入任何素材/依赖） ——
+
+/** 生成一张装饰性封面（渐变 + 光斑 + 细噪点），返回 PNG 字节 */
+async function makeRandomCover() {
+  const size = RANDOM_COVER_SIZE;
+  // 必须用 OffscreenCanvas：普通 <canvas> 没有 convertToBlob（踩过：报错被状态栏吞掉，看起来像「点了没反应」）
+  const canvas = new OffscreenCanvas(size, size);
+  const ctx = canvas.getContext('2d');
+
+  const hue = Math.floor(Math.random() * 360);
+  const bg = ctx.createLinearGradient(0, 0, size, size);
+  bg.addColorStop(0, `hsl(${hue} 78% 62%)`);
+  bg.addColorStop(0.55, `hsl(${(hue + 40) % 360} 72% 48%)`);
+  bg.addColorStop(1, `hsl(${(hue + 300) % 360} 68% 28%)`);
+  ctx.fillStyle = bg;
+  ctx.fillRect(0, 0, size, size);
+
+  // 光斑：径向渐变圆
+  for (let i = 0; i < 9; i += 1) {
+    const cx = Math.random() * size;
+    const cy = Math.random() * size;
+    const r = size * (0.08 + Math.random() * 0.28);
+    const spot = ctx.createRadialGradient(cx, cy, 0, cx, cy, r);
+    const h = (hue + Math.floor(Math.random() * 360)) % 360;
+    spot.addColorStop(0, `hsla(${h} 90% 78% / ${0.25 + Math.random() * 0.35})`);
+    spot.addColorStop(1, 'hsla(0 0% 100% / 0)');
+    ctx.fillStyle = spot;
+    ctx.beginPath();
+    ctx.arc(cx, cy, r, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  // 细噪点：让画面不那么"塑料"，也更耐压缩
+  const dots = Math.floor(size * size * 0.02);
+  for (let i = 0; i < dots; i += 1) {
+    ctx.fillStyle = `hsla(0 0% ${Math.random() > 0.5 ? 100 : 0}% / 0.05)`;
+    ctx.fillRect(Math.random() * size, Math.random() * size, 1.6, 1.6);
+  }
+
+  const blob = await canvas.convertToBlob({ type: 'image/png' });
+  return new Uint8Array(await blob.arrayBuffer());
+}
+
+/** 在图片左上角叠加文字水印（重编码为 PNG） */
+async function applyWatermark(bytes, text) {
+  const { pixels, width, height } = await decodeImageFromBytes(bytes);
+  // 同上：OffscreenCanvas 才有 convertToBlob
+  const canvas = new OffscreenCanvas(width, height);
+  const ctx = canvas.getContext('2d');
+  ctx.putImageData(new ImageData(pixels, width, height), 0, 0);
+
+  const fontSize = Math.max(14, Math.round(Math.min(width, height) * 0.055));
+  const pad = Math.round(fontSize * 0.7);
+  ctx.font = `bold ${fontSize}px "Microsoft YaHei", "Segoe UI", sans-serif`;
+  ctx.textBaseline = 'top';
+  ctx.lineJoin = 'round';
+  ctx.lineWidth = Math.max(2, Math.round(fontSize * 0.14));
+  ctx.strokeStyle = 'rgba(0, 0, 0, 0.55)';
+  ctx.fillStyle = 'rgba(255, 255, 255, 0.86)';
+  ctx.strokeText(text, pad, pad);
+  ctx.fillText(text, pad, pad);
+
+  const blob = await canvas.convertToBlob({ type: 'image/png' });
+  return new Uint8Array(await blob.arrayBuffer());
+}
+
 // —— 表图 / 待解包图 ——
 
 function revokeThumb(which) {
@@ -142,6 +231,37 @@ function revokeThumb(which) {
     URL.revokeObjectURL(holder.thumbUrl);
     holder.thumbUrl = '';
   }
+}
+
+function renderCoverMeta(title, sub) {
+  const { els } = state;
+  els.coverMeta.innerHTML = '<span class="ih-cover-name"></span><span class="ih-sub"></span>';
+  els.coverMeta.querySelector('.ih-cover-name').textContent = title;
+  els.coverMeta.querySelector('.ih-sub').textContent = sub;
+}
+
+/** 设为随机生成的封面（没有磁盘来源） */
+async function setRandomCover() {
+  const { ctx, els } = state;
+  ctx.setStatus('正在生成随机表图…');
+  const bytes = await makeRandomCover();
+  revokeThumb('cover');
+  state.cover = {
+    source: 'random',
+    path: '',
+    name: `随机表图-${stamp()}.png`,
+    size: bytes.length,
+    kind: 'png',
+    needsReencode: false,
+    bytes,
+    thumbUrl: URL.createObjectURL(new Blob([bytes]))
+  };
+  els.coverThumb.src = state.cover.thumbUrl;
+  els.coverThumb.hidden = false;
+  els.coverBox.classList.add('is-set');
+  renderCoverMeta(`随机表图（${humanBytes(bytes.length)}）`, '软件生成的封面；不满意可以再点一次「随机表图」换一张，或改成「选择图片」');
+  refreshRunState();
+  ctx.setStatus('已生成随机表图；再点一次可以换一张');
 }
 
 async function setCover(filePath) {
@@ -172,6 +292,7 @@ async function setCover(filePath) {
 
   revokeThumb('cover');
   state.cover = {
+    source: 'file',
     path: filePath,
     name: info.name,
     size: info.size || bytes.length,
@@ -187,9 +308,7 @@ async function setCover(filePath) {
   const kindText = needsReencode
     ? `不是 PNG/GIF（${reason}）`
     : (kind === 'gif' ? 'GIF（原样写入，动图也能藏）' : 'PNG（原图直接写入，画质不变）');
-  els.coverMeta.innerHTML = `<span class="ih-cover-name"></span><span class="ih-sub"></span>`;
-  els.coverMeta.querySelector('.ih-cover-name').textContent = `${state.cover.name}（${humanBytes(state.cover.size)}）`;
-  els.coverMeta.querySelector('.ih-sub').textContent = kindText;
+  renderCoverMeta(`${state.cover.name}（${humanBytes(state.cover.size)}）`, kindText);
   refreshRunState();
 }
 
@@ -200,7 +319,7 @@ function clearCover() {
   els.coverThumb.hidden = true;
   els.coverThumb.removeAttribute('src');
   els.coverBox.classList.remove('is-set');
-  els.coverMeta.innerHTML = '<span>还没选表图</span><span class="ih-sub">表图 = 最终发给别人的那张图（文件就藏在它里面）</span>';
+  els.coverMeta.innerHTML = '<span>还没选表图</span><span class="ih-sub">表图 = 最终发给别人的那张图（文件就藏在它里面）；也可以点「随机表图」让软件生成一张</span>';
   refreshRunState();
 }
 
@@ -226,7 +345,7 @@ async function setUnpackImage(filePath) {
   els.imageThumb.src = state.unpackImage.thumbUrl;
   els.imageThumb.hidden = false;
   els.imageBox.classList.add('is-set');
-  els.imageMeta.innerHTML = `<span class="ih-cover-name"></span><span class="ih-sub"></span>`;
+  els.imageMeta.innerHTML = '<span class="ih-cover-name"></span><span class="ih-sub"></span>';
   els.imageMeta.querySelector('.ih-cover-name').textContent = `${state.unpackImage.name}（${humanBytes(state.unpackImage.size)}）`;
   els.imageMeta.querySelector('.ih-sub').textContent = '点「开始解包」取出里面的文件';
   refreshRunState();
@@ -307,21 +426,50 @@ function renderItems() {
 
 // —— 运行状态与结果 ——
 
+function refreshSizeNote() {
+  const { els } = state;
+  const total = state.items.reduce((sum, it) => sum + (Number(it.size) || 0), 0);
+  const coverSize = state.cover ? Number(state.cover.size) || 0 : 0;
+  const warn = sizeWarning(total, coverSize, isProMode() ? 'pro' : 'fast');
+  if (!state.items.length) {
+    els.sizeNote.textContent = '';
+    els.sizeNote.className = 'ih-note';
+    return;
+  }
+  els.sizeNote.textContent = warn.text || `合计 ${humanBytes(total)}（预计产物约 ${humanBytes(total + coverSize)}）。`;
+  els.sizeNote.className = `ih-note${warn.level === 'warn' ? ' is-error' : warn.level === 'hint' ? ' is-warn' : ''}`;
+}
+
+function isProMode() {
+  return !!state.els.algoPro.checked;
+}
+
 function refreshRunState() {
   const { els } = state;
+  const pro = isProMode();
+  els.password.disabled = !pro;
+  els.passwordHint.textContent = pro
+    ? '填了密码，对方要用同一密码才能取出文件（留空 = 只换结构不加密）'
+    : '选「图夹 PRO」才能设密码';
+  els.algoNote.textContent = pro
+    ? '图夹 PRO（防查）：整张图重新压一遍、带官方指纹，网页版打开时会提示「识别到图夹PRO文件」并要你点一次确认（设了密码就输密码）。'
+    : '动态混淆（极速）：文件直接接在图片尾部，网页版/手机 APP 打开即解、不弹密码框；表图什么格式都行，图片画质一点不变。';
   els.runPack.disabled = state.busy || !state.cover || state.items.length === 0;
   els.runUnpack.disabled = state.busy || !state.unpackImage;
   els.clearPack.disabled = state.busy;
   els.clearUnpack.disabled = state.busy;
+  els.openProduct.hidden = !state.productPath;
   els.packResult.textContent = state.packedText || '';
   els.packResult.className = `ih-result${state.packedClass ? ` ${state.packedClass}` : ''}`;
   els.unpackResult.textContent = state.unpackText || '';
   els.unpackResult.className = `ih-result${state.unpackClass ? ` ${state.unpackClass}` : ''}`;
+  refreshSizeNote();
 }
 
-function showPackResult(text, cls) {
+function showPackResult(text, cls, productPath) {
   state.packedText = text;
   state.packedClass = cls || '';
+  state.productPath = productPath || '';
   refreshRunState();
 }
 
@@ -371,28 +519,56 @@ async function runPack() {
   refreshRunState();
   ctx.showProgress('正在打包…', 0);
   try {
+    const watermark = els.watermark.value.trim();
+    const mode = isProMode() ? 'pro' : 'fast';
+    const password = mode === 'pro' ? els.password.value.trim() : '';
     let coverBytes = null;
     let coverKind = state.cover.kind;
-    if (state.cover.needsReencode) {
-      ctx.showProgress('正在把表图转成 PNG…', 5);
-      const raw = state.cover.bytes || await ctx.readFile(state.cover.path);
-      const { pixels, width, height } = await decodeImageFromBytes(raw);
-      coverBytes = await encodeImageToBytes(pixels, width, height, { format: 'png' });
+    let outputDir;
+    let baseName;
+
+    const raw = state.cover.bytes || (state.cover.path ? await ctx.readFile(state.cover.path) : null);
+    // 「防查」要把数据塞进 IDAT 流，所以表图必须是 8 位 PNG（或 GIF）；「极速」直接追加在尾部，什么格式都行
+    const needConvert = watermark !== '' || (mode === 'pro' && state.cover.source !== 'random' && state.cover.needsReencode);
+    if (needConvert) {
+      ctx.showProgress(watermark ? '正在给表图加水印…' : '正在把表图转成 PNG…', 5);
+      let png = raw;
+      if (watermark || state.cover.needsReencode) {
+        const { pixels, width, height } = await decodeImageFromBytes(raw);
+        png = await encodeImageToBytes(pixels, width, height, { format: 'png' });
+      }
+      if (watermark) png = await applyWatermark(png, watermark);
+      coverBytes = png;
       coverKind = 'png';
     }
+
+    if (state.cover.source === 'random') {
+      // 随机表图没有磁盘文件：字节得交给主进程；产物落系统「图片」文件夹（由主进程决定），名字带时间戳
+      if (!coverBytes) coverBytes = raw;
+      baseName = `随机表图-${stamp()}`;
+      outputDir = undefined;
+    }
+
     const res = await ctx.hidePack({
-      coverPath: state.cover.path,
+      mode,
+      coverPath: state.cover.path || undefined,
       coverBytes,
       coverKind,
       items: state.items.map((item) => ({ path: item.path, name: item.name })),
-      password: els.password.value.trim()
+      password,
+      outputDir,
+      baseName
     });
     if (!res || !res.ok) throw new Error((res && res.message) || '打包失败');
     state.packed = res;
-    showPackResult(`已生成：${res.path}（${humanBytes(res.size)}，${res.files} 个文件）—— 直接发给别人即可`, 'is-ok');
+    showPackResult(
+      `已生成：${res.path}（${humanBytes(res.size)}，${res.files} 个文件）—— 直接发给别人即可`,
+      'is-ok',
+      res.path
+    );
     ctx.setStatus(`打包完成：${res.path}`);
   } catch (err) {
-    showPackResult(`打包失败：${err.message}`, 'is-error');
+    showPackResult(`打包失败：${err.message}`, 'is-error', '');
     ctx.setStatus(`打包失败：${err.message}`);
   } finally {
     state.busy = false;
@@ -485,6 +661,7 @@ export function mount(container, ctx) {
     unpackImage: null,
     unpackResult: null,
     packed: null,
+    productPath: '',
     busy: false,
     packedText: '',
     packedClass: '',
@@ -500,6 +677,7 @@ export function mount(container, ctx) {
     modeUnpack: $('ihModeUnpack'),
     packPane: $('ihPackPane'),
     unpackPane: $('ihUnpackPane'),
+    randomCover: $('ihRandomCover'),
     pickCover: $('ihPickCover'),
     clearCover: $('ihClearCover'),
     coverBox: $('ihCoverBox'),
@@ -508,10 +686,17 @@ export function mount(container, ctx) {
     addFiles: $('ihAddFiles'),
     items: $('ihItems'),
     itemsEmpty: $('ihItemsEmpty'),
+    sizeNote: $('ihSizeNote'),
+    algoFast: $('ihAlgoFast'),
+    algoPro: $('ihAlgoPro'),
+    algoNote: $('ihAlgoNote'),
     password: $('ihPassword'),
+    passwordHint: $('ihPasswordHint'),
+    watermark: $('ihWatermark'),
     runPack: $('ihRunPack'),
     clearPack: $('ihClearPack'),
     packResult: $('ihPackResult'),
+    openProduct: $('ihOpenProduct'),
     pickImage: $('ihPickImage'),
     clearImage: $('ihClearImage'),
     imageBox: $('ihImageBox'),
@@ -533,6 +718,13 @@ export function mount(container, ctx) {
   on(els.modePack, 'click', () => setMode('pack'));
   on(els.modeUnpack, 'click', () => setMode('unpack'));
 
+  on(els.randomCover, 'click', async () => {
+    try {
+      await setRandomCover();
+    } catch (err) {
+      ctx.setStatus(`生成随机表图失败：${err.message}`);
+    }
+  });
   on(els.pickCover, 'click', async () => {
     const paths = await ctx.openHideCover();
     if (paths && paths.length) await setCover(paths[0]);
@@ -542,13 +734,21 @@ export function mount(container, ctx) {
     const paths = await ctx.openHideFiles();
     if (paths && paths.length) await addItems(paths);
   });
+  on(els.algoFast, 'change', refreshRunState);
+  on(els.algoPro, 'change', refreshRunState);
+  on(els.watermark, 'input', refreshRunState);
   on(els.runPack, 'click', runPack);
+  on(els.openProduct, 'click', async () => {
+    if (state.productPath) await ctx.hideReveal(state.productPath);
+  });
   on(els.clearPack, 'click', () => {
     clearCover();
     state.items = [];
     renderItems();
     els.password.value = '';
-    showPackResult('', '');
+    els.watermark.value = '';
+    els.algoFast.checked = true;
+    showPackResult('', '', '');
     refreshRunState();
     ctx.setStatus('已清空打包区');
   });

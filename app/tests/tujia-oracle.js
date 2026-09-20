@@ -1,6 +1,6 @@
 // 互通验证的「裁判」：直接跑官方实现（tj.qdqqd.com 的 decryptWorker.js）
 //
-// 为什么这样做：modulen「文件藏图」的验收核心是**双向互通**，光靠自家往返只能证明自洽。
+// 为什么这样做：「文件藏图」的验收核心是**双向互通**，光靠自家往返只能证明自洽。
 // 把官方那份**未混淆的明文 worker**（人工从 https://tj.qdqqd.com/decryptWorker.js 取回）
 // 放在 `.tools/tujia-oracle/decryptWorker.js` 当裁判，才能证明：
 //   ① 我们打的图，官方能解（→ 网站/APP/同族工具也能解）；
@@ -82,10 +82,44 @@ async function oracleEmbedGif(appDir, { gifBytes, payload }) {
   return toBytes(await core.embedDataInGIF(toBytes(gifBytes), toBytes(payload)));
 }
 
+/**
+ * 用官方实现走「动态混淆（极速）」那条路解一份**整文件字节**
+ * （官方客户端就是这么干的：把整个文件丢给 action='decrypt'，它先在文件里找 16 字节 PRO 指纹，
+ *  没找到才按 DYNAMIC_V2_ 分隔符格式解析 —— 所以这个函数同时验证了「不带指纹、不弹密码框」）
+ */
+function oracleLegacyDecrypt(appDir, bytes) {
+  loadOracle(appDir);
+  const selfObj = globalThis.self;
+  const previous = selfObj.postMessage;
+  return new Promise((resolve, reject) => {
+    let settled = false;
+    const restore = () => { selfObj.postMessage = previous; };
+    selfObj.postMessage = (msg) => {
+      if (settled) return;
+      if (msg && msg.type === 'done') {
+        settled = true;
+        restore();
+        resolve((msg.files || []).map((f) => ({ name: f.name, bytes: toBytes(f.data) })));
+      } else if (msg && msg.type === 'error') {
+        settled = true;
+        restore();
+        reject(new Error(msg.error || '未知错误'));
+      }
+    };
+    try {
+      selfObj.onmessage({ data: { taskId: 'oracle-legacy', action: 'decrypt', payload: { encryptedData: toBytes(bytes) } } });
+    } catch (err) {
+      settled = true;
+      restore();
+      reject(err);
+    }
+  });
+}
+
 /** 用官方实现加密载荷（验证我们的解密能读官方密文） */
 async function oracleEncrypt(appDir, payload, password) {
   const core = requireOracle(appDir);
   return toBytes(await core.encryptData(toBytes(payload), password));
 }
 
-module.exports = { loadOracle, oracleExtractFiles, oracleEmbedPng, oracleEmbedGif, oracleEncrypt, oracleFile };
+module.exports = { loadOracle, oracleExtractFiles, oracleLegacyDecrypt, oracleEmbedPng, oracleEmbedGif, oracleEncrypt, oracleFile };

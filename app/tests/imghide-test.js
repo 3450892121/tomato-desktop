@@ -215,7 +215,7 @@ async function runImgHideTest({ portableDir, mainWindow } = {}) {
 
   // —— ① PNG 载体往返 ——
   {
-    const packed = await engine.packImage({ coverPath: coverPng, items, outputDir: WORK });
+    const packed = await engine.packImage({ mode: 'pro', coverPath: coverPng, items, outputDir: WORK });
     const out = await engine.unpackImage({ imagePath: packed.path, outputDir: path.join(WORK, 'out-png') });
     const product = fs.readFileSync(packed.path);
     checks.roundTripPng = {
@@ -237,7 +237,7 @@ async function runImgHideTest({ portableDir, mainWindow } = {}) {
 
   // —— ② GIF 载体往返（原字节零改动） ——
   {
-    const packed = await engine.packImage({ coverPath: coverGif, items, outputDir: WORK });
+    const packed = await engine.packImage({ mode: 'pro', coverPath: coverGif, items, outputDir: WORK });
     const product = fs.readFileSync(packed.path);
     const out = await engine.unpackImage({ imagePath: packed.path, outputDir: path.join(WORK, 'out-gif') });
     checks.roundTripGif = {
@@ -256,7 +256,7 @@ async function runImgHideTest({ portableDir, mainWindow } = {}) {
 
   // —— ③ 密码 ——
   {
-    const packed = await engine.packImage({ coverPath: coverPng, items: [{ path: fileA }], password: '图夹密码abc', outputDir: WORK, baseName: 'pw' });
+    const packed = await engine.packImage({ mode: 'pro', coverPath: coverPng, items: [{ path: fileA }], password: '图夹密码abc', outputDir: WORK, baseName: 'pw' });
     const okOut = path.join(WORK, 'out-pw');
     const okRes = await engine.unpackImage({ imagePath: packed.path, password: '图夹密码abc', outputDir: okOut });
     const wrongDir = path.join(WORK, 'out-pw-bad');
@@ -284,6 +284,42 @@ async function runImgHideTest({ portableDir, mainWindow } = {}) {
     log(`密码：${checks.password.ok ? '✅' : '❌'}（错误密码「${wrongMessage}」，不填密码「${noPwMessage}」）`);
   }
 
+  // —— ③之二「动态混淆（极速）」往返 + 官方能否直接读（不弹密码框） ——
+  {
+    const packedPng = await engine.packImage({ mode: 'fast', coverPath: coverPng, items, outputDir: WORK, baseName: '极速PNG' });
+    const packedGif = await engine.packImage({ mode: 'fast', coverPath: coverGif, items: [{ path: fileA }], outputDir: WORK, baseName: '极速GIF' });
+    const outFast = await engine.unpackImage({ imagePath: packedPng.path, outputDir: path.join(WORK, 'out-fast') });
+    const pngBytes = fs.readFileSync(packedPng.path);
+    const coverBytes = fs.readFileSync(coverPng);
+    checks.roundTripFast = {
+      ok: outFast.files.length === 2
+        && await sameFile(outFast.files[0].path, bytesA)
+        && await sameFile(outFast.files[1].path, bytesB)
+        && sameBytes(pngBytes.subarray(0, coverBytes.length), coverBytes)   // 表图零改动
+        && !pngBytes.includes(Buffer.from([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16])) // 不带 PRO 指纹
+        && pngBytes.includes(Buffer.from('DYNAMIC_V2_')),                    // 有动态前缀
+      product: packedPng.path
+    };
+    const loaded = oracle.loadOracle(APP_DIR);
+    if (!loaded.ok) {
+      checks.interopFast = { ok: true, oracle: 'skipped', reason: loaded.reason };
+    } else {
+      // 官方客户端不填密码走的就是 action='decrypt'（先在文件里找 PRO 指纹，没有才按 DYNAMIC_V2_ 解析）
+      const officialPng = await oracle.oracleLegacyDecrypt(APP_DIR, new Uint8Array(pngBytes));
+      const officialGif = await oracle.oracleLegacyDecrypt(APP_DIR, new Uint8Array(fs.readFileSync(packedGif.path)));
+      checks.interopFast = {
+        ok: officialPng.length === 2
+          && sameBytes(officialPng[0].bytes, bytesA)
+          && sameBytes(officialPng[1].bytes, bytesB)
+          && officialGif.length === 1
+          && sameBytes(officialGif[0].bytes, bytesA),
+        oracle: 'used',
+        officialPngFiles: officialPng.map((f) => `${f.name}(${f.bytes.length})`)
+      };
+    }
+    log(`极速模式（动态混淆）：往返 ${checks.roundTripFast.ok ? '✅' : '❌'}；官方不解密直接读 ${checks.interopFast.ok ? '✅' : '❌'}（${(checks.interopFast.officialPngFiles || []).join(', ') || checks.interopFast.reason || ''}）`);
+  }
+
   // —— ④ 双向互通（官方实现当裁判） ——
   {
     const loaded = oracle.loadOracle(APP_DIR);
@@ -293,9 +329,9 @@ async function runImgHideTest({ portableDir, mainWindow } = {}) {
     } else {
       const detail = {};
       // ① 我们打的图 → 官方解
-      const ourPng = (await engine.packImage({ coverPath: coverPng, items, outputDir: WORK, baseName: '互通PNG' })).path;
-      const ourGif = (await engine.packImage({ coverPath: coverGif, items: [{ path: fileA }], outputDir: WORK, baseName: '互通GIF' })).path;
-      const ourPw = (await engine.packImage({ coverPath: coverPng, items: [{ path: fileA }], password: 'pw-我们', outputDir: WORK, baseName: '互通PW' })).path;
+      const ourPng = (await engine.packImage({ mode: 'pro', coverPath: coverPng, items, outputDir: WORK, baseName: '互通PNG' })).path;
+      const ourGif = (await engine.packImage({ mode: 'pro', coverPath: coverGif, items: [{ path: fileA }], outputDir: WORK, baseName: '互通GIF' })).path;
+      const ourPw = (await engine.packImage({ mode: 'pro', coverPath: coverPng, items: [{ path: fileA }], password: 'pw-我们', outputDir: WORK, baseName: '互通PW' })).path;
 
       const readBack = async (file) => oracle.oracleExtractFiles(APP_DIR, fs.readFileSync(file));
       const officialFromPng = await readBack(ourPng);
@@ -372,7 +408,7 @@ async function runImgHideTest({ portableDir, mainWindow } = {}) {
 
     checks.errors = {
       ok: /不是图夹图|被压缩/.test(plainMessage)
-        && /不是 PNG \/ GIF 图夹/.test(jpgMessage)
+        && /不是图夹图/.test(jpgMessage)
         && cutMessage.length > 0
         && inside,
       plainMessage,

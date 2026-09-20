@@ -10,7 +10,8 @@ import zlib from 'node:zlib';
 import {
   detectCoverKind, pngInfo, pngCompatError, parsePngChunks, concatIdatData,
   extractPayloadFromInflatedPng, writePngWithIdat, embedPayloadInGif, extractPayloadFromGif,
-  buildPayload, parsePayload, safeEntryName, uniqueEntryName, concatBytes
+  buildPayload, parsePayload, safeEntryName, uniqueEntryName, concatBytes,
+  buildDynamicPayload, parseDynamicPayload, appendDynamicPayload
 } from './format.mjs';
 import { encryptPayload, decryptPayload } from './crypto.mjs';
 
@@ -31,6 +32,27 @@ export function uniqueTargetPath(dir, baseName, ext) {
 function fsExists(p) {
   // 这里用同步判断即可：调用点都在同一事件循环内做命名决策
   return fsSync.existsSync(p);
+}
+
+/**
+ * 落盘改名要抗「Windows 抖动」：杀毒/索引/上一个进程刚放开句柄时，
+ * rename 到已存在的目标文件会偶发 EPERM（实测被自动回归撞到过一次）。
+ * 这里重试数次，并在重试前把目标文件删掉；彻底失败则清掉 .part 半成品。
+ */
+async function renameWithRetry(from, to, attempts = 5) {
+  for (let attempt = 0; attempt < attempts; attempt += 1) {
+    try {
+      if (attempt > 0) await fsp.rm(to, { force: true }).catch(() => {});
+      await fsp.rename(from, to);
+      return;
+    } catch (err) {
+      if (attempt === attempts - 1) {
+        await fsp.rm(from, { force: true }).catch(() => {});
+        throw err;
+      }
+      await new Promise((resolve) => setTimeout(resolve, 80));
+    }
+  }
 }
 
 /** 目录也要防重名（解包默认落在 `<图片名>_解出`） */
@@ -90,16 +112,19 @@ export async function packImage(options) {
   const items = Array.isArray(options.items) ? options.items : [];
   if (items.length === 0) throw new Error('还没有要藏进去的文件');
 
+  const mode = options.mode === 'pro' ? 'pro' : 'fast';
   const coverBytes = options.coverBytes
     ? (options.coverBytes instanceof Uint8Array ? options.coverBytes : new Uint8Array(options.coverBytes))
     : await fsp.readFile(options.coverPath);
   const kind = options.coverKind || detectCoverKind(coverBytes);
-  if (kind !== 'gif' && kind !== 'png') {
-    throw new Error('表图只支持 PNG / GIF（其它格式请先选一次「自动转 PNG」）');
-  }
-  if (kind === 'png') {
-    const reason = pngCompatError(pngInfo(coverBytes));
-    if (reason) throw new Error(`这张 PNG 需要先转成 8 位 PNG（${reason}）`);
+  if (mode === 'pro') {
+    if (kind !== 'gif' && kind !== 'png') {
+      throw new Error('「防查」格式的表图只支持 PNG / GIF（想用 JPG/WebP 请先转 PNG，或用「极速」格式）');
+    }
+    if (kind === 'png') {
+      const reason = pngCompatError(pngInfo(coverBytes));
+      if (reason) throw new Error(`这张 PNG 需要先转成 8 位 PNG（${reason}）`);
+    }
   }
 
   // 1) 读里图 + 拼载荷
@@ -112,39 +137,52 @@ export async function packImage(options) {
     entries.push({ name, bytes });
   }
   report(50, '拼装数据');
-  let payload = buildPayload(entries);
-  if (options.password) {
-    report(55, '加密');
-    payload = encryptPayload(payload, options.password);
-  }
 
-  // 2) 嵌入载体
+  // 2) 按模式嵌入载体
   let outBytes;
   let ext;
-  if (kind === 'gif') {
-    report(65, '写入 GIF');
-    outBytes = embedPayloadInGif(coverBytes, payload);
-    ext = '.gif';
+  if (mode === 'fast') {
+    // 动态混淆（极速）：明文分隔符载荷直接追加在图片尾部；表图可以是任何格式、原字节零改动
+    report(65, '写入图片尾部');
+    const payload = buildDynamicPayload(entries);
+    outBytes = appendDynamicPayload(coverBytes, payload);
+    // 表图原样保留（JPG/WebP/GIF 都行，追加在尾部不影响打开）；只有界面重新编码过（水印/随机表图）才是 PNG
+    ext = options.coverBytes ? '.png' : (options.coverPath ? path.extname(options.coverPath) || '.png' : '.png');
   } else {
-    report(65, '写入 PNG');
-    const inflated = zlib.inflateSync(concatIdatData(coverBytes, parsePngChunks(coverBytes)));
-    const deflated = zlib.deflateSync(concatBytes([inflated, payload]));
-    outBytes = writePngWithIdat(coverBytes, deflated);
-    ext = '.png';
+    let payload = buildPayload(entries);
+    if (options.password) {
+      report(55, '加密');
+      payload = encryptPayload(payload, options.password);
+    }
+    if (kind === 'gif') {
+      report(65, '写入 GIF');
+      outBytes = embedPayloadInGif(coverBytes, payload);
+      ext = '.gif';
+    } else {
+      report(65, '写入 PNG');
+      const inflated = zlib.inflateSync(concatIdatData(coverBytes, parsePngChunks(coverBytes)));
+      const deflated = zlib.deflateSync(concatBytes([inflated, payload]));
+      outBytes = writePngWithIdat(coverBytes, deflated);
+      ext = '.png';
+    }
   }
 
-  // 3) 落盘（默认放在表图旁边）
-  const sourceDir = options.coverPath ? path.dirname(options.coverPath) : null;
-  const dir = options.outputDir || sourceDir;
-  if (!dir) throw new Error('缺少输出目录');
-  await fsp.mkdir(dir, { recursive: true });
-  const base = options.baseName
-    || `${path.basename(options.coverPath || '图夹', path.extname(options.coverPath || ''))}_图夹`;
-  const target = uniqueTargetPath(dir, base, ext);
+  // 3) 落盘（自定义表图默认放在表图旁边；随机表图由调用方给 outputDir，例如「图片」文件夹）
+  const target = options.outputPath
+    ? options.outputPath
+    : (() => {
+      const dir = options.outputDir || (options.coverPath ? path.dirname(options.coverPath) : null);
+      if (!dir) throw new Error('缺少输出目录');
+      // 产物统一叫「<名字>_图夹.png|gif」：名字默认取表图基名；调用方给的名字也补上后缀，保持同一约定
+      const stem = options.baseName || path.basename(options.coverPath || '图夹', path.extname(options.coverPath || '')) || '图夹';
+      const base = stem.endsWith('_图夹') ? stem : `${stem}_图夹`;
+      return uniqueTargetPath(dir, base, ext);
+    })();
+  await fsp.mkdir(path.dirname(target), { recursive: true });
   const tmp = `${target}${TMP_SUFFIX}`;
   report(85, '写文件');
   await fsp.writeFile(tmp, outBytes);
-  await fsp.rename(tmp, target);
+  await renameWithRetry(tmp, target);
   report(100, '完成');
 
   return { ok: true, path: target, size: outBytes.length, ms: Date.now() - started, kind, files: entries.length };
@@ -165,36 +203,42 @@ export async function unpackImage(options) {
   report(10, '读取图片');
   const bytes = new Uint8Array(await fsp.readFile(options.imagePath));
   const kind = detectCoverKind(bytes);
-  if (kind !== 'gif' && kind !== 'png') {
-    throw new Error('这个文件不是 PNG / GIF 图夹（官方格式只支持这两种载体）');
-  }
 
   report(30, '取出数据');
-  let payload;
-  if (kind === 'gif') {
-    payload = extractPayloadFromGif(bytes);
-  } else {
-    const info = pngInfo(bytes);
-    const inflated = zlib.inflateSync(concatIdatData(bytes, parsePngChunks(bytes)));
-    payload = extractPayloadFromInflatedPng(inflated, info);
-  }
-
-  let encrypted = false;
-  if (options.password) {
-    report(50, '解密');
-    payload = decryptPayload(payload, options.password);
-    encrypted = true;
-  }
-
-  report(70, '解析文件表');
   let files;
-  try {
-    files = parsePayload(payload);
-  } catch (err) {
-    if (!options.password) {
-      throw new Error('解包失败：这张图可能设了密码（请填密码后重试），或图片被压缩/损坏（数据已丢失）');
+  let encrypted = false;
+
+  // ① 先按「动态混淆（极速）」找：明文分隔符载荷就在文件里（官方也是全文件扫描，不解压、不需要密码）
+  const dynamic = parseDynamicPayload(bytes);
+  if (dynamic) {
+    files = dynamic.files;
+  } else {
+    // ② 再按「图夹 PRO」的 V6 容器找（PNG 的 IDAT 尾部 / GIF 的扩展块）
+    if (kind !== 'gif' && kind !== 'png') {
+      throw new Error('这个文件不是图夹图（图夹只有两种形态：图片尾部带数据，或 PNG/GIF 的 V6 容器）');
     }
-    throw new Error(`解包失败：${err.message}`);
+    let payload;
+    if (kind === 'gif') {
+      payload = extractPayloadFromGif(bytes);
+    } else {
+      const info = pngInfo(bytes);
+      const inflated = zlib.inflateSync(concatIdatData(bytes, parsePngChunks(bytes)));
+      payload = extractPayloadFromInflatedPng(inflated, info);
+    }
+    if (options.password) {
+      report(50, '解密');
+      payload = decryptPayload(payload, options.password);
+      encrypted = true;
+    }
+    report(70, '解析文件表');
+    try {
+      files = parsePayload(payload);
+    } catch (err) {
+      if (!options.password) {
+        throw new Error('解包失败：这张图可能设了密码（请填密码后重试），或图片被压缩/损坏（数据已丢失）');
+      }
+      throw new Error(`解包失败：${err.message}`);
+    }
   }
 
   const dir = options.outputDir

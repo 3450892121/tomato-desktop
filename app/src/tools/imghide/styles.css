@@ -68,8 +68,22 @@
   line-height: 1.6;
 }
 .ih-note.is-warn { color: var(--color-warning); }
-/* 密码输入框宽度（不用内联 style：界面进程有 CSP，内联样式会被拦） */
+/* 密码/水印输入框宽度（不用内联 style：界面进程有 CSP，内联样式会被拦） */
 .ih-w-md { width: 280px; max-width: 100%; }
+
+/* 加密方式单选（极速 / 防查） */
+.ih-radio {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding: var(--space-1) var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface-soft);
+  font-size: var(--font-size-sm);
+  cursor: pointer;
+}
+.ih-radio input { cursor: pointer; }
 .ih-note.is-error { color: var(--color-danger); }
 
 /* —— 表图/图片预览 —— */
