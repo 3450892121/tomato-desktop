@@ -102,7 +102,7 @@ body {
               transform var(--transition-base), box-shadow var(--transition-base);
 }
 .tool-item:hover { background: var(--color-surface-soft); }
-/* 当前工具（本次改动）：磨砂玻璃块 —— 半透明白玻璃底 + 背景模糊 + 顶部内高光 + 主色细描边。
+/* 当前工具（v2.2.2）：磨砂玻璃块 —— 半透明白玻璃底 + 背景模糊 + 顶部内高光 + 主色细描边。
    相比 v2.1.0 的番茄红染色块更清爽高级（用户反馈「染色块颜色不好看，想要玻璃效果」）。
    关键：背景 / 描边 / 内高光全部 inset 落地，绝不外溢 —— 分组容器 overflow:hidden 会把外投影裁掉，
    看起来就像选中框右边被切掉一块。悬停位移也去掉了，避免选中块左右晃动。 */
