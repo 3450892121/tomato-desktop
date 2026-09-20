@@ -13,6 +13,10 @@ export const DEFAULT_SETTINGS = {
   //   null = 用户没设置过 → 用默认行为「全部分组收起，只显示分类标题」；
   //   数组 = 用户明确点过的状态（[] 表示用户把所有分组都展开了）
   collapsedGroups: null,
+  // 左侧导航的手动排序（见 spec/modules/toolkit.md「导航手动排序」）：
+  //   null = 从没排过序 → 按默认（GROUPS 定义顺序 × 组内 order 字段）；
+  //   { groups: [...分组id], tools: { <组id>: [...工具id] } } = 用户拖出的顺序
+  navOrder: null,
   // 外观主题（见 spec/modules/theme.md）：
   //   'system' = 跟随系统深浅色（默认，对非技术用户最省心）
   //   'light' / 'dark' = 用户明确指定

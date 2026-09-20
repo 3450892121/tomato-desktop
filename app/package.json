@@ -1,14 +1,14 @@
 {
   "name": "tomato-obfuscator-desktop",
   "productName": "番茄图片混淆 桌面版",
-  "version": "2.5.0",
+  "version": "2.6.0",
   "description": "把安卓 App「番茄图片混淆」的图片混淆/解混淆能力搬到 Windows：免安装、纯离线、与手机版互相兼容",
   "main": "main.js",
   "private": true,
   "license": "UNLICENSED",
   "scripts": {
     "start": "electron .",
-    "test": "node tests/engine.test.mjs && node tests/taskqueue.test.mjs && node tests/archive.test.mjs && node tests/imghide.test.mjs",
+    "test": "node tests/engine.test.mjs && node tests/taskqueue.test.mjs && node tests/archive.test.mjs && node tests/imghide.test.mjs && node tests/navorder.test.mjs",
     "icon": "node tools/make-icon.js",
     "pack": "node tools/pack.js"
   },

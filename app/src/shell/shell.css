@@ -200,6 +200,93 @@ body {
 }
 .tool-group-items .tool-item { padding-left: var(--space-5); } /* 略微缩进，体现层级 */
 
+/* ============================================================
+   导航手动排序（v2.6.0，交互逻辑见 navsort.js）
+   - 进入排序模式：全部分组展开、条目亮出抓手、点击让位给拖拽；
+   - 拖拽：被拖条目升起玻璃卡跟随指针，同级兄弟用 transform 平滑让位；
+   - 松手：按视觉序重排 DOM，被拖条目从松手位置平滑滑进插槽。
+   ============================================================ */
+
+/* 折叠动画要 overflow:hidden，但排序时折叠已禁用——放开才能让玻璃卡的外阴影/放大不被裁 */
+.tool-nav.is-sorting .tool-group-items { overflow: visible; }
+/* 可抓取的条目：浅玻璃底 + grab 光标；触屏拖拽不被浏览器接管成滚动 */
+.tool-nav.is-sorting .tool-item,
+.tool-nav.is-sorting .tool-group-head {
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+}
+/* 当前工具在排序模式下仍保持选中玻璃块（:not(.is-active) 只给普通条目铺底） */
+.tool-nav.is-sorting .tool-item:not(.is-active) {
+  background: var(--color-surface-soft);
+  box-shadow: inset 0 0 0 1px var(--color-border);
+}
+/* 抓手（六点）：工具条目画在 24px 缩进区内（不挤文字、不与 4px 选中标记条重叠）；
+   分组头用同一图形替换折叠箭头的位置（排序期间折叠让位）。颜色随条目文字色。 */
+.tool-nav.is-sorting .tool-item::after,
+.tool-nav.is-sorting .tool-group-head::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  width: 5px;
+  height: 15px;
+  transform: translateY(-50%);
+  background-image: radial-gradient(circle, currentColor 1.3px, transparent 1.5px);
+  background-size: 3px 5px;
+  opacity: 0.55;
+  pointer-events: none;
+}
+.tool-nav.is-sorting .tool-item::after { left: 9px; }
+.tool-nav.is-sorting .tool-group-head { position: relative; }
+.tool-nav.is-sorting .tool-group-head::after { left: 3px; }
+.tool-nav.is-sorting .tool-group-chevron { visibility: hidden; }
+
+/* 同级兄弟让位：transform 由 navsort.js 内联驱动，这里只负责平滑过渡
+   （被拖条目 .is-dragging 例外——跟随指针必须逐帧，见下）。 */
+.tool-nav.is-sorting .tool-item,
+.tool-nav.is-sorting .tool-group {
+  transition: transform var(--transition-base), background var(--transition-fast),
+              box-shadow var(--transition-fast);
+}
+
+/* 被拖条目：升起玻璃卡。必须盖过 .tool-item.is-active（含磨砂选中块与 nav-select-in
+   的 transform 关键帧动画——逐帧跟随的 translateY 不能和它打架）。
+   transform 本身由 JS 内联（translateY + scale），CSS 不写 transform。 */
+.tool-nav.is-sorting .tool-item.is-dragging,
+.tool-nav.is-sorting .tool-item.is-dragging.is-active {
+  position: relative;
+  z-index: 20;
+  cursor: grabbing;
+  transition: none;
+  animation: none;
+  background: var(--glass-bg-strong);
+  background-image: var(--glass-sheen);
+  backdrop-filter: blur(var(--glass-blur-strong)) saturate(var(--glass-saturate));
+  color: var(--color-text);
+  font-weight: 400;
+  box-shadow: var(--shadow-card), inset 0 0 0 1px var(--glass-border);
+}
+/* 被拖的分组块：整组升起一张更实的玻璃卡（正常分组是透明的，拖起来得有「实体」感） */
+.tool-nav.is-sorting .tool-group.is-dragging {
+  position: relative;
+  z-index: 20;
+  cursor: grabbing;
+  transition: none;
+  background: var(--glass-bg-soft);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-card), inset 0 0 0 1px var(--glass-border);
+}
+
+/* 排序模式的 footer：提示行 + 完成按钮（主色强调） */
+.sort-hint {
+  padding: 0 var(--space-2);
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-xs);
+  line-height: 1.6;
+}
+.side-btn-accent { color: var(--color-primary); font-weight: 600; }
+.side-btn-accent:hover { background: var(--color-select-bg); }
+
 .sidebar-footer {
   display: flex;
   flex-direction: column;

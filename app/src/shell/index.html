@@ -26,7 +26,12 @@
       <nav class="tool-nav" id="toolNav"><!-- 工具项由 shell.js 渲染 --></nav>
       <div class="sidebar-footer">
         <button class="side-btn" id="btnSettings">⚙ 设置</button>
+        <button class="side-btn" id="btnSort" title="手动调整左侧工具与分组的顺序">⇅ 排序</button>
         <button class="side-btn" id="btnHelp">? 帮助</button>
+        <!-- 排序模式专用（默认隐藏；进入排序模式时由 navsort.js 切换显示） -->
+        <div class="sort-hint" id="sortHint" hidden>拖动条目调整顺序：分组与工具各自独立排序，工具在本组内移动</div>
+        <button class="side-btn side-btn-accent" id="btnSortDone" hidden>✓ 完成排序</button>
+        <button class="side-btn" id="btnSortReset" hidden>↺ 恢复默认顺序</button>
       </div>
     </aside>
 

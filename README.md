@@ -76,7 +76,7 @@ npm start
 ### 测试与自检（交付前必须全绿）
 ```powershell
 cd app
-npm test                                                    # 算法测试 55 项（图片混淆）
+npm test                                                    # 纯逻辑单测共 203 项（算法 55 + 任务队列 13 + 压缩 68 + 文件藏图 38 + 导航排序 29）
 .\node_modules\electron\dist\electron.exe . --smoke-test     # 冒烟自检（元素/按钮）
 .\node_modules\electron\dist\electron.exe . --self-test      # 端到端（编解码 + 算法 + 性能）
 .\node_modules\electron\dist\electron.exe . --ui-test        # 图片混淆 界面自动测试（含截图与像素级校验）

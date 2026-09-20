@@ -945,7 +945,7 @@ ipcMain.handle('settings:export', async () => {
  */
 ipcMain.handle('settings:import', async () => {
   // 白名单：与 src/shared/settings.js 的 DEFAULT_SETTINGS 保持一致
-  const KNOWN_KEYS = ['blockSize', 'jpegQuality', 'defaultDoubleKey', 'outputDir', 'askSavePath', 'collapsedGroups', 'theme'];
+  const KNOWN_KEYS = ['blockSize', 'jpegQuality', 'defaultDoubleKey', 'outputDir', 'askSavePath', 'collapsedGroups', 'navOrder', 'theme'];
 
   let source = null;
   if (testMode()) {

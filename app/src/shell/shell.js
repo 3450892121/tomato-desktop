@@ -1,5 +1,6 @@
 // 工具箱框架：左侧工具列表渲染、工具挂载/卸载、通用能力上下文（ctx）、设置与帮助弹窗
 import { TOOLS, GROUPS } from './registry.js';
+import { computeNavPlan, createNavSort } from './navsort.js';
 import * as settings from '../shared/settings.js';
 import { createQueue } from '../shared/taskqueue.js';
 import { createTaskCenter } from './taskcenter.js';
@@ -379,7 +380,10 @@ function createToolButton(tool) {
   btn.className = 'tool-item' + (activeTool && tool.id === activeTool.id ? ' is-active' : '');
   btn.dataset.toolId = tool.id;
   btn.innerHTML = `<span class="tool-item-icon">${tool.icon || '🔧'}</span><span>${tool.name}</span>`;
-  btn.addEventListener('click', () => switchTool(tool.id));
+  btn.addEventListener('click', () => {
+    if (navSort.isActive()) return; // 排序模式中点击让位给拖拽
+    switchTool(tool.id);
+  });
   return btn;
 }
 
@@ -486,15 +490,16 @@ function updateActiveNav(toolId) {
 }
 
 /**
- * 渲染左侧工具列表：按分组显示（图片 / 视频 / 文档），组内按 order 升序。
+ * 渲染左侧工具列表：按分组显示，分组与组内顺序取 settings.navOrder（手动排序，见 navsort.js），
+ * 没排过序（null）时按 GROUPS 定义 × 组内 order 升序；非法数据由 computeNavPlan 净化（回退默认，不丢工具）。
  * 每个分组标题可点击：点一下收起（只留标题）、再点一下展开；收起状态会记住（settings.collapsedGroups）。
- * 容错：未声明 group 的工具归入末尾「其它」组，保证以后新增工具忘记写 group 也能正常显示。
+ * 容错：未声明 group（或声明了未知分组）的工具归入末尾「其它」组。
  */
 function renderNav() {
+  navSort.cancelDrag(); // 防御：重建 DOM 前结束任何拖拽（排序模式本身保留，nav 的 is-sorting 类不受影响）
   els.nav.innerHTML = '';
   navGroups.clear();
-  const sorted = [...TOOLS].sort((a, b) => (a.order || 0) - (b.order || 0));
-  const others = sorted.filter((t) => !GROUPS.some((g) => g.id === t.group));
+  const plan = computeNavPlan(GROUPS, TOOLS, settings.getSettings().navOrder);
 
   const renderGroup = (group, tools) => {
     if (tools.length === 0) return; // 空分组不显示
@@ -516,7 +521,10 @@ function renderNav() {
       + `<span class="tool-group-name">${group.name}</span>`
       + `<span class="tool-group-count">${tools.length}</span>`;
     // 以「眼睛看到的当前状态」为准取反：自动展开过的分组，点一下就是收起
-    head.addEventListener('click', () => setGroupCollapsed(group.id, !wrap.classList.contains('is-collapsed')));
+    head.addEventListener('click', () => {
+      if (navSort.isActive()) return; // 排序模式中折叠让位给拖拽（整组拖动）
+      setGroupCollapsed(group.id, !wrap.classList.contains('is-collapsed'));
+    });
     wrap.appendChild(head);
 
     const items = document.createElement('div');
@@ -528,14 +536,34 @@ function renderNav() {
     navGroups.set(group.id, { wrap, head, items });
   };
 
-  for (const group of GROUPS) {
-    renderGroup(group, sorted.filter((t) => t.group === group.id));
+  for (const group of plan) {
+    renderGroup(group, group.tools);
   }
-  renderGroup({ id: 'other', name: '其它', icon: '📁' }, others);
 
   // 重建后当前工具所在的分组必须仍是展开的（瞬时展开，不播动画）
   ensureGroupExpanded(activeTool && activeTool.group);
 }
+
+// —— 导航手动排序（v2.6.0；纯逻辑与拖拽交互见 navsort.js） ——
+// 分组与组内工具各自独立排序；顺序存 settings.navOrder（null = 默认序）。
+const navSort = createNavSort({
+  nav: els.nav,
+  persist: (order) => settings.updateSettings({ navOrder: order }).then(() => setStatus('工具顺序已保存')),
+  resetOrder: async () => {
+    await settings.updateSettings({ navOrder: null });
+    renderNav(); // 排序模式保持开启，列表回默认顺序可继续拖
+    setStatus('已恢复默认顺序');
+  },
+  expandAllGroups: () => {
+    for (const [groupId, entry] of navGroups) {
+      if (entry.wrap.classList.contains('is-collapsed')) applyGroupVisual(groupId, false);
+    }
+  },
+  restoreCollapsed: () => {
+    for (const groupId of navGroups.keys()) applyGroupVisual(groupId, collapsedGroups.has(groupId));
+  },
+  onStatus: setStatus
+});
 
 /**
  * 切换到指定工具：只切换「显示哪个页面」，不销毁其它页面。

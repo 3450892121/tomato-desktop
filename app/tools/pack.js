@@ -114,6 +114,8 @@ fs.copyFileSync(path.join(appRoot, 'tests', 'player-ui-test.js'), path.join(appT
 fs.copyFileSync(path.join(appRoot, 'tests', 'imghide-test.js'), path.join(appTarget, 'tests', 'imghide-test.js'));
 fs.copyFileSync(path.join(appRoot, 'tests', 'imghide-ui-test.js'), path.join(appTarget, 'tests', 'imghide-ui-test.js'));
 fs.copyFileSync(path.join(appRoot, 'tests', 'tujia-oracle.js'), path.join(appTarget, 'tests', 'tujia-oracle.js'));
+// v2.6.0 起：导航手动排序（排序净化纯逻辑，挂 npm test）
+fs.copyFileSync(path.join(appRoot, 'tests', 'navorder.test.mjs'), path.join(appTarget, 'tests', 'navorder.test.mjs'));
 
 // —— 4b) 复制 PDF 工具运行时依赖（纯 JS，界面进程按相对路径直接引用） ——
 // 说明：本项目没有打包器，工具代码里写的是 ../../../../node_modules/pdfjs-dist/... 这样的
