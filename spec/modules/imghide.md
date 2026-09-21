@@ -87,11 +87,11 @@
 | `imghide:progress`（事件） | — | `{ jobId, percent, text }` |
 
 - 产物不覆盖已有文件：`<表图名>_图夹.gif|png`，重名自动加序号（复用 `uniqueTargetPath`）。
-- 解包默认落在 `<图片名>_解出/` 目录（重名加序号）；**条目名一律取 basename**，拒绝 `..`/绝对路径，防路径穿越。
+- 解包默认落在 `<图片名>_解出/` 目录（重名加序号）；**条目名一律取 basename**，拒绝 `..`/绝对路径，防路径穿越；同时拦 **Windows 保留设备名**（`CON`/`NUL`/`COM1-9`/`LPT1-9` 等，含带扩展名形态，加 `_` 前缀避让）并剥掉结尾的点与空格（v2.8.1 起，对齐 Windows 落盘行为）。
 - 专用对话框：`dialog:open-hide-cover`（图片，测试模式取夹具 `测试藏图表图*`）、`dialog:open-hide-files`（任意文件，测试模式取 `测试藏图文件*`）。
 
 ## 测试
-- **纯逻辑单测** `app/tests/imghide.test.mjs`（挂进 `npm test`，38 项）：两套容器的载荷往返（中文名 / 空文件 / 大文件）与容错、**动态格式的官方硬要求**（分隔符必须「随机串 + `|||`」）与整文件定位、老版固定分隔符兼容、base64 自洽、GIF 嵌入与回读、PNG 流切分（`高×(1+宽×bpp)`）、CRC32 与 Node `zlib.crc32` 对齐、AES-GCM 密码往返与错误密码、路径穿越名净化、输出命名、体积提示门槛。
+- **纯逻辑单测** `app/tests/imghide.test.mjs`（挂进 `npm test`，40 项）：两套容器的载荷往返（中文名 / 空文件 / 大文件）与容错、**动态格式的官方硬要求**（分隔符必须「随机串 + `|||`」）与整文件定位、老版固定分隔符兼容、base64 自洽、GIF 嵌入与回读、PNG 流切分（`高×(1+宽×bpp)`）、CRC32 与 Node `zlib.crc32` 对齐、AES-GCM 密码往返与错误密码、路径穿越名净化（含 Windows 保留设备名与结尾点/空格，v2.8.1 起）、输出命名、体积提示门槛。
 - **引擎自检** `app/tests/imghide-test.js`（`electron . --imghide-test`）：PNG/GIF 两种载体真实打包 → 解包 → **逐字节比对**；带密码往返；错误密码必须失败且不落盘垃圾；产物仍能被解码（画布渲染尺寸一致）；**互通验证**用官方实现当裁判（见下）——结果写 `%TEMP%\tomato-imghide-test.json`，`ok:true` 为通过。
 - **界面自动测试** `app/tests/imghide-ui-test.js`（`electron . --imghide-ui-test`）：切到工具 → **随机表图** → 加文件 → 打包（产物落测试目录、能被画布解码成 1024 宽）→ 解包比对 → 换成自定义表图 + **水印** → 打包解出 → 切**图夹 PRO** + 密码（错误密码被拒、正确密码解出）→ **体积提示两种模式**（极速提示传输不便 / PRO 警告打不开）→ 清空；截图 `shot-imghide-*.png`，结果写 `%TEMP%\tomato-imghide-ui-test.json`，`pass:true` 为通过。
 - **互通验证（关键）**：把官方前端 `https://tj.qdqqd.com/decryptWorker.js`（未混淆的明文 JS）放在 **`.tools/tujia-oracle/`**（不进 git，属本机验证工具；它是对方代码，**不随仓库分发**）。自检时：

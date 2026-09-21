@@ -68,7 +68,7 @@ LibreOffice 的 `writer_pdf_import` 走「按坐标重建页面」路线：**每
 - 读取/渲染：**pdfjs-dist**（Apache-2.0，Mozilla）——在 Electron 界面进程内渲染，零原生依赖；npm 当前 6.3.x。
 - 生成/编辑：**pdf-lib**（MIT）——图片嵌入、页面合并/拆分/提取。
 - 后续增强（本期不做）：@cantoo/pdf-lib（MIT，活跃分支，AES-256 加密解密）或 qpdf（Apache-2.0）。
-- Office→PDF 降级：**docx-preview**（Apache-2.0）+ **SheetJS CE**（Apache-2.0）+ Electron 内置 `printToPDF`（无额外依赖）。
+- Office→PDF 降级：**docx-preview**（Apache-2.0）+ **SheetJS CE**（Apache-2.0；v2.8.1 起走本地内置 `app/vendor/xlsx/`（0.20.3）——npm 版停在 0.18.5 有已知漏洞且官方不再发 npm，见该目录 `说明.txt`）+ Electron 内置 `printToPDF`（无额外依赖）。
 - 高保真 / PDF→Word：**LibreOffice 便携版**（MPL-2.0）；CLI 参数与过滤器：LibreOffice 官方帮助（`--convert-to`、`--infilter`）；质量对比与 `writer_pdf_import` 关键细节：pdf4.dev《Open source PDF to Word converters: 5 tools tested (2026)》《Best PDF-to-Word converters 2026》。
 - 规避 AGPL：Ghostscript（AGPL 或商业双许可，Artifex 官网）、PyMuPDF（AGPL-3.0，PyPI）——均不捆绑分发。
 

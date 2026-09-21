@@ -396,6 +396,30 @@ test('条目名净化：剥掉路径、只留 basename（防路径穿越）', ()
   assert.equal(safeEntryName('a:b?c.txt'), 'a_b_c.txt');
 });
 
+test('条目名净化：拦 Windows 保留设备名（v2.8.1）', () => {
+  // 纯保留名（大小写不敏感）与带扩展名的形态都要避让
+  assert.equal(safeEntryName('CON'), '_CON');
+  assert.equal(safeEntryName('con'), '_con');
+  assert.equal(safeEntryName('NUL.txt'), '_NUL.txt');
+  assert.equal(safeEntryName('com1.dat'), '_com1.dat');
+  assert.equal(safeEntryName('LPT9'), '_LPT9');
+  assert.equal(safeEntryName('aux.cfg'), '_aux.cfg');
+  assert.equal(safeEntryName('prn'), '_prn');
+  // 不该误伤的：正常名里含这些子串
+  assert.equal(safeEntryName('console.log'), 'console.log');
+  assert.equal(safeEntryName('contact.txt'), 'contact.txt');
+  assert.equal(safeEntryName('comedy.mp4'), 'comedy.mp4');
+  assert.equal(safeEntryName('nulpaper.doc'), 'nulpaper.doc');
+});
+
+test('条目名净化：结尾点与空格剥掉（Windows 落盘行为对齐）', () => {
+  assert.equal(safeEntryName('evil.'), 'evil');
+  assert.equal(safeEntryName('evil...  '), 'evil');
+  assert.equal(safeEntryName('name.txt. '), 'name.txt');
+  assert.equal(safeEntryName('. '), '未命名文件'); // 剥完为空 → 兜底名
+  assert.equal(safeEntryName('...'), '未命名文件');
+});
+
 test('重名条目自动加序号', () => {
   const used = new Set();
   assert.equal(uniqueEntryName(used, 'a.txt'), 'a.txt');

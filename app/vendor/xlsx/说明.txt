@@ -1,0 +1,23 @@
+SheetJS（xlsx.full.min.js）本地内置说明
+========================================
+
+用途：「PDF 转格式」工具的内置降级链路（docx / xlsx → PDF，见 src/tools/pdf-convert/preview/office-print.html）。
+
+版本：0.20.3（官方发行版）
+来源：https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js
+许可证：Apache-2.0（见同目录 LICENSE）
+SHA-256（xlsx.full.min.js）：CC015130AA8521E7F088F88898EBA949CCDCBFB38DF0BD129B44B7273C3A6F41
+
+为什么放 vendor/ 而不走 npm（v2.8.1 起）：
+  npm 上的 xlsx 停在 0.18.5，存在已知漏洞（CVE-2023-30533 原型污染、
+  CVE-2024-22363 ReDoS），且 SheetJS 官方已不在 npm 发新版本，升级只能走
+  官方分发货道 cdn.sheetjs.com。用户会用本工具打开别人发来的 Excel 文件，
+  解析库必须用修复后的版本，故改为本地内置、随 git 提交，打包时由
+  tools/pack.js 步骤 4b 复制到产物 vendor/ 目录。
+
+升级方法：
+  1. 到 https://cdn.sheetjs.com/ 查最新 0.20.x 版本号；
+  2. 下载 dist/xlsx.full.min.js 与 LICENSE 覆盖本目录同名文件；
+  3. 更新本文件的版本号、来源链接与 SHA-256；
+  4. 跑 `cd app && .\node_modules\electron\dist\electron.exe . --pdf-test`（含
+     xlsx→PDF 内置降级链路回归）确认通过。

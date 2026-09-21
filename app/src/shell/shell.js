@@ -4,6 +4,7 @@ import { computeNavPlan, pickStartupTool, createNavSort } from './navsort.js';
 import * as settings from '../shared/settings.js';
 import { createQueue } from '../shared/taskqueue.js';
 import { createTaskCenter } from './taskcenter.js';
+import { escapeHtml } from '../shared/htmlescape.js';
 
 const els = {
   nav: document.getElementById('toolNav'),
@@ -723,23 +724,23 @@ function openSettings() {
       </div>
       <div class="field">
         <label class="field-label">方块数（方块混淆 B 模式）</label>
-        <input class="input" id="setBlockSize" type="number" min="2" max="256" step="1" value="${s.blockSize}" />
+        <input class="input" id="setBlockSize" type="number" min="2" max="256" step="1" value="${escapeHtml(s.blockSize)}" />
         <div class="field-hint">默认 32（与手机版一致）。改大更碎、改小更快。</div>
       </div>
       <div class="field">
         <label class="field-label">JPG 画质（空间曲线混淆保存用）</label>
-        <input class="input" id="setJpegQuality" type="number" min="1" max="100" step="1" value="${s.jpegQuality}" />
+        <input class="input" id="setJpegQuality" type="number" min="1" max="100" step="1" value="${escapeHtml(s.jpegQuality)}" />
         <div class="field-hint">默认 95（与手机版一致）。越低体积越小、画质越差。</div>
       </div>
       <div class="field">
         <label class="field-label">默认密钥（PE1 / PE2）</label>
-        <input class="input" id="setDefaultKey" type="text" value="${s.defaultDoubleKey}" />
+        <input class="input" id="setDefaultKey" type="text" value="${escapeHtml(s.defaultDoubleKey)}" />
         <div class="field-hint">默认 0.666（与手机版一致），必须是 0 到 1 之间的小数。</div>
       </div>
       <div class="field">
         <label class="field-label">输出目录</label>
         <div class="control-row">
-          <input class="input" id="setOutputDir" type="text" value="${s.outputDir}" placeholder="留空 = 保存在原图旁边" />
+          <input class="input" id="setOutputDir" type="text" value="${escapeHtml(s.outputDir)}" placeholder="留空 = 保存在原图旁边" />
           <button class="btn btn-ghost" id="setOutputDirPick" type="button">选择文件夹…</button>
           <button class="btn btn-ghost" id="setOutputDirClear" type="button">用原图旁边</button>
         </div>
@@ -849,7 +850,11 @@ function openSettings() {
       Array.isArray(fresh.collapsedGroups) ? fresh.collapsedGroups : GROUPS.map((g) => g.id)
     );
     renderNav();
-    setStatus(`设置已导入（${res.applied.length} 项）：${res.applied.join('、')}`);
+    // 已知键但值不合法的会被主进程跳过（防恶意设置文件），这里如实说明，不静默丢弃
+    const skipNote = (res.skipped && res.skipped.length)
+      ? `；另有 ${res.skipped.length} 项值不合法已跳过（${res.skipped.map((x) => x.key).join('、')}）`
+      : '';
+    setStatus(`设置已导入（${res.applied.length} 项）：${res.applied.join('、')}${skipNote}`);
   });
 }
 

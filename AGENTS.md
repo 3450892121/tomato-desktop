@@ -14,7 +14,8 @@
   - `main.js` / `preload.js`：主进程与安全桥（窗口、文件对话框等系统能力）。
   - `src/shell/`：工具箱框架（工具页容器、左侧导航、`registry.js` 工具注册表、`theme.css` 设计令牌、`components.css` 通用组件库）。**工具页保活（只保「动过」的页）**：切换工具不销毁页面，切回时列表/输入/预览/滚动位置与顶栏提示全部保留；没动过的页（只是点开看看）切走即静默释放、不占额度，免得「随便看看」挤掉别处用过的东西；动过的页上限 5 页，超出按 LRU 回收最久没用过的那页（当前页不回收，回收时提示「已自动释放」）；工具里的全局交互要用 `ctx.isActive()` 让位，被释放/回收时会走 `unmount()` 清理。
   - `src/tools/<工具名>/`：各工具自包含目录（声明 + 界面 + 逻辑 + 样式）。现有：`obfuscate` 图片混淆、`pdf-convert` PDF 转格式、`compress` 图片压缩、`enhance` 图片变清晰、`img-convert` 图片格式转换、`batch-rename` 批量重命名、`watermark` 加水印、`stitch` 长图拼接、`grid-slice` 九宫格切图、`player` 视频播放器、`video-convert` 视频格式转换、`video-compress` 视频压缩、`sticker` 动图与视频互转、`audio-convert` 音频格式转换、`audio-edit` 音频剪辑、`transcribe` 语音转文字、`pdf-edit` PDF 编辑整理、`ocr` 文字识别、`archive` 压缩与解压、`imghide` 文件藏图、`uninstall` 软件卸载；`_template` 为新工具模板。
-  - `src/shared/`：跨工具复用能力（图片读写、ffmpeg 封装与编码参数、文件封装、设置）。
+  - `src/shared/`：跨工具复用能力（图片读写、ffmpeg 封装与编码参数、文件封装、设置、设置键值校验、HTML 转义）。
+  - `vendor/`：不走 npm 的第三方库（进 git）：`xlsx/`（SheetJS 0.20.3，「PDF 转格式」内置降级解析 Excel 用；npm 版停在 0.18.5 有已知漏洞，官方分发货道是 cdn.sheetjs.com，来源与升级方法见 `vendor/xlsx/说明.txt`）。
   - `addons/`：随包加装包（不进 git）：`libreoffice/`（PDF→Word 与高保真 Office→PDF，可选）、`ffmpeg/`（视频/动图工具必需，单文件 83MB，GPL v3）、`realesrgan/`（「图片变清晰」的 AI 放大，约 50MB，BSD 3-Clause，需 Vulkan 显卡）、`asr/`（「语音转文字」的 FunASR·SenseVoice 识别引擎，约 246MB，MIT，纯 CPU）、`ocr/`（「文字识别」的 PP-OCRv5 mobile ONNX 模型，约 20MB，Apache-2.0 模型 + MIT 运行时，纯 CPU）、`hibit/`（「软件卸载」随包内置的 HiBit Uninstaller 4.0.10 官方便携版，单文件 15.4MB，官网标注个人与商业使用均免费，**启动需管理员权限**——exe 清单即 `requireAdministrator`）、`7zip/`（「压缩与解压」引擎，约 2.4MB，LGPL 2.1+）；许可与来源见各自目录的 LICENSE/说明.txt。
 - `docs/`：开发指南（如《新增工具指南》）。
 - `app/release/`：打包产物（不进 git）。
@@ -44,7 +45,7 @@
 - Node 环境：`.tools/node/node.exe`（便携版 v22.20.0，不进 git；命令行里先把 `.tools/node` 加入 PATH）。
 - 安装依赖：`cd app` → `npm install`（npm registry 用 `https://registry.npmmirror.com`；Electron 二进制需设 `ELECTRON_MIRROR=https://registry.npmmirror.com/-/binary/electron/`）。
 - 启动调试：`cd app` → `npm start`。
-- 算法测试：`cd app` → `npm test`（连跑纯逻辑单测共 222 项：算法 55 项（MD5 对照、洗牌、Gilbert 覆盖、六模式往返、填充规则、密钥校验）+ 任务队列 13 项 + 压缩与解压 68 项 + 文件藏图 38 项 + 导航排序 29 项（v2.6.0 起，`tests/navorder.test.mjs`）+ 软件卸载 19 项（v2.8.0 起，`tests/uninstall.test.mjs`）。
+- 算法测试：`cd app` → `npm test`（连跑纯逻辑单测共 247 项：算法 55 项（MD5 对照、洗牌、Gilbert 覆盖、六模式往返、填充规则、密钥校验）+ 任务队列 13 项 + 压缩与解压 68 项 + 文件藏图 40 项 + 导航排序 33 项（v2.6.0 起，`tests/navorder.test.mjs`）+ 软件卸载 19 项（v2.8.0 起，`tests/uninstall.test.mjs`）+ 设置校验与转义 19 项（v2.8.1 起，`tests/settingsschema.test.mjs`）。
 - 冒烟自检：`cd app` → `.\node_modules\electron\dist\electron.exe . --smoke-test`（输出 `SMOKE_TEST_OK tools=9 options=6 …` 与 `SMOKE_UI {...}`，界面元素完整、按钮可点即正常）。
 - 端到端自检：`cd app` → `.\node_modules\electron\dist\electron.exe . --self-test`（在界面进程里跑「PNG 无损往返 + 算法链路 + JPG 保存 + 方块填充」，输出 `SELF_TEST {...}`）。
 - 界面自动测试：`cd app` → `.\node_modules\electron\dist\electron.exe . --ui-test`（模拟真人点按钮走完整流程：选图→混淆→保存→还原→批量→清空，逐步截图并做像素级校验，输出 `UI_TEST {..., "pass":true}`；截图落在 `%TEMP%\tomato-uitest`）。

@@ -358,12 +358,19 @@ export function writePngWithIdat(bytes, idatData) {
 
 // —— 条目名净化（防路径穿越；解包落盘前的最后一道关） ——
 
+/** Windows 保留设备名（大小写不敏感；带扩展名的形态同样保留，如 CON.txt） */
+const WIN_RESERVED = /^(con|prn|aux|nul|com[1-9]|lpt[1-9])(\.|$)/i;
+
 /** 取 basename 并清掉非法字符；空名给兜底名 */
 export function safeEntryName(raw) {
   const flat = String(raw || '').replace(/\\/g, '/');
   let name = flat.split('/').pop() || '';
   name = name.replace(/[\u0000-\u001f<>:"|?*]/g, '_').trim();
+  // Windows 会剥掉文件名结尾的点与空格（剥完可能变成另一个名字甚至空名），先自己剥掉
+  name = name.replace(/[. ]+$/, '').trim();
   if (name === '' || name === '.' || name === '..') name = UNNAMED;
+  // Windows 保留设备名（CON/NUL/COM1…）：直接落盘会失败或打到设备上，加前缀避让（v2.8.1）
+  if (WIN_RESERVED.test(name)) name = `_${name}`;
   return name;
 }
 

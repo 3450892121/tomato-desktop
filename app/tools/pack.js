@@ -144,13 +144,21 @@ copyIfExists(path.join('pdfjs-dist', 'LICENSE'));
 copyIfExists(path.join('pdf-lib', 'dist', 'pdf-lib.esm.js'));
 copyIfExists(path.join('pdf-lib', 'dist', 'pdf-lib.js'));
 copyIfExists(path.join('pdf-lib', 'LICENSE.md'));
-// 内置降级（Word/Excel→PDF）用：docx-preview + JSZip + SheetJS 的 UMD 构建
+// 内置降级（Word/Excel→PDF）用：docx-preview + JSZip 的 UMD 构建
 copyIfExists(path.join('docx-preview', 'dist', 'docx-preview.js'));
 copyIfExists(path.join('docx-preview', 'LICENSE'));
 copyIfExists(path.join('jszip', 'dist', 'jszip.min.js'));
 copyIfExists(path.join('jszip', 'LICENSE.markdown'));
-copyIfExists(path.join('xlsx', 'dist', 'xlsx.full.min.js'));
-copyIfExists(path.join('xlsx', 'dist', 'LICENSE'));
+// SheetJS（xlsx）：v2.8.1 起走本地内置 vendor/（0.20.3）——npm 版停在 0.18.5 有已知漏洞
+// （CVE-2023-30533 / CVE-2024-22363），官方分发货道是 cdn.sheetjs.com。见 app/vendor/xlsx/说明.txt。
+{
+  const vendorSrc = path.join(appRoot, 'vendor', 'xlsx');
+  const vendorDst = path.join(appTarget, 'vendor', 'xlsx');
+  if (!fs.existsSync(path.join(vendorSrc, 'xlsx.full.min.js'))) {
+    throw new Error('缺少 vendor/xlsx/xlsx.full.min.js（SheetJS 本地内置；来源与升级方法见 app/vendor/xlsx/说明.txt）');
+  }
+  copyTree(vendorSrc, vendorDst);
+}
 // 4b-2) C 批工具依赖：@cantoo/pdf-lib（加密 / 隐形文字层）+ @cantoo/fontkit（中文字子集化）
 //   **整包复制**而不是只挑单文件——踩过的坑：
 //     · 界面进程用 ESM 产物（pdf-lib.esm.js / fontkit.umd.min.js）；

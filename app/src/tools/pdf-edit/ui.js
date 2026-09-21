@@ -563,7 +563,13 @@ async function openPreview(index) {
     }
     st.preview.pdf = pdf;
   } catch (err) {
-    if (state === st) els.thumbs.innerHTML = `<div class="ped-thumb-msg">预览失败：${err.message}</div>`;
+    // 错误消息含完整文件路径（文件名用户可控），必须走 textContent，不能拼进 innerHTML
+    if (state === st) {
+      const msg = document.createElement('div');
+      msg.className = 'ped-thumb-msg';
+      msg.textContent = `预览失败：${err.message}`;
+      els.thumbs.replaceChildren(msg);
+    }
     return;
   }
   await renderThumbs(st);

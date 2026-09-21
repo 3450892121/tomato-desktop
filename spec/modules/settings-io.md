@@ -23,10 +23,11 @@
 `_` 前缀字段是**元信息**，导入时忽略；只有 `settings` 里的内容会被读取。
 
 ## 安全约定（重要）
-1. **只合并已知键**：导入端维护一份白名单（`blockSize` / `jpegQuality` / `defaultDoubleKey` / `outputDir` / `askSavePath` / `collapsedGroups` / `theme`），与 `shared/settings.js` 的 `DEFAULT_SETTINGS` 保持一致。白名单之外的键**一律忽略**，避免野文件把乱七八糟的内容写进配置文件。
-2. **非法文件被拒绝且不改动现有设置**：缺少 `settings` 对象、JSON 解析失败、白名单项一个都没有 —— 三种情况都直接报错返回，**不写盘**。
-3. **合并而非替换**：只覆盖文件里出现的键，其余保持当前值（所以「只导出外观设置」这种部分导入也成立）。
-4. UI 必须如实反馈：成功时状态栏说明「导入了几项、分别是哪些」，失败时说明原因。
+1. **只合并已知键**：导入端维护一份白名单（`blockSize` / `jpegQuality` / `defaultDoubleKey` / `outputDir` / `askSavePath` / `collapsedGroups` / `navOrder` / `theme`），与 `shared/settings.js` 的 `DEFAULT_SETTINGS` 保持一致。白名单之外的键**一律忽略**，避免野文件把乱七八糟的内容写进配置文件。
+2. **已知键的值也必须合法**（v2.8.1 起）：类型 / 取值范围不合法（如 `blockSize` 传字符串、`theme` 传任意词）的键**跳过不合并并如实上报**，防止把任意值写进配置、再被界面拼进设置弹窗的 HTML。键清单与校验规则统一在 `src/shared/settings-schema.mjs`（主进程导入与界面共用，不再双头维护；`navOrder` 的内部结构交给 `navsort.computeNavPlan` 净化，校验只挡「根本不是对象」的值）。
+3. **非法文件被拒绝且不改动现有设置**：缺少 `settings` 对象、JSON 解析失败、已知项一个都没有（或全不合法）—— 直接报错返回，**不写盘**。
+4. **合并而非替换**：只覆盖文件里出现的键，其余保持当前值（所以「只导出外观设置」这种部分导入也成立）。
+5. UI 必须如实反馈：成功时状态栏说明「导入了几项、分别是哪些、跳过了哪些不合法项」，失败时说明原因。
 
 ## 实现要点
 - 主进程 IPC：`settings:export` / `settings:import`（设置文件在软件目录 `userdata/`，只有主进程能读写）。

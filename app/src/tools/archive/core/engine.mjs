@@ -103,9 +103,13 @@ function killTree(child) {
 
 /**
  * 跑一次 7-Zip。
- * @returns {Promise<{code:number, stdout:string, stderr:string, canceled:boolean, timedOut:boolean}>}
+ * @param {object} [options]
+ * @param {boolean} [options.keepFullStdout] 列目录/安全闸门必须置 true：完整保留 stdout
+ *   （头部被截掉会让「查可疑路径」漏检归档头部的条目，等于给 zip-slip 留后门，v2.8.1 修复）。
+ *   进度解析等只看尾部的场景保持默认（只留尾部，防异常输出撑爆内存）。
+ * @returns {Promise<{code:number, stdout:string, stderr:string, canceled:boolean, timedOut:boolean, stdoutIncomplete:boolean}>}
  */
-function run7z(binPath, args, { cwd, jobId, onStdout, timeoutMs = 6 * 3600 * 1000 } = {}) {
+function run7z(binPath, args, { cwd, jobId, onStdout, timeoutMs = 6 * 3600 * 1000, keepFullStdout = false } = {}) {
   return new Promise((resolve) => {
     const child = spawn(binPath, args, {
       cwd: cwd || undefined,
@@ -115,22 +119,36 @@ function run7z(binPath, args, { cwd, jobId, onStdout, timeoutMs = 6 * 3600 * 100
     });
     if (jobId) jobs.set(jobId, child);
 
+    // 完整模式的输出上限：只是防野输出撑爆内存的保险丝。超过即置 stdoutIncomplete，
+    // 上层（listArchive）会把「列不完整」当失败拒绝处理——宁可拒绝，不可漏检。
+    const FULL_STDOUT_CAP = 64 * 1024 * 1024;
+
     let stdout = '';
     let stderr = '';
     let canceled = false;
     let timedOut = false;
+    let stdoutIncomplete = false;
     const timer = setTimeout(() => { timedOut = true; killTree(child); }, timeoutMs);
 
     const finish = (code) => {
       clearTimeout(timer);
       if (jobId) jobs.delete(jobId);
-      resolve({ code, stdout, stderr, canceled, timedOut });
+      resolve({ code, stdout, stderr, canceled, timedOut, stdoutIncomplete });
     };
 
     child.stdout.on('data', (d) => {
       const s = d.toString();
-      stdout += s;
-      if (stdout.length > 400000) stdout = stdout.slice(-200000); // 只留尾部，异常时不撑爆内存
+      if (keepFullStdout) {
+        if (stdout.length < FULL_STDOUT_CAP) {
+          stdout += s;
+          if (stdout.length >= FULL_STDOUT_CAP) stdoutIncomplete = true;
+        } else {
+          stdoutIncomplete = true; // 继续消费管道（避免子进程被写满阻塞），但不再堆积
+        }
+      } else {
+        stdout += s;
+        if (stdout.length > 400000) stdout = stdout.slice(-200000); // 只留尾部，异常时不撑爆内存
+      }
       if (onStdout) onStdout(s, stdout);
     });
     child.stderr.on('data', (d) => {
@@ -156,9 +174,16 @@ export async function listArchive({ archivePath, password = '', binPath }) {
   if (!archivePath || !fs.existsSync(archivePath)) {
     return { ok: false, message: '找不到压缩包文件' };
   }
-  const res = await run7z(binPath, listArgs({ archivePath, password }), { timeoutMs: 10 * 60 * 1000 });
+  const res = await run7z(binPath, listArgs({ archivePath, password }), {
+    timeoutMs: 10 * 60 * 1000,
+    keepFullStdout: true // 列目录的输出要喂给「查可疑路径」的闸门，必须完整（见 run7z 注释）
+  });
   if (res.code !== 0) {
     return { ok: false, message: translateSevenZipError(res) };
+  }
+  if (res.stdoutIncomplete) {
+    // 列表不完整 = 闸门不可信：拒绝列出（解压前的闸门也走这里，等于连解压一起拒绝）
+    return { ok: false, message: '压缩包条目过多，无法完整列出校验（超出安全上限）；为防可疑路径漏检已拒绝处理' };
   }
   const entries = parseListOutput(res.stdout);
   const meta = parseArchiveMeta(res.stdout);

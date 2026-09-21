@@ -494,7 +494,13 @@ async function renderPreview() {
       rendered = await decodeImageFromBytes(await st.ctx.readFile(f.path));
     }
   } catch (err) {
-    if (state === st) els.canvasWrap.innerHTML = `<div class="ocr-thumb-msg">预览失败：${err.message}</div>`;
+    // 错误消息含完整文件路径（文件名用户可控），必须走 textContent，不能拼进 innerHTML
+    if (state === st) {
+      const msg = document.createElement('div');
+      msg.className = 'ocr-thumb-msg';
+      msg.textContent = `预览失败：${err.message}`;
+      els.canvasWrap.replaceChildren(msg);
+    }
     return;
   }
   if (state !== st || !st.els) return;

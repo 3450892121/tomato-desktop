@@ -71,6 +71,37 @@ function makeTraversalTar(target) {
   fs.writeFileSync(target, Buffer.concat([block, content, pad, Buffer.alloc(1024)]));
 }
 
+/**
+ * 造一个「条目很多 + 头部藏 `..` 穿越路径」的 tar。
+ * 回归用例（v2.8.1）：修复前列目录输出被截成「只留尾部 200KB」，
+ * 头部的可疑条目会漏检、闸门被绕过（zip-slip），所以穿越条目必须放在**最前面**。
+ */
+function makeBigTraversalTar(target, count) {
+  const parts = [];
+  const pushEntry = (name, content) => {
+    const block = Buffer.alloc(512);
+    const writeStr = (buf, off, len, str) => { buf.write(str, off, len, 'utf8'); };
+    writeStr(block, 0, 100, name);
+    writeStr(block, 100, 8, '0000644\0');
+    writeStr(block, 108, 8, '0000000\0');
+    writeStr(block, 116, 8, '0000000\0');
+    writeStr(block, 124, 12, `${content.length.toString(8).padStart(11, '0')}\0`);
+    writeStr(block, 136, 12, '00000000000\0');
+    block.write('        ', 148, 8, 'ascii');
+    let sum = 0;
+    for (const b of block) sum += b;
+    writeStr(block, 148, 8, `${sum.toString(8).padStart(6, '0')}\0 `);
+    const pad = Buffer.alloc((512 - (content.length % 512)) % 512);
+    parts.push(block, content, pad);
+  };
+  pushEntry('../evil-head.txt', Buffer.from('pwned', 'utf8')); // 必须在最前：旧实现的截断恰恰丢头部
+  for (let i = 0; i < count; i += 1) {
+    pushEntry(`f${String(i).padStart(6, '0')}.txt`, Buffer.from(`file-${i}`, 'utf8'));
+  }
+  parts.push(Buffer.alloc(1024)); // tar 结尾两块零
+  fs.writeFileSync(target, Buffer.concat(parts));
+}
+
 async function runArchiveTest(options = {}) {
   const portableDir = options.portableDir || path.join(__dirname, '..');
   const engine = await import('../src/tools/archive/core/engine.mjs');
@@ -340,6 +371,31 @@ async function runArchiveTest(options = {}) {
     log(`路径穿越：${checks.traversal.ok ? '✅' : '❌'} 识别 ${listed.suspicious.length} 条；解压被拒=${!ex.ok}`);
   }
 
+  // —— 5b) 大包 + 头部穿越条目：列表必须完整、闸门必须仍然拦得住（v2.8.1 回归） ——
+  {
+    const MANY = 3000; // 列表输出约 700KB，远超修复前「只留尾部 200KB」的截断线
+    const bigTravTar = path.join(WORK, 'trav-big.tar');
+    makeBigTraversalTar(bigTravTar, MANY);
+    const listed = await engine.listArchive({ archivePath: bigTravTar, password: '', binPath });
+    // 7-Zip 在 Windows 上输出 tar 条目路径可能用反斜杠，断言前先归一化
+    const suspiciousPaths = (listed.suspicious || []).map((e) => String(e.path).replace(/\\/g, '/'));
+    const exDir = path.join(WORK, 'ex-trav-big');
+    const exPlan = plan.buildExtractPlan({ archives: [{ path: bigTravTar, name: 'trav-big.tar' }], outputDir: exDir });
+    const ex = await engine.extractArchive({ steps: exPlan.steps, binPath, jobId: 'travbig', onProgress: () => {} });
+    checks.traversalBigList = {
+      ok: listed.ok
+        && listed.entries.length === MANY + 1
+        && suspiciousPaths.includes('../evil-head.txt')
+        && !ex.ok
+        && !fs.existsSync(path.join(WORK, 'evil-head.txt')),
+      entries: listed.ok ? listed.entries.length : 0,
+      suspicious: suspiciousPaths,
+      extractRejected: !ex.ok,
+      message: ex.message || ''
+    };
+    log(`大包头部穿越：${checks.traversalBigList.ok ? '✅' : '❌'} 列出 ${checks.traversalBigList.entries} 条，头部可疑条目被识别=${suspiciousPaths.includes('../evil-head.txt')}；解压被拒=${!ex.ok}`);
+  }
+
   // —— 6) 大文件（分块/流式，记录耗时） ——
   {
     const bigPath = path.join(WORK, 'big.bin');
@@ -465,6 +521,7 @@ async function runArchiveTest(options = {}) {
     && checks.volume.ok
     && checks.extractOnly.ok
     && checks.traversal.ok
+    && checks.traversalBigList.ok
     && checks.largeFile.ok
     && checks.nodeCodecs.ok
     && checks.invalidFile.ok

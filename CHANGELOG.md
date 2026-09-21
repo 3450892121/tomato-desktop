@@ -2,6 +2,29 @@
 
 本项目遵循语义化版本（x.y.z）：修 bug → z+1；加功能 → y+1；重要改动 → x+1。
 
+## v2.8.1（2026-09-21）安全加固与结构整理：一次全面代码审查后的集中修复
+
+> 背景：对整个项目做了一轮代码审查（安全 / 可维护性 / 测试 / 依赖），按优先级修复全部可修项。
+
+**安全修复（P1/P2）**
+- **修「压缩与解压」解压闸门可被绕过（zip-slip，中危）**：引擎跑 7z 时把 stdout 截成「只留尾部 200KB」，超大压缩包（千条目以上）时**归档头部**的条目会从列表里丢掉——而解压前的可疑路径闸门解析的正是这份列表，把 `..` 条目放在归档头部即可绕过闸门写到解压目录之外。修法：列目录/闸门路径改为**完整保留输出**（`run7z` 新增 `keepFullStdout`），超上限（64MB，约 60 万+ 条目）列不完的极端包直接拒绝列出与解压——宁可拒绝，不可漏检。回归用例：`--archive-test` 新增「3000 条目 + 头部藏 `../evil-head.txt`」的 tar，断言列表完整、可疑条目被识别、解压被拒（`traversalBigList`）。
+- **SheetJS（xlsx）从 npm 0.18.5 升到官方 0.20.3（中危）**：npm 版停在 0.18.5 且已停更，存在已知漏洞（CVE-2023-30533 原型污染、CVE-2024-22363 ReDoS）；「PDF 转格式」的内置降级链路（xlsx→PDF）会用它解析**别人发来的** Excel 文件，必须升级。官方分发货道是 cdn.sheetjs.com（不再发 npm），故改为**本地内置 `app/vendor/xlsx/`（进 git，0.20.3，Apache-2.0，附来源/SHA-256/升级方法的 `说明.txt`）**：`office-print.html` 与 `--pdf-test` 改从 vendor 加载，`pack.js` 步骤 4b 从 vendor 复制到产物，`package.json` 移除 npm 依赖。`--pdf-test` 的 `fallbackXlsx` 断言保持通过。
+- **错误消息不再拼 innerHTML（低-中危，2 处）**：「文字识别」「PDF 编辑整理」的预览失败提示原先把 `err.message`（含完整路径、文件名用户可控）拼进 innerHTML，改为 `createElement + textContent`，HTML 字符再也构不成标签。
+- **设置导入加值校验 + 设置弹窗插值转义（低-中危）**：`settings:import` 原先只做键白名单、值原样合并——恶意设置文件导入后再打开设置弹窗，值会被拼进 innerHTML（CSP 拦住了脚本执行，止步于界面破坏，但要修）。修法两层：① 新增纯逻辑模块 `src/shared/settings-schema.mjs`（键清单 + 每键类型/范围校验，主进程导入与界面共用，**顺带解决了 KNOWN_KEYS 与 DEFAULT_SETTINGS 双头维护**），不合法的键跳过并如实上报（状态栏说明跳过了哪几项）；② 设置弹窗的值插值统一走 `escapeHtml`（新共享模块 `src/shared/htmlescape.js`）。原型污染键（`__proto__`/`constructor`）也进了单测断言。
+- **补窗口导航兜底**：主窗口加 `will-navigate` 拦截（只放行 `file://`）与 `setWindowOpenHandler` 全拒——正常使用走不到，纯粹纵深防御。
+- **「文件藏图」条目名对齐 Windows 落盘规则**：`safeEntryName` 新增拦保留设备名（`CON`/`NUL`/`COM1-9`/`LPT1-9`，含带扩展名形态，加 `_` 前缀避让）与剥结尾点/空格，避免解包写出打不开的文件。
+
+**结构整理（P3，降低「每加一个工具要改 N 处」的成本）**
+- **自动测试入口表驱动**：原先 23 个 `if (xxxTest)` 块各写一遍「did-finish-load → 跑测试 → 输出 → 退出」，仅细微差别；统一为 `AUTO_TESTS` 规格表 + `registerAutoTests()`（**硬约定不降级**：`app.quit()` 在 finally、结果落盘在成败两分支都做且失败分支自己兜 try/catch——都是踩过的坑）。控制台输出前缀与格式逐项保持原样（验收脚本按它们 grep）。冒烟/端到端/造验样本形态特殊，保留原样。
+- **打开文件对话框规格表**：17 个纯规格差异的 `dialog:open-*` handler 合并为 `OPEN_FILE_DIALOGS` 一张表（新增工具加一行）；夹具前缀互相独立、印章前缀避让等教训注释全部保留。8 个有定制夹具语义的（open-folder / save-file / batch-rename / archive×2 / hide×3）保留原实现。preload / ctx / 工具代码零改动。
+- `main.js` 从 2674 行降到约 2260 行（同时净增了 will-navigate、导入校验等新逻辑）。
+
+**测试与文档**
+- 新增纯逻辑单测 `tests/settingsschema.test.mjs`（19 项，挂 `npm test`）：键清单与 `DEFAULT_SETTINGS` 不漂移、各键合法/非法值、导入挑选（未知键忽略 / 非法值跳过 / 原型污染键不进 patch）、`escapeHtml`。
+- `tests/imghide.test.mjs` 新增 2 项（共 40）：保留设备名避让（含不误伤 `console.log` 等）、结尾点/空格剥除。
+- `npm test` 总数 222 → **247 项**（算法 55 + 队列 13 + 压缩 68 + 藏图 40 + 导航 33 + 卸载 19 + 设置校验 19），`AGENTS.md` 已同步。
+- spec 同步：`settings-io.md`（值校验约定 + 白名单补 `navOrder`）、`archive.md`（闸门基于完整列表输出）、`imghide.md`（保留设备名与结尾点/空格）。
+
 ## v2.8.0（2026-09-21）新增「软件卸载」工具：把「卸载软件 + 清理残留」也收进工具箱
 
 > 用户需求原文：「`C:\Users\chen3\Desktop\HiBitUninstaller.exe - 快捷方式.lnk` 可不可以把这个内置进这个项目里面」。

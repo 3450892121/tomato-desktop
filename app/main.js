@@ -265,6 +265,71 @@ function windowBackgroundColor() {
   return nativeTheme.shouldUseDarkColors ? DARK : LIGHT;
 }
 
+// —— 自动测试入口表（v2.8.1 起） ——
+// 之前每个测试各写一个 if 块（20+ 个、仅细微差别）；统一后「加一个自动测试 = 表里加一行 +
+// 文件头声明 flag」。冒烟（--smoke-test）、端到端（--self-test）、造/验样本（--make/verify-samples）
+// 的形态特殊，仍在 createMainWindow 里各自保留。
+// 硬约定（都是踩过的坑，别省）：
+//   · app.quit() 必须在 finally——曾因 catch 里二次抛错跳过退出，留下常驻进程干扰后续测试；
+//   · writeResult（结果落盘到 %TEMP%，交付验收依据）在成功/失败两分支都要做，
+//     失败分支的落盘自己兜 try/catch（写不进去也要退出）。
+// 字段：flag=文件头的开关变量；tag=控制台输出前缀（验收脚本按它 grep，保持原样）；
+//       file/runner=测试模块与入口函数；args=实参（多数只传窗口，带加装包的补 portableDir）；
+//       log=控制台输出的 JSON 摘要（保持各测试原有格式）；write=需要结果落盘。
+const AUTO_TESTS = [
+  { flag: uiTest, tag: 'UI_TEST', file: './tests/ui-test.js', runner: 'runUiTest', args: (win) => [win], log: (r) => JSON.stringify(r) },
+  { flag: pdfTest, tag: 'PDF_TEST', file: './tests/pdf-test.js', runner: 'runPdfTest', args: (win) => [win], log: (r) => JSON.stringify(r) },
+  { flag: pdfUiTest, tag: 'PDF_UI_TEST', file: './tests/pdf-ui-test.js', runner: 'runPdfUiTest', args: (win) => [win], log: (r) => JSON.stringify(r), write: true },
+  { flag: mediaTest, tag: 'MEDIA_TEST', file: './tests/media-test.js', runner: 'runMediaTest', args: (win) => [win], log: (r) => JSON.stringify(r) },
+  { flag: mediaUiTest, tag: 'MEDIA_UI_TEST', file: './tests/media-ui-test.js', runner: 'runMediaUiTest', args: (win) => [win], log: (r) => JSON.stringify(r), write: true },
+  { flag: audioTest, tag: 'AUDIO_TEST', file: './tests/audio-test.js', runner: 'runAudioTest', args: (win) => [win], log: (r) => JSON.stringify(r) },
+  { flag: audioUiTest, tag: 'AUDIO_UI_TEST', file: './tests/audio-ui-test.js', runner: 'runAudioUiTest', args: (win) => [win], log: (r) => JSON.stringify(r), write: true },
+  { flag: asrTest, tag: 'ASR_TEST', file: './tests/asr-test.js', runner: 'runAsrTest', args: (win) => [win], log: (r) => JSON.stringify(r) },
+  { flag: asrUiTest, tag: 'ASR_UI_TEST', file: './tests/asr-ui-test.js', runner: 'runAsrUiTest', args: (win) => [win], log: (r) => JSON.stringify(r), write: true },
+  { flag: ocrPoc, tag: 'OCR_POC', file: './tests/ocr-poc.js', runner: 'runOcrPoc', args: (win) => [win], log: (r) => JSON.stringify(r) },
+  { flag: themeTest, tag: 'THEME_TEST', file: './tests/theme-test.js', runner: 'runThemeTest', args: (win) => [win], log: (r) => JSON.stringify({ pass: r.pass, failures: r.failures }), write: true },
+  { flag: avTest, tag: 'AV_TEST', file: './tests/av-test.js', runner: 'runAvTest', args: (win) => [win], log: (r) => JSON.stringify({ ok: r.ok, failures: r.failures }) },
+  { flag: imgbatchTest, tag: 'IMGBATCH_TEST', file: './tests/imgbatch-test.js', runner: 'runImgbatchTest', args: (win) => [win], log: (r) => JSON.stringify({ ok: r.ok, failures: r.failures }) },
+  { flag: settingsIoTest, tag: 'SETTINGSIO_TEST', file: './tests/settingsio-test.js', runner: 'runSettingsIoTest', args: (win) => [win], log: (r) => JSON.stringify({ pass: r.pass, failures: r.failures }) },
+  { flag: pdfOcrTest, tag: 'PDF_OCR_TEST', file: './tests/pdf-ocr-test.js', runner: 'runPdfOcrTest', args: (win) => [win], log: (r) => JSON.stringify({ ok: r.ok, failures: r.failures }) },
+  { flag: queueUiTest, tag: 'QUEUE_UI_TEST', file: './tests/queue-ui-test.js', runner: 'runQueueUiTest', args: (win) => [win], log: (r) => JSON.stringify({ pass: r.pass, failures: r.failures }), write: true },
+  { flag: archiveTest, tag: 'ARCHIVE_TEST', file: './tests/archive-test.js', runner: 'runArchiveTest', args: () => [{ portableDir: PORTABLE_DIR }], log: (r) => JSON.stringify({ ok: r.ok, failedFormats: r.failedFormats, formatsTested: r.formatsTested, ms: r.ms }) },
+  { flag: archiveUiTest, tag: 'ARCHIVE_UI_TEST', file: './tests/archive-ui-test.js', runner: 'runArchiveUiTest', args: (win) => [win], log: (r) => JSON.stringify({ pass: r.pass, failures: r.failures }), write: true },
+  { flag: imgHideTest, tag: 'IMGHIDE_TEST', file: './tests/imghide-test.js', runner: 'runImgHideTest', args: (win) => [{ portableDir: PORTABLE_DIR, mainWindow: win }], log: (r) => JSON.stringify({ ok: r.ok }) },
+  { flag: uninstallTest, tag: 'UNINSTALL_TEST', file: './tests/uninstall-test.js', runner: 'runUninstallTest', args: (win) => [win, { portableDir: PORTABLE_DIR }], log: (r) => JSON.stringify({ pass: r.pass, failures: r.failures }), write: true },
+  { flag: imgHideUiTest, tag: 'IMGHIDE_UI_TEST', file: './tests/imghide-ui-test.js', runner: 'runImgHideUiTest', args: (win) => [win, { portableDir: PORTABLE_DIR }], log: (r) => JSON.stringify({ pass: r.pass, failures: r.failures }), write: true },
+  { flag: playerTest, tag: 'PLAYER_TEST', file: './tests/player-test.js', runner: 'runPlayerTest', args: (win) => [win], log: (r) => JSON.stringify({ ok: r.ok, failures: r.failures }) },
+  { flag: playerUiTest, tag: 'PLAYER_UI_TEST', file: './tests/player-ui-test.js', runner: 'runPlayerUiTest', args: (win) => [win], log: (r) => JSON.stringify({ pass: r.pass, failures: r.failures }), write: true }
+];
+
+/** 按表注册自动测试入口（createMainWindow 里调用；一次运行只会命中一个 flag） */
+function registerAutoTests() {
+  for (const entry of AUTO_TESTS) {
+    if (!entry.flag) continue;
+    mainWindow.webContents.once('did-finish-load', async () => {
+      let mod = null;
+      try {
+        mod = require(entry.file);
+        const result = await mod[entry.runner](...entry.args(mainWindow));
+        console.log(`${entry.tag} ${entry.log(result)}`);
+        if (entry.write && mod.writeResult) {
+          mod.writeResult({ ok: !!result.pass, at: new Date().toISOString(), result });
+        }
+      } catch (err) {
+        console.log(`${entry.tag}_FAIL ${err.message}\n${err.stack}`);
+        if (entry.write && mod && mod.writeResult) {
+          try {
+            mod.writeResult({ ok: false, at: new Date().toISOString(), error: err.message, stack: err.stack });
+          } catch { /* 结果写不进去也要退出 */ }
+        }
+      } finally {
+        // app.quit() 必须在 finally：曾因 catch 里二次抛错跳过退出，留下常驻进程（测试窗口不关、干扰后续测试）
+        app.quit();
+      }
+    });
+  }
+}
+
 function createMainWindow() {
   mainWindow = new BrowserWindow({
     width: 1180,
@@ -284,6 +349,13 @@ function createMainWindow() {
   });
 
   mainWindow.loadFile(path.join(__dirname, 'src', 'shell', 'index.html'));
+
+  // 纵深防御（v2.8.1）：本应用只加载本地界面，任何导航/弹窗一律拒绝。
+  // 正常使用永远走不到这两个回调；万一界面被注入了跳转代码（外链、重定向），在这里兜底。
+  mainWindow.webContents.on('will-navigate', (event, url) => {
+    if (!url.startsWith('file://')) event.preventDefault();
+  });
+  mainWindow.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
 
   if (smokeTest) {
     mainWindow.webContents.once('did-finish-load', async () => {
@@ -350,343 +422,8 @@ function createMainWindow() {
     });
   }
 
-  if (uiTest) {
-    mainWindow.webContents.once('did-finish-load', async () => {
-      try {
-        const { runUiTest } = require('./tests/ui-test.js');
-        const result = await runUiTest(mainWindow);
-        console.log(`UI_TEST ${JSON.stringify(result)}`);
-      } catch (err) {
-        console.log(`UI_TEST_FAIL ${err.message}\n${err.stack}`);
-      }
-      app.quit();
-    });
-  }
-
-  if (pdfTest) {
-    mainWindow.webContents.once('did-finish-load', async () => {
-      try {
-        const { runPdfTest } = require('./tests/pdf-test.js');
-        const result = await runPdfTest(mainWindow);
-        console.log(`PDF_TEST ${JSON.stringify(result)}`);
-      } catch (err) {
-        console.log(`PDF_TEST_FAIL ${err.message}\n${err.stack}`);
-      }
-      app.quit();
-    });
-  }
-
-  if (pdfUiTest) {
-    const { runPdfUiTest, writeResult } = require('./tests/pdf-ui-test.js');
-    mainWindow.webContents.once('did-finish-load', async () => {
-      try {
-        const result = await runPdfUiTest(mainWindow);
-        console.log(`PDF_UI_TEST ${JSON.stringify(result)}`);
-        writeResult({ ok: !!result.pass, at: new Date().toISOString(), result });
-      } catch (err) {
-        console.log(`PDF_UI_TEST_FAIL ${err.message}\n${err.stack}`);
-        writeResult({ ok: false, at: new Date().toISOString(), error: err.message, stack: err.stack });
-      }
-      app.quit();
-    });
-  }
-
-  if (mediaTest) {
-    mainWindow.webContents.once('did-finish-load', async () => {
-      try {
-        const { runMediaTest } = require('./tests/media-test.js');
-        const result = await runMediaTest(mainWindow);
-        console.log(`MEDIA_TEST ${JSON.stringify(result)}`);
-      } catch (err) {
-        console.log(`MEDIA_TEST_FAIL ${err.message}\n${err.stack}`);
-      }
-      app.quit();
-    });
-  }
-
-  if (mediaUiTest) {
-    const { runMediaUiTest, writeResult } = require('./tests/media-ui-test.js');
-    mainWindow.webContents.once('did-finish-load', async () => {
-      try {
-        const result = await runMediaUiTest(mainWindow);
-        console.log(`MEDIA_UI_TEST ${JSON.stringify(result)}`);
-        writeResult({ ok: !!result.pass, at: new Date().toISOString(), result });
-      } catch (err) {
-        console.log(`MEDIA_UI_TEST_FAIL ${err.message}\n${err.stack}`);
-        writeResult({ ok: false, at: new Date().toISOString(), error: err.message, stack: err.stack });
-      }
-      app.quit();
-    });
-  }
-
-  if (audioTest) {
-    mainWindow.webContents.once('did-finish-load', async () => {
-      try {
-        const { runAudioTest } = require('./tests/audio-test.js');
-        const result = await runAudioTest(mainWindow);
-        console.log(`AUDIO_TEST ${JSON.stringify(result)}`);
-      } catch (err) {
-        console.log(`AUDIO_TEST_FAIL ${err.message}\n${err.stack}`);
-      }
-      app.quit();
-    });
-  }
-
-  if (audioUiTest) {
-    const { runAudioUiTest, writeResult } = require('./tests/audio-ui-test.js');
-    mainWindow.webContents.once('did-finish-load', async () => {
-      try {
-        const result = await runAudioUiTest(mainWindow);
-        console.log(`AUDIO_UI_TEST ${JSON.stringify(result)}`);
-        writeResult({ ok: !!result.pass, at: new Date().toISOString(), result });
-      } catch (err) {
-        console.log(`AUDIO_UI_TEST_FAIL ${err.message}\n${err.stack}`);
-        try { writeResult({ ok: false, at: new Date().toISOString(), error: err.message, stack: err.stack }); } catch { /* 结果写不进去也要退出 */ }
-      } finally {
-        // app.quit() 必须在 finally：曾因 catch 里二次抛错跳过退出，留下常驻进程（测试窗口不关、干扰后续测试）
-        app.quit();
-      }
-    });
-  }
-
-  if (asrTest) {
-    mainWindow.webContents.once('did-finish-load', async () => {
-      try {
-        const { runAsrTest } = require('./tests/asr-test.js');
-        const result = await runAsrTest(mainWindow);
-        console.log(`ASR_TEST ${JSON.stringify(result)}`);
-      } catch (err) {
-        console.log(`ASR_TEST_FAIL ${err.message}\n${err.stack}`);
-      }
-      app.quit();
-    });
-  }
-
-  if (asrUiTest) {
-    const { runAsrUiTest, writeResult } = require('./tests/asr-ui-test.js');
-    mainWindow.webContents.once('did-finish-load', async () => {
-      try {
-        const result = await runAsrUiTest(mainWindow);
-        console.log(`ASR_UI_TEST ${JSON.stringify(result)}`);
-        writeResult({ ok: !!result.pass, at: new Date().toISOString(), result });
-      } catch (err) {
-        console.log(`ASR_UI_TEST_FAIL ${err.message}\n${err.stack}`);
-        try { writeResult({ ok: false, at: new Date().toISOString(), error: err.message, stack: err.stack }); } catch { /* 结果写不进去也要退出 */ }
-      } finally {
-        // app.quit() 必须在 finally：曾因 catch 里二次抛错跳过退出，留下常驻进程（测试窗口不关、干扰后续测试）
-        app.quit();
-      }
-    });
-  }
-
-  if (ocrPoc) {
-    const { runOcrPoc } = require('./tests/ocr-poc.js');
-    mainWindow.webContents.once('did-finish-load', async () => {
-      try {
-        const result = await runOcrPoc(mainWindow);
-        console.log(`OCR_POC ${JSON.stringify(result)}`);
-      } catch (err) {
-        console.log(`OCR_POC_FAIL ${err.message}\n${err.stack}`);
-      }
-      app.quit();
-    });
-  }
-
-  if (themeTest) {
-    const { runThemeTest, writeResult } = require('./tests/theme-test.js');
-    mainWindow.webContents.once('did-finish-load', async () => {
-      try {
-        const result = await runThemeTest(mainWindow);
-        console.log(`THEME_TEST ${JSON.stringify({ pass: result.pass, failures: result.failures })}`);
-        writeResult({ ok: !!result.pass, at: new Date().toISOString(), result });
-      } catch (err) {
-        console.log(`THEME_TEST_FAIL ${err.message}\n${err.stack}`);
-        try { writeResult({ ok: false, at: new Date().toISOString(), error: err.message, stack: err.stack }); } catch { /* 结果写不进去也要退出 */ }
-      } finally {
-        // app.quit() 必须在 finally：曾因 catch 里二次抛错跳过退出，留下常驻进程（干扰后续测试）
-        app.quit();
-      }
-    });
-  }
-
-  if (avTest) {
-    const { runAvTest } = require('./tests/av-test.js');
-    mainWindow.webContents.once('did-finish-load', async () => {
-      try {
-        const result = await runAvTest(mainWindow);
-        console.log(`AV_TEST ${JSON.stringify({ ok: result.ok, failures: result.failures })}`);
-      } catch (err) {
-        console.log(`AV_TEST_FAIL ${err.message}\n${err.stack}`);
-      } finally {
-        app.quit();
-      }
-    });
-  }
-
-  if (imgbatchTest) {
-    const { runImgbatchTest } = require('./tests/imgbatch-test.js');
-    mainWindow.webContents.once('did-finish-load', async () => {
-      try {
-        const result = await runImgbatchTest(mainWindow);
-        console.log(`IMGBATCH_TEST ${JSON.stringify({ ok: result.ok, failures: result.failures })}`);
-      } catch (err) {
-        console.log(`IMGBATCH_TEST_FAIL ${err.message}\n${err.stack}`);
-      } finally {
-        app.quit();
-      }
-    });
-  }
-
-  if (settingsIoTest) {
-    const { runSettingsIoTest } = require('./tests/settingsio-test.js');
-    mainWindow.webContents.once('did-finish-load', async () => {
-      try {
-        const result = await runSettingsIoTest(mainWindow);
-        console.log(`SETTINGSIO_TEST ${JSON.stringify({ pass: result.pass, failures: result.failures })}`);
-      } catch (err) {
-        console.log(`SETTINGSIO_TEST_FAIL ${err.message}\n${err.stack}`);
-      } finally {
-        app.quit();
-      }
-    });
-  }
-
-  if (pdfOcrTest) {
-    const { runPdfOcrTest } = require('./tests/pdf-ocr-test.js');
-    mainWindow.webContents.once('did-finish-load', async () => {
-      try {
-        const result = await runPdfOcrTest(mainWindow);
-        console.log(`PDF_OCR_TEST ${JSON.stringify({ ok: result.ok, failures: result.failures })}`);
-      } catch (err) {
-        console.log(`PDF_OCR_TEST_FAIL ${err.message}\n${err.stack}`);
-      } finally {
-        app.quit();
-      }
-    });
-  }
-
-  if (queueUiTest) {
-    const { runQueueUiTest, writeResult } = require('./tests/queue-ui-test.js');
-    mainWindow.webContents.once('did-finish-load', async () => {
-      try {
-        const result = await runQueueUiTest(mainWindow);
-        console.log(`QUEUE_UI_TEST ${JSON.stringify({ pass: result.pass, failures: result.failures })}`);
-        // 结果落盘（与 AGENTS.md 的约定一致；否则留下的旧文件会误导下次验收）
-        writeResult({ ok: !!result.pass, at: new Date().toISOString(), result });
-      } catch (err) {
-        console.log(`QUEUE_UI_TEST_FAIL ${err.message}\n${err.stack}`);
-        writeResult({ ok: false, at: new Date().toISOString(), error: err.message, stack: err.stack });
-      } finally {
-        app.quit();
-      }
-    });
-  }
-
-  if (archiveTest) {
-    mainWindow.webContents.once('did-finish-load', async () => {
-      try {
-        const { runArchiveTest } = require('./tests/archive-test.js');
-        const result = await runArchiveTest({ portableDir: PORTABLE_DIR });
-        console.log(`ARCHIVE_TEST ${JSON.stringify({ ok: result.ok, failedFormats: result.failedFormats, formatsTested: result.formatsTested, ms: result.ms })}`);
-      } catch (err) {
-        console.log(`ARCHIVE_TEST_FAIL ${err.message}\n${err.stack}`);
-      } finally {
-        app.quit();
-      }
-    });
-  }
-
-  if (archiveUiTest) {
-    const { runArchiveUiTest, writeResult } = require('./tests/archive-ui-test.js');
-    mainWindow.webContents.once('did-finish-load', async () => {
-      try {
-        const result = await runArchiveUiTest(mainWindow);
-        console.log(`ARCHIVE_UI_TEST ${JSON.stringify({ pass: result.pass, failures: result.failures })}`);
-        writeResult({ ok: !!result.pass, at: new Date().toISOString(), result });
-      } catch (err) {
-        console.log(`ARCHIVE_UI_TEST_FAIL ${err.message}\n${err.stack}`);
-        writeResult({ ok: false, at: new Date().toISOString(), error: err.message, stack: err.stack });
-      } finally {
-        app.quit();
-      }
-    });
-  }
-
-  if (imgHideTest) {
-    mainWindow.webContents.once('did-finish-load', async () => {
-      try {
-        const { runImgHideTest } = require('./tests/imghide-test.js');
-        const result = await runImgHideTest({ portableDir: PORTABLE_DIR, mainWindow });
-        console.log(`IMGHIDE_TEST ${JSON.stringify({ ok: result.ok })}`);
-      } catch (err) {
-        console.log(`IMGHIDE_TEST_FAIL ${err.message}\n${err.stack}`);
-      } finally {
-        app.quit();
-      }
-    });
-  }
-
-  if (uninstallTest) {
-    const { runUninstallTest, writeResult } = require('./tests/uninstall-test.js');
-    mainWindow.webContents.once('did-finish-load', async () => {
-      try {
-        const result = await runUninstallTest(mainWindow, { portableDir: PORTABLE_DIR });
-        console.log(`UNINSTALL_TEST ${JSON.stringify({ pass: result.pass, failures: result.failures })}`);
-        writeResult({ ok: !!result.pass, at: new Date().toISOString(), result });
-      } catch (err) {
-        console.log(`UNINSTALL_TEST_FAIL ${err.message}\n${err.stack}`);
-        writeResult({ ok: false, at: new Date().toISOString(), error: err.message, stack: err.stack });
-      } finally {
-        app.quit();
-      }
-    });
-  }
-
-  if (imgHideUiTest) {
-    const { runImgHideUiTest, writeResult } = require('./tests/imghide-ui-test.js');
-    mainWindow.webContents.once('did-finish-load', async () => {
-      try {
-        const result = await runImgHideUiTest(mainWindow, { portableDir: PORTABLE_DIR });
-        console.log(`IMGHIDE_UI_TEST ${JSON.stringify({ pass: result.pass, failures: result.failures })}`);
-        writeResult({ ok: !!result.pass, at: new Date().toISOString(), result });
-      } catch (err) {
-        console.log(`IMGHIDE_UI_TEST_FAIL ${err.message}\n${err.stack}`);
-        writeResult({ ok: false, at: new Date().toISOString(), error: err.message, stack: err.stack });
-      } finally {
-        app.quit();
-      }
-    });
-  }
-
-  if (playerTest) {
-    mainWindow.webContents.once('did-finish-load', async () => {
-      try {
-        const { runPlayerTest } = require('./tests/player-test.js');
-        const result = await runPlayerTest(mainWindow);
-        console.log(`PLAYER_TEST ${JSON.stringify({ ok: result.ok, failures: result.failures })}`);
-      } catch (err) {
-        console.log(`PLAYER_TEST_FAIL ${err.message}\n${err.stack}`);
-      } finally {
-        app.quit();
-      }
-    });
-  }
-
-  if (playerUiTest) {
-    const { runPlayerUiTest, writeResult } = require('./tests/player-ui-test.js');
-    mainWindow.webContents.once('did-finish-load', async () => {
-      try {
-        const result = await runPlayerUiTest(mainWindow);
-        console.log(`PLAYER_UI_TEST ${JSON.stringify({ pass: result.pass, failures: result.failures })}`);
-        writeResult({ ok: !!result.pass, at: new Date().toISOString(), result });
-      } catch (err) {
-        console.log(`PLAYER_UI_TEST_FAIL ${err.message}\n${err.stack}`);
-        writeResult({ ok: false, at: new Date().toISOString(), error: err.message, stack: err.stack });
-      } finally {
-        app.quit();
-      }
-    });
-  }
+  // 其余自动测试入口统一走 AUTO_TESTS 表（见函数定义处的约定）
+  registerAutoTests();
 
   if (makeSamplesDir) {
     mainWindow.webContents.once('did-finish-load', async () => {
@@ -733,26 +470,7 @@ app.on('window-all-closed', () => {
 });
 
 // —— IPC 骨架：先只放通道占位，具体实现随功能补全（见 spec/modules/*.md） ——
-
-// 打开图片文件对话框（返回所选路径列表）
-ipcMain.handle('dialog:open-images', async () => {
-  // 界面自动测试模式：跳过系统对话框，直接返回测试目录内的图片
-  if (testMode()) {
-    const { TEST_DIR } = require('./tests/ui-test.js');
-    const IMAGE_EXTS = new Set(['.png', '.jpg', '.jpeg', '.webp', '.bmp']);
-    const entries = await fs.readdir(TEST_DIR, { withFileTypes: true }).catch(() => []);
-    return entries
-      .filter((e) => e.isFile() && IMAGE_EXTS.has(path.extname(e.name).toLowerCase()) && e.name.startsWith('测试原图'))
-      .map((e) => path.join(TEST_DIR, e.name))
-      .sort();
-  }
-  const result = await dialog.showOpenDialog(mainWindow, {
-    title: '选择图片',
-    properties: ['openFile', 'multiSelections'],
-    filters: [{ name: '图片', extensions: ['png', 'jpg', 'jpeg', 'webp', 'bmp'] }]
-  });
-  return result.canceled ? [] : result.filePaths;
-});
+// （「打开文件」类对话框统一走下面的 OPEN_FILE_DIALOGS 规格表，不再逐个注册）
 
 // 打开文件夹对话框（用于批量导入 / 选择输出目录）
 ipcMain.handle('dialog:open-folder', async () => {
@@ -969,14 +687,19 @@ ipcMain.handle('settings:export', async () => {
 
 /**
  * 导入设置：让用户挑一个设置文件，校验后**合并**进当前设置并落盘。
- * 安全性：只接受本软件导出的结构（`settings` 字段为对象），且**只合并已知键**——
- * 野文件里的未知键一律忽略，避免把乱七八糟的东西写进配置文件。
- * 返回 {ok, applied, settings} 或 {ok:false, canceled|message}
+ * 安全性：只接受本软件导出的结构（`settings` 字段为对象），且**只合并已知键、值必须合法**——
+ * 野文件里的未知键一律忽略；已知键的值不合法（类型/范围不对）也跳过并如实上报，
+ * 避免把任意值写进配置文件、再被界面拼进设置弹窗的 HTML（v2.8.1 加固）。
+ * 键清单与校验规则统一在 src/shared/settings-schema.mjs（与界面共享，不再双头维护）。
+ * 返回 {ok, applied, skipped, settings} 或 {ok:false, canceled|message}
  */
-ipcMain.handle('settings:import', async () => {
-  // 白名单：与 src/shared/settings.js 的 DEFAULT_SETTINGS 保持一致
-  const KNOWN_KEYS = ['blockSize', 'jpegQuality', 'defaultDoubleKey', 'outputDir', 'askSavePath', 'collapsedGroups', 'navOrder', 'theme'];
+let settingsSchemaPromise = null;
+function loadSettingsSchema() {
+  if (!settingsSchemaPromise) settingsSchemaPromise = import('./src/shared/settings-schema.mjs');
+  return settingsSchemaPromise;
+}
 
+ipcMain.handle('settings:import', async () => {
   let source = null;
   if (testMode()) {
     const { TEST_DIR } = require('./tests/ui-test.js');
@@ -1002,20 +725,16 @@ ipcMain.handle('settings:import', async () => {
     return { ok: false, message: '这个文件不是本软件导出的设置文件（缺少 settings 内容）' };
   }
 
-  const patch = {};
-  const applied = [];
-  for (const k of KNOWN_KEYS) {
-    if (Object.prototype.hasOwnProperty.call(incoming, k)) {
-      patch[k] = incoming[k];
-      applied.push(k);
-    }
+  const schema = await loadSettingsSchema();
+  const { patch, applied, skipped } = schema.pickImportableSettings(incoming);
+  if (applied.length === 0) {
+    return { ok: false, message: '设置文件里没有可用的设置项（已知项的值都不合法或缺失）' };
   }
-  if (applied.length === 0) return { ok: false, message: '设置文件里没有可用的设置项' };
 
   const merged = { ...(await readSettingsFile()), ...patch };
   await fs.mkdir(USER_DATA_DIR, { recursive: true });
   await fs.writeFile(SETTINGS_FILE, JSON.stringify(merged, null, 2), 'utf8');
-  return { ok: true, applied, settings: merged, source };
+  return { ok: true, applied, skipped, settings: merged, source };
 });
 
 // —— OCR 加装包（「文字识别」工具；见 spec/modules/ocr.md） ——
@@ -1159,44 +878,7 @@ ipcMain.handle('app:info', async () => ({
 }));
 
 // —— PDF 转格式 工具：文件对话框与 LibreOffice 加装包（见 spec/modules/pdf-convert.md） ——
-
-// 打开 PDF 文件对话框（可多选）
-ipcMain.handle('dialog:open-pdfs', async () => {
-  // 界面自动测试模式：跳过系统对话框，直接返回测试目录里的 PDF
-  if (testMode()) {
-    const { TEST_DIR } = require('./tests/ui-test.js');
-    const entries = await fs.readdir(TEST_DIR, { withFileTypes: true }).catch(() => []);
-    return entries
-      .filter((e) => e.isFile() && e.name.toLowerCase().endsWith('.pdf'))
-      .map((e) => path.join(TEST_DIR, e.name))
-      .sort();
-  }
-  const result = await dialog.showOpenDialog(mainWindow, {
-    title: '选择 PDF 文件',
-    properties: ['openFile', 'multiSelections'],
-    filters: [{ name: 'PDF 文件', extensions: ['pdf'] }]
-  });
-  return result.canceled ? [] : result.filePaths;
-});
-
-// 打开 Word/Excel 文件对话框（可多选）
-ipcMain.handle('dialog:open-documents', async () => {
-  if (testMode()) {
-    const { TEST_DIR } = require('./tests/ui-test.js');
-    const DOC_EXTS = new Set(['.doc', '.docx', '.xls', '.xlsx']);
-    const entries = await fs.readdir(TEST_DIR, { withFileTypes: true }).catch(() => []);
-    return entries
-      .filter((e) => e.isFile() && DOC_EXTS.has(path.extname(e.name).toLowerCase()))
-      .map((e) => path.join(TEST_DIR, e.name))
-      .sort();
-  }
-  const result = await dialog.showOpenDialog(mainWindow, {
-    title: '选择 Word / Excel 文件',
-    properties: ['openFile', 'multiSelections'],
-    filters: [{ name: 'Word / Excel', extensions: ['doc', 'docx', 'xls', 'xlsx'] }]
-  });
-  return result.canceled ? [] : result.filePaths;
-});
+// （open-pdfs / open-documents 对话框已并入 OPEN_FILE_DIALOGS 规格表）
 
 // LibreOffice 加装包：位置约定 = 软件目录/addons/libreoffice/program/soffice.(com|exe)
 const LIBREOFFICE_ADDON_DIR = path.join(PORTABLE_DIR, 'addons', 'libreoffice');
@@ -1397,137 +1079,58 @@ const ARCHIVE_EXTS_FOR_DIALOG = [
   'cpio', 'z', 'wim', 'msi', 'deb', 'rpm', 'chm', 'dmg', 'xar', 'udf', 'vhd', 'vmdk', 'squashfs'
 ];
 
-// 图片（含 ICO/AVIF/SVG 等扩展名）
-ipcMain.handle('dialog:open-image-any', async () => {
-  // 测试模式只返回固定夹具「测试原图C」：避免把历次测试产生的副本/产物一起选进来（曾导致一次载入上千张）
-  if (testMode()) return testDirFiles(IMAGE_ANY_EXTS, { exact: '测试原图C' });
-  const result = await dialog.showOpenDialog(mainWindow, {
-    title: '选择图片',
-    properties: ['openFile', 'multiSelections'],
-    filters: [{ name: '图片（含 ICO/AVIF/SVG）', extensions: IMAGE_ANY_EXTS }]
-  });
-  return result.canceled ? [] : result.filePaths;
-});
-
-// 视频
-ipcMain.handle('dialog:open-videos', async () => {
-  if (testMode()) return testDirFiles(VIDEO_EXTS, { startWith: '测试视频' });
-  const result = await dialog.showOpenDialog(mainWindow, {
-    title: '选择视频',
-    properties: ['openFile', 'multiSelections'],
-    filters: [{ name: '视频', extensions: VIDEO_EXTS }]
-  });
-  return result.canceled ? [] : result.filePaths;
-});
-
-// 视频播放器（工具：player；测试模式下只取「测试播放*」夹具，避免与其它视频工具的夹具相互污染）
-ipcMain.handle('dialog:open-player-videos', async () => {
-  if (testMode()) return testDirFiles(VIDEO_EXTS, { startWith: '测试播放' });
-  const result = await dialog.showOpenDialog(mainWindow, {
-    title: '打开视频',
-    properties: ['openFile'],
-    filters: [
-      { name: '视频', extensions: VIDEO_EXTS },
-      { name: '全部文件', extensions: ['*'] }
-    ]
-  });
-  return result.canceled ? [] : result.filePaths;
-});
-
-// 动图与视频（动图与视频互转工具）
-ipcMain.handle('dialog:open-media', async () => {
-  if (testMode()) return testDirFiles([...VIDEO_EXTS, ...ANIMATED_EXTS], { startWith: '测试' });
-  const result = await dialog.showOpenDialog(mainWindow, {
-    title: '选择动图或视频',
-    properties: ['openFile', 'multiSelections'],
-    filters: [{ name: '动图（GIF/WebP/APNG）与视频', extensions: [...ANIMATED_EXTS, ...VIDEO_EXTS] }]
-  });
-  return result.canceled ? [] : result.filePaths;
-});
-
-// 音频与视频（音频格式转换工具；视频会自动提取声音）
-ipcMain.handle('dialog:open-audios', async () => {
-  if (testMode()) return testDirFiles([...AUDIO_EXTS, ...VIDEO_EXTS], { startWith: '测试音频' });
-  const result = await dialog.showOpenDialog(mainWindow, {
-    title: '选择音频或视频',
-    properties: ['openFile', 'multiSelections'],
-    filters: [{ name: '音频与视频（视频自动提取声音）', extensions: [...AUDIO_EXTS, ...VIDEO_EXTS] }]
-  });
-  return result.canceled ? [] : result.filePaths;
-});
-
-// 音频与视频（语音转文字工具；测试模式下取「测试语音*」夹具，避免与音频转换工具的夹具相互污染）
-ipcMain.handle('dialog:open-speech', async () => {
-  if (testMode()) return testDirFiles([...AUDIO_EXTS, ...VIDEO_EXTS], { startWith: '测试语音' });
-  const result = await dialog.showOpenDialog(mainWindow, {
-    title: '选择音频或视频',
-    properties: ['openFile', 'multiSelections'],
-    filters: [{ name: '音频与视频（视频自动提取声音）', extensions: [...AUDIO_EXTS, ...VIDEO_EXTS] }]
-  });
-  return result.canceled ? [] : result.filePaths;
-});
-
-// 视频（视频压缩工具；测试模式下取「测试压缩视频*」夹具，避免与视频格式转换的夹具相互污染）
-ipcMain.handle('dialog:open-videos-compress', async () => {
-  if (testMode()) return testDirFiles(VIDEO_EXTS, { startWith: '测试压缩视频' });
-  const result = await dialog.showOpenDialog(mainWindow, {
-    title: '选择要压缩的视频',
-    properties: ['openFile', 'multiSelections'],
-    filters: [{ name: '视频', extensions: VIDEO_EXTS }]
-  });
-  return result.canceled ? [] : result.filePaths;
-});
-
-// 音频与视频（音频剪辑工具；测试模式下取「测试剪辑音频*」夹具，避免与音频转换/语音转文字的夹具相互污染）
-ipcMain.handle('dialog:open-audios-edit', async () => {
-  if (testMode()) return testDirFiles([...AUDIO_EXTS, ...VIDEO_EXTS], { startWith: '测试剪辑音频' });
-  const result = await dialog.showOpenDialog(mainWindow, {
-    title: '选择音频或视频',
-    properties: ['openFile', 'multiSelections'],
-    filters: [{ name: '音频与视频（视频自动提取声音）', extensions: [...AUDIO_EXTS, ...VIDEO_EXTS] }]
-  });
-  return result.canceled ? [] : result.filePaths;
-});
-
-// —— B 批图片工具专用对话框 ——
-// 每个工具一个独立前缀：测试模式下只返回自己的夹具，避免历次测试的产物互相污染
+// —— 打开文件的对话框：统一规格表（v2.8.1 起） ——
+// 每个工具一个专用通道 + 独立夹具前缀：测试模式下只返回自己的夹具，避免历次测试的产物互相污染
 // （踩过坑：共用前缀会一次加进几十个历史文件）。
-const IMG_BATCH_DIALOGS = {
-  'dialog:open-batch-rename': { startWith: '测试重命名', title: '选择要重命名的文件' },
-  'dialog:open-watermark': { startWith: '测试水印', title: '选择要加水印的图片' },
-  'dialog:open-stitch': { startWith: '测试拼接', title: '选择要拼接的图片（按列表顺序拼接）' },
-  'dialog:open-grid-slice': { startWith: '测试切图', title: '选择要切图的图片' },
-  'dialog:open-watermark-stamp': { startWith: '测试印章', title: '选择水印图片（印章）' }
+// 新增工具的「选文件」对话框在这里加一行即可（preload/ctx 的接线照旧，见 preload.js）。
+// 注意：印章（watermark-stamp）的夹具前缀故意**不以「测试水印」开头**，否则会被主对话框
+// （startWith '测试水印'）一起选进来，导致界面测试里图片张数多出一张（踩过）。
+//
+// 规格：{ title, name（过滤器显示名）, exts（过滤器与夹具共用）, fixture（夹具匹配：
+//   startWith=前缀 / exact=去扩展名全等；缺省=按扩展名全收）, allFiles（追加「全部文件」过滤器）,
+//   multi=false（单选，如视频播放器） }
+const OPEN_FILE_DIALOGS = {
+  'dialog:open-images': { title: '选择图片', name: '图片', exts: ['png', 'jpg', 'jpeg', 'webp', 'bmp'], fixture: { startWith: '测试原图' } },
+  'dialog:open-pdfs': { title: '选择 PDF 文件', name: 'PDF 文件', exts: ['pdf'] },
+  'dialog:open-documents': { title: '选择 Word / Excel 文件', name: 'Word / Excel', exts: ['doc', 'docx', 'xls', 'xlsx'] },
+  'dialog:open-image-any': {
+    title: '选择图片', name: '图片（含 ICO/AVIF/SVG）', exts: IMAGE_ANY_EXTS,
+    // 测试模式只返回固定夹具「测试原图C」：避免把历次测试产生的副本/产物一起选进来（曾导致一次载入上千张）
+    fixture: { exact: '测试原图C' }
+  },
+  'dialog:open-videos': { title: '选择视频', name: '视频', exts: VIDEO_EXTS, fixture: { startWith: '测试视频' } },
+  'dialog:open-player-videos': {
+    title: '打开视频', name: '视频', exts: VIDEO_EXTS, fixture: { startWith: '测试播放' },
+    allFiles: true, multi: false // 播放器一次只开一个；测试夹具前缀与其它视频工具互不污染
+  },
+  'dialog:open-media': { title: '选择动图或视频', name: '动图（GIF/WebP/APNG）与视频', exts: [...ANIMATED_EXTS, ...VIDEO_EXTS], fixture: { startWith: '测试' } },
+  'dialog:open-audios': { title: '选择音频或视频', name: '音频与视频（视频自动提取声音）', exts: [...AUDIO_EXTS, ...VIDEO_EXTS], fixture: { startWith: '测试音频' } },
+  'dialog:open-speech': { title: '选择音频或视频', name: '音频与视频（视频自动提取声音）', exts: [...AUDIO_EXTS, ...VIDEO_EXTS], fixture: { startWith: '测试语音' } },
+  'dialog:open-videos-compress': { title: '选择要压缩的视频', name: '视频', exts: VIDEO_EXTS, fixture: { startWith: '测试压缩视频' } },
+  'dialog:open-audios-edit': { title: '选择音频或视频', name: '音频与视频（视频自动提取声音）', exts: [...AUDIO_EXTS, ...VIDEO_EXTS], fixture: { startWith: '测试剪辑音频' } },
+  'dialog:open-watermark': { title: '选择要加水印的图片', name: '图片', exts: IMAGE_ANY_EXTS, fixture: { startWith: '测试水印' } },
+  'dialog:open-watermark-stamp': { title: '选择水印图片（印章）', name: '图片', exts: IMAGE_ANY_EXTS, fixture: { startWith: '测试印章' } },
+  'dialog:open-stitch': { title: '选择要拼接的图片（按列表顺序拼接）', name: '图片', exts: IMAGE_ANY_EXTS, fixture: { startWith: '测试拼接' } },
+  'dialog:open-grid-slice': { title: '选择要切图的图片', name: '图片', exts: IMAGE_ANY_EXTS, fixture: { startWith: '测试切图' } },
+  'dialog:open-pdf-edit': { title: '选择要整理的 PDF', name: 'PDF 文档', exts: ['pdf'], fixture: { startWith: '测试PDF编辑' } },
+  'dialog:open-ocr': {
+    title: '选择图片或扫描版 PDF', name: '图片与 PDF', exts: [...IMAGE_ANY_EXTS, 'pdf'],
+    fixture: { startWith: '测试识别' }, allFiles: true
+  }
 };
-// 注意：印章夹具前缀故意**不以「测试水印」开头**，否则会被主对话框（startWith '测试水印'）一起选进来，
-// 导致界面测试里图片张数多出一张（踩过）。
 
-// PDF 编辑整理工具专用对话框（测试模式下只取自己的夹具，避免与 PDF 转格式工具的样本互相污染）
-ipcMain.handle('dialog:open-pdf-edit', async () => {
-  if (testMode()) return testDirFiles(['pdf'], { startWith: '测试PDF编辑' });
-  const result = await dialog.showOpenDialog(mainWindow, {
-    title: '选择要整理的 PDF',
-    properties: ['openFile', 'multiSelections'],
-    filters: [{ name: 'PDF 文档', extensions: ['pdf'] }]
+for (const [channel, cfg] of Object.entries(OPEN_FILE_DIALOGS)) {
+  ipcMain.handle(channel, async () => {
+    if (testMode()) return testDirFiles(cfg.exts, cfg.fixture || {});
+    const filters = [{ name: cfg.name, extensions: cfg.exts }];
+    if (cfg.allFiles) filters.push({ name: '全部文件', extensions: ['*'] });
+    const properties = cfg.multi === false ? ['openFile'] : ['openFile', 'multiSelections'];
+    const result = await dialog.showOpenDialog(mainWindow, { title: cfg.title, properties, filters });
+    return result.canceled ? [] : result.filePaths;
   });
-  return result.canceled ? [] : result.filePaths;
-});
+}
 
-// 文字识别工具专用对话框：图片与 PDF 混选（PDF 会逐页识别）
-ipcMain.handle('dialog:open-ocr', async () => {
-  if (testMode()) return testDirFiles(['pdf', ...IMAGE_ANY_EXTS], { startWith: '测试识别' });
-  const result = await dialog.showOpenDialog(mainWindow, {
-    title: '选择图片或扫描版 PDF',
-    properties: ['openFile', 'multiSelections'],
-    filters: [
-      { name: '图片与 PDF', extensions: [...IMAGE_ANY_EXTS, 'pdf'] },
-      { name: '全部文件', extensions: ['*'] }
-    ]
-  });
-  return result.canceled ? [] : result.filePaths;
-});
-
-// 批量重命名要能处理任意文件，所以不按图片扩展名过滤，而是按「本工具夹具前缀」取
+// 批量重命名要能处理任意文件：夹具按「本工具前缀」取（不按扩展名过滤），真对话框也给「全部文件」
 ipcMain.handle('dialog:open-batch-rename', async () => {
   if (testMode()) {
     const { TEST_DIR } = require('./tests/ui-test.js');
@@ -1547,19 +1150,6 @@ ipcMain.handle('dialog:open-batch-rename', async () => {
   });
   return result.canceled ? [] : result.filePaths;
 });
-
-for (const [channel, cfg] of Object.entries(IMG_BATCH_DIALOGS)) {
-  if (channel === 'dialog:open-batch-rename') continue; // 上面已单独注册
-  ipcMain.handle(channel, async () => {
-    if (testMode()) return testDirFiles(IMAGE_ANY_EXTS, { startWith: cfg.startWith });
-    const result = await dialog.showOpenDialog(mainWindow, {
-      title: cfg.title,
-      properties: ['openFile', 'multiSelections'],
-      filters: [{ name: '图片', extensions: IMAGE_ANY_EXTS }]
-    });
-    return result.canceled ? [] : result.filePaths;
-  });
-}
 
 // —— 文件压缩与解压（工具：archive；见 spec/modules/archive.md） ——
 // 引擎 = 随包内置的 7-Zip（软件目录/addons/7zip/，见 pack.js 步骤 5g）；

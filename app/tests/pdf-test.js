@@ -12,8 +12,10 @@ const path = require('path');
 
 // 依赖按显式路径引用 UMD 产物（兼容开发态与绿色版：绿色版没有 npm 的模块解析）
 const dep = (pkg, file) => path.join(__dirname, '..', 'node_modules', pkg, file);
+// SheetJS 走本地内置（vendor/，0.20.3）：npm 版停在 0.18.5 有已知漏洞，见 app/vendor/xlsx/说明.txt
+const vendor = (dir, file) => path.join(__dirname, '..', 'vendor', dir, file);
 const JSZip = require(dep('jszip', 'dist/jszip.min.js'));
-const XLSX = require(dep('xlsx', 'dist/xlsx.full.min.js'));
+const XLSX = require(vendor('xlsx', 'xlsx.full.min.js'));
 
 /** 自检结果文件（固定路径，便于验收脚本读取） */
 const RESULT_FILE = path.join(os.tmpdir(), 'tomato-pdf-test.json');
