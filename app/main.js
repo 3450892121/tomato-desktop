@@ -522,10 +522,13 @@ ipcMain.handle('fs:path-info', async (_event, filePath) => {
 
 /**
  * 批量重命名（「批量重命名」工具用）
- * 入参：renames = [{from, to}]
- * 返回：{ok, done, failed:[{from, to, message}]}
+ * 入参：renames = [{from, to, overwrite?}]
+ * 返回：{ok, done, failed:[{from, to, message}], overwritten}
  *
- * 安全性：**绝不覆盖已存在的文件**——目标已存在（且不是本批次里要被改名的源文件）就跳过该条并报原因。
+ * 安全性：**默认绝不覆盖已存在的文件**——目标已存在（且不是本批次里要被改名的源文件）就跳过该条并报原因。
+ *         只有该条显式带 overwrite:true（界面选「替换已存在文件」）时才覆盖：
+ *         阶段 2 先把旧目标挪成同目录备份（.tomato-rename-bak-<ts>-<i>），改名成功后再删备份，
+ *         改名失败则把备份还原回原位——覆盖不会两头空。
  * 正确性：分两阶段执行（先把所有源改成同目录下的临时名，再改成最终名），
  *        这样「链式改名」（001→002、002→003）与「互换名」都不会互相踩。
  * 跨目录：fs.rename 在跨盘时会失败，自动回退为复制 + 删除源文件。
@@ -537,22 +540,24 @@ ipcMain.handle('fs:rename-batch', async (_event, renames) => {
   const sources = new Set(list.map((r) => path.resolve(r.from)));
   const failed = [];
   const stage1 = [];
+  const stamp = Date.now();
 
   // 阶段 1：源文件 → 同目录临时名（源不存在或临时名创建失败的直接记为失败）
   for (let i = 0; i < list.length; i++) {
-    const { from, to } = list[i];
+    const { from, to, overwrite } = list[i];
     const src = path.resolve(from);
     const dst = path.resolve(to);
     try {
       const st = await fs.stat(src);
       if (st.isDirectory()) throw new Error('是文件夹，已跳过');
-      // 目标已存在，且它不在本批次的源文件里 → 改名会覆盖别人的文件，拒绝
-      if (dst !== src && sources.has(dst) === false && fsSync.existsSync(dst)) {
+      // 目标已存在，且它不在本批次的源文件里 → 改名会覆盖别人的文件；
+      // 没勾「替换」就拒绝，勾了则交给阶段 2 走「备份 → 覆盖 → 删备份」
+      if (dst !== src && sources.has(dst) === false && fsSync.existsSync(dst) && !overwrite) {
         throw new Error('目标文件已存在');
       }
-      const tmp = path.join(path.dirname(src), `.tomato-rename-${Date.now()}-${i}`);
+      const tmp = path.join(path.dirname(src), `.tomato-rename-${stamp}-${i}`);
       await fs.rename(src, tmp);
-      stage1.push({ tmp, dst, from, to });
+      stage1.push({ tmp, dst, from, to, i, overwrite: !!overwrite });
     } catch (err) {
       failed.push({ from, to, message: String((err && err.message) || err) });
     }
@@ -560,25 +565,43 @@ ipcMain.handle('fs:rename-batch', async (_event, renames) => {
 
   // 阶段 2：临时名 → 最终名
   let done = 0;
+  let overwritten = 0;
   for (const item of stage1) {
+    let bak = null;
     try {
+      // 覆盖模式：先把旧目标挪走（同目录，改名是瞬间操作），成功后再删
+      if (item.overwrite && fsSync.existsSync(item.dst)) {
+        bak = path.join(path.dirname(item.dst), `.tomato-rename-bak-${stamp}-${item.i}`);
+        await fs.rename(item.dst, bak);
+      }
       await fs.rename(item.tmp, item.dst);
+      if (bak) {
+        await fs.rm(bak, { force: true });
+        bak = null;
+        overwritten += 1;
+      }
       done += 1;
     } catch (err) {
       // 跨盘（EXDEV）等情况：回退为复制 + 删源
       try {
         await fs.copyFile(item.tmp, item.dst);
         await fs.rm(item.tmp, { force: true });
+        if (bak) {
+          await fs.rm(bak, { force: true });
+          bak = null;
+          overwritten += 1;
+        }
         done += 1;
       } catch (err2) {
         failed.push({ from: item.from, to: item.to, message: String((err2 && err2.message) || err2) });
-        // 尽力把临时名还原回原名，避免文件"消失"
+        // 尽力把临时名还原回原名、把备份还原回目标位，避免文件"消失"
         try { await fs.rename(item.tmp, item.from); } catch { /* 还原失败只能如实报告 */ }
+        if (bak) { try { await fs.rename(bak, item.dst); } catch { /* 同上 */ } }
       }
     }
   }
 
-  return { ok: failed.length === 0, done, failed };
+  return { ok: failed.length === 0, done, failed, overwritten };
 });
 
 // 列出文件夹内的图片（用于文件夹拖入 / 批量导入）

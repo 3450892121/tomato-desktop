@@ -87,24 +87,47 @@
   font-size: var(--font-size-md);
 }
 .bren-item.is-bad { border-color: var(--color-danger); }
+.bren-item.is-skip { border-color: var(--color-warning); }
 .bren-old-name {
-  flex: 0 1 42%;
+  flex: 1 1 32%;
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
   color: var(--color-text-secondary);
 }
+/* 修改日期列：等宽数字，等宽列，方便竖着看 */
+.bren-time {
+  flex: none;
+  width: 106px;
+  font-size: var(--font-size-xs);
+  font-variant-numeric: tabular-nums;
+  color: var(--color-text-secondary);
+  white-space: nowrap;
+}
 .bren-arrow { flex: none; color: var(--color-text-secondary); }
 .bren-new-name {
-  flex: 1 1 auto;
+  flex: 1 1 32%;
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
   color: var(--color-text);
 }
 .bren-item.is-bad .bren-new-name { color: var(--color-danger); }
+.bren-item.is-skip .bren-new-name { color: var(--color-text-secondary); }
 .bren-item-meta { flex: none; font-size: var(--font-size-xs); color: var(--color-text-secondary); }
 .bren-reason { flex: none; font-size: var(--font-size-xs); color: var(--color-danger); }
+.bren-item.is-skip .bren-reason { color: var(--color-warning); }
+/* 「覆盖」「自动编号」小标签 */
+.bren-tag {
+  flex: none;
+  padding: 0 var(--space-1);
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-sm);
+  font-size: var(--font-size-xs);
+  color: var(--color-text-secondary);
+}
 .bren-item-actions { flex: none; }
 .bren-icon-btn {
   width: 24px;
@@ -137,3 +160,38 @@
   font-size: var(--font-size-sm);
 }
 .bren-notice[hidden] { display: none; }
+
+/* —— 执行前的确认弹窗（外壳的 .modal-backdrop / .modal-card 来自 components.css，宽度沿用外壳弹窗） —— */
+.bren-confirm-summary { font-size: var(--font-size-md); color: var(--color-text); }
+.bren-confirm-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  max-height: 240px;
+  overflow-y: auto;
+  padding: var(--space-2);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface-soft);
+  font-size: var(--font-size-sm);
+}
+.bren-confirm-row { display: flex; align-items: center; gap: var(--space-2); }
+.bren-confirm-from {
+  flex: 1 1 50%;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--color-text-secondary);
+}
+.bren-confirm-arrow { flex: none; color: var(--color-text-secondary); }
+.bren-confirm-to {
+  flex: 1 1 50%;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.bren-confirm-to.is-skip { color: var(--color-warning); }
+.bren-confirm-more { font-size: var(--font-size-xs); color: var(--color-text-secondary); }
+.bren-confirm-warn { font-size: var(--font-size-sm); color: var(--color-warning); line-height: 1.6; }
