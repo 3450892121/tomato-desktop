@@ -2,6 +2,36 @@
 
 本项目遵循语义化版本（x.y.z）：修 bug → z+1；加功能 → y+1；重要改动 → x+1。
 
+## v2.8.0（2026-09-21）新增「软件卸载」工具：把「卸载软件 + 清理残留」也收进工具箱
+
+> 用户需求原文：「`C:\Users\chen3\Desktop\HiBitUninstaller.exe - 快捷方式.lnk` 可不可以把这个内置进这个项目里面」。
+
+**用户选定方案（三问三答）**：① 随包内置便携版 + 新增工具页；② 以管理员身份启动（弹一次 UAC）；③ 工具页做「极简启动页」。规格见 `spec/modules/uninstall.md`。
+
+**新增**
+- 左侧新增「系统」分组（🧰），新工具「软件卸载」（🧹，id `uninstall`）：启动按钮 + 引擎状态卡（版本 / 位置 / 来源链接）+ 用法要点 + 「重新检测」。样式只用 `theme.css` 变量，深浅色自动适配。
+- **随包内置 HiBit Uninstaller 4.0.10 官方便携版**：`app/addons/hibit/HiBitUninstaller-Portable.exe`（15.4MB，官方原版未修改）+ `版本.txt` + `说明.txt`（来源、许可说明、SHA-256）；`pack.js` 新增步骤 5h 随主包复制。加装包不进 git（`.gitignore` 的 `app/addons`）。
+- 主进程新增 `hibit:status` / `hibit:launch`（preload 暴露 `hibitStatus` / `hibitLaunch`）；**提权走 Windows 标准 `Start-Process -Verb RunAs`**，PowerShell 用**绝对路径**（PATH 不全时 `powershell` 会 ENOENT——pack.js 有过同款教训），命令拼装与结果解读抽成纯函数 `src/tools/uninstall/core/launch.mjs`，主进程与自检共用。
+
+**为什么必须提权（实测证据）**：官方 exe 清单里 `requestedExecutionLevel = requireAdministrator`——不提权根本起不来（这条已写成自检断言）。所以按钮就是「打开卸载工具（管理员）」，由系统弹 UAC 把关；用户点「否」按「已取消管理员授权」温和提示，不当错误刷屏。
+
+**安全与红线**
+- 不静默提权、不缓存凭据、**不给对方传任何参数**（不给「无人值守自动卸载」留口子）；卸载什么、删哪些残留，全部由用户在 HiBit 自己的界面里决定。
+- **自动化测试一律空跑**：`testMode()` 下 `hibit:launch` 只返回 `dryRun`，界面如实标注「（自动化测试模式：未真正启动卸载工具）」，自检再用 `tasklist` 断言进程确实没被拉起。
+- 加装包缺失时按钮禁用 + 状态卡给放置说明（与 ffmpeg / 7zip / ocr 同一约定），其余工具不受影响。
+
+**测试**
+- 新增纯逻辑单测 `tests/uninstall.test.mjs`（19 项，已挂进 `npm test`，总 222 项）：提权脚本拼装（中文 / 空格 / 单引号路径）、结果三态解读、PowerShell 绝对路径存在性。
+- 新增自检 `--uninstall-test`（`pass:true`，写 `%TEMP%\tomato-uninstall-test.json`）：加装包在位 + **SHA-256 与说明一致** + 清单权限 + IPC 状态 + 界面走查（截图三张）+ **空跑无进程** + 缺失降级（临时藏起 exe 再还原，带自愈）。
+- 全套自检复跑通过；`--ui-test` 导航断言（21 个条目 / 可滚动 / 排序 24 条）与 `--theme-test`（含新页深色残留扫描）保持通过。
+
+**打包与交付**
+- 产物 `番茄图片混淆-桌面版-v2.8.0-win64` 2485.7 MB / zip 1048.7 MB（对比 v2.0.0 的 2468.2 / 1041.6 MB：体积增量来自本次新增的 hibit 加装包以及既有工具迭代）。
+- 新增 `pack.js` 步骤 5h：`app/addons/hibit/` 随主包复制到产物（缺失时只打警告，其余工具照常可用）。
+- 桌面快捷方式三处（TargetPath / WorkingDirectory / IconLocation）已由步骤 8b 同步到新版本并读回验证；上一版 `userdata/settings.json` 已由步骤 8c 迁移（用户排序里没有 `system` 分组属正常：缺的分组按注册序追加到尾部）；旧版产物已由步骤 9 清除。
+- 老用户升级后的预期表现：左侧多出「系统」分组（默认收起，点标题展开），原有排序与折叠偏好保持不变。
+- **打包白名单踩坑（本次修掉）**：`pack.js` 步骤 4 复制 `tests/` 用的是**逐个文件白名单**，新增的 `tests/uninstall-test.js` / `uninstall.test.mjs` 首次打包没被复制。产物上跑 `--uninstall-test` 时主进程 `require` 抛在 try 之外 → 表现是「窗口开着、测试不跑、也不退出」的**静默卡住**（不是报错，很容易误判成测试本身挂死）。定位过程：① 用 dev 版 Electron 加载产物 `resources/app` 也卡住 → 排除「打包运行时」因素；② 把用户设置复制进 dev 目录不卡 → 排除设置；③ 对比产物 `tests/` 文件清单 → 确认缺两个文件。修法：白名单补两行 + 把这条陷阱写进 `AGENTS.md`（新增测试必须同步登记，并核对产物 `resources/app/tests/` 文件齐全）。
+
 ## v2.7.1（2026-09-20）启动行为修正：打开软件＝进「排最前分组」的第一个工具，不再自动展开图片组
 
 > 用户反馈：刚进软件「图片」的子项目总是自动全部展开；即使把别的分组排到第一位，进软件时排第一的和图片的都展开——看起来像自己的收起设置没生效。

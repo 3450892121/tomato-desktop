@@ -267,3 +267,11 @@
 - **安全**：条目名带 `../` 或绝对路径时被净化为 basename，落盘一定在输出目录内（实测无文件泄漏到上级目录）。
 - **界面全流程**：切工具 → 选表图 → 加文件 → 打包 → 校验产物 → 切解包页 → 解包 → 内容比对 → 密码往返（含错误密码被拒）→ 清空回到初始态；渲染进程零报错（无 CSP 违规）。
 - 证据：`--imghide-test` `ok:true`、`--imghide-ui-test` `pass:true`、`npm test` 含 `tests/imghide.test.mjs`（29 项纯逻辑），截图 `shot-imghide-*.png`。
+
+## A42 软件卸载（新工具，v2.8.0，需 hibit 加装包 + 管理员权限）
+- **加装包**：`addons/hibit/HiBitUninstaller-Portable.exe` 在位（约 15MB），`版本.txt` 可读，**SHA-256 与同目录 `说明.txt` 记录一致**；exe 清单里的 `requestedExecutionLevel` = `requireAdministrator`（这是「必须提权启动」的硬证据）。
+- **提权启动**：命令走 Windows 标准 `Start-Process -Verb RunAs`（PowerShell 绝对路径 + 单引号转义，中文 / 空格 / 单引号路径都不能拼坏），**不向对方传任何参数**；结果分三态——成功 / 用户取消授权（温和提示，不当错误）/ 失败（附可读原因）。
+- **不静默提权**：只有用户点「打开卸载工具（管理员）」才发起，UAC 由系统把关；软件不缓存凭据、不代替用户点、不自动卸载任何东西。
+- **测试红线**：自动化测试模式下 `hibit:launch` 一律空跑，界面如实标注「（自动化测试模式：未真正启动卸载工具）」，并用 `tasklist` 断言**进程确实没被拉起**。
+- **降级**：加装包缺失时按钮禁用、状态卡给出放置说明、顶栏提示「未检测到软件卸载加装包」，其余工具不受影响（把文件放回后点「重新检测」即恢复）。
+- 证据：`--uninstall-test` `pass:true`（`%TEMP%\tomato-uninstall-test.json`；含哈希一致、清单权限、命令构造、IPC、空跑无进程、缺失降级与还原）+ `npm test` 含 `tests/uninstall.test.mjs`（19 项纯逻辑）+ 截图 `shot-uninstall-01/02/03`。

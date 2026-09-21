@@ -91,13 +91,17 @@ const playerUiTest = process.argv.includes('--player-ui-test');
 const imgHideTest = process.argv.includes('--imghide-test');
 const imgHideUiTest = process.argv.includes('--imghide-ui-test');
 
+// 软件卸载自检：`electron . --uninstall-test`（加装包与版本、提权命令构造、界面走查与截图；见 spec/modules/uninstall.md）
+const uninstallTest = process.argv.includes('--uninstall-test');
+
 // 测试模式下关闭硬件加速：保证截图（capturePage）在任何机器上都能稳定拿到画面
-if (uiTest || pdfUiTest || mediaUiTest || audioUiTest || asrUiTest || themeTest || avTest || imgbatchTest || settingsIoTest || pdfOcrTest || queueUiTest || archiveUiTest || playerUiTest || imgHideUiTest) {
+if (uiTest || pdfUiTest || mediaUiTest || audioUiTest || asrUiTest || themeTest || avTest || imgbatchTest || settingsIoTest || pdfOcrTest || queueUiTest || archiveUiTest || playerUiTest || imgHideUiTest || uninstallTest) {
   app.disableHardwareAcceleration();
 }
 
-/** 是否处于任一自动测试模式：此时系统对话框一律换成本地测试文件（避免测试卡在弹窗上） */
-const testMode = () => uiTest || pdfUiTest || mediaTest || mediaUiTest || audioTest || audioUiTest || asrTest || asrUiTest || ocrPoc || themeTest || avTest || imgbatchTest || settingsIoTest || pdfOcrTest || queueUiTest || archiveTest || archiveUiTest || playerTest || playerUiTest || imgHideTest || imgHideUiTest;
+/** 是否处于任一自动测试模式：此时系统对话框一律换成本地测试文件（避免测试卡在弹窗上），
+ *  卸载工具的提权启动也会空跑（免得弹 UAC 卡住测试） */
+const testMode = () => uiTest || pdfUiTest || mediaTest || mediaUiTest || audioTest || audioUiTest || asrTest || asrUiTest || ocrPoc || themeTest || avTest || imgbatchTest || settingsIoTest || pdfOcrTest || queueUiTest || archiveTest || archiveUiTest || playerTest || playerUiTest || imgHideTest || imgHideUiTest || uninstallTest;
 
 /** 自动测试模式下：从测试目录取指定扩展名的文件（对话框桩用；扩展名带不带点都能匹配） */
 async function testDirFiles(exts, { startWith, exact } = {}) {
@@ -616,6 +620,22 @@ function createMainWindow() {
         console.log(`IMGHIDE_TEST ${JSON.stringify({ ok: result.ok })}`);
       } catch (err) {
         console.log(`IMGHIDE_TEST_FAIL ${err.message}\n${err.stack}`);
+      } finally {
+        app.quit();
+      }
+    });
+  }
+
+  if (uninstallTest) {
+    const { runUninstallTest, writeResult } = require('./tests/uninstall-test.js');
+    mainWindow.webContents.once('did-finish-load', async () => {
+      try {
+        const result = await runUninstallTest(mainWindow, { portableDir: PORTABLE_DIR });
+        console.log(`UNINSTALL_TEST ${JSON.stringify({ pass: result.pass, failures: result.failures })}`);
+        writeResult({ ok: !!result.pass, at: new Date().toISOString(), result });
+      } catch (err) {
+        console.log(`UNINSTALL_TEST_FAIL ${err.message}\n${err.stack}`);
+        writeResult({ ok: false, at: new Date().toISOString(), error: err.message, stack: err.stack });
       } finally {
         app.quit();
       }
@@ -2607,4 +2627,48 @@ ipcMain.handle('office:to-pdf', async (_event, options) => {
   } finally {
     if (!win.isDestroyed()) win.destroy();
   }
+});
+
+// —— 软件卸载（工具：uninstall；见 spec/modules/uninstall.md） ——
+// 引擎 = 随包内置的 HiBit Uninstaller 便携版（软件目录/addons/hibit/，见 pack.js 步骤 5h）。
+// 它的 exe 清单声明了 requireAdministrator（不提权起不来），所以启动一律走提权路径；
+// 提权命令的拼装与结果解读在 src/tools/uninstall/core/launch.mjs（纯函数，自检共用）。
+const HIBIT_ADDON_DIR = path.join(PORTABLE_DIR, 'addons', 'hibit');
+let hibitLaunchPromise = null;
+function loadHibitLaunch() {
+  if (!hibitLaunchPromise) hibitLaunchPromise = import('./src/tools/uninstall/core/launch.mjs');
+  return hibitLaunchPromise;
+}
+
+async function findHibit() {
+  const lib = await loadHibitLaunch();
+  const exePath = path.join(HIBIT_ADDON_DIR, lib.EXE_NAME);
+  if (!fsSync.existsSync(exePath)) {
+    return lib.describeAddonStatus({ found: false, dir: HIBIT_ADDON_DIR });
+  }
+  let version = '';
+  try {
+    version = fsSync.readFileSync(path.join(HIBIT_ADDON_DIR, lib.VERSION_FILE), 'utf8');
+  } catch { /* 版本文件缺失不影响启动，界面照常显示「已就绪」 */ }
+  return lib.describeAddonStatus({ found: true, exePath, dir: HIBIT_ADDON_DIR, version });
+}
+
+ipcMain.handle('hibit:status', async () => findHibit());
+
+// 以管理员身份启动卸载工具：
+//  - 自动化测试模式（testMode）下一律空跑——否则会弹 UAC 卡住测试，甚至真的执行卸载动作；
+//  - 不传任何参数给对方，不给「无人值守自动卸载」留口子。
+ipcMain.handle('hibit:launch', async () => {
+  const lib = await loadHibitLaunch();
+  const st = await findHibit();
+  if (!st.found) return { ok: false, message: '未检测到软件卸载加装包（把 addons/hibit 放回软件目录后重开本工具）' };
+  if (testMode()) return { ok: true, dryRun: true, path: st.path };
+
+  const psExe = lib.powershellPath();
+  if (!fsSync.existsSync(psExe)) {
+    return { ok: false, message: `未找到 PowerShell（${psExe}），无法以管理员身份启动` };
+  }
+  const script = lib.buildRunAsScript({ exePath: st.path, workingDir: st.dir });
+  const r = spawnSync(psExe, ['-NoProfile', '-NonInteractive', '-Command', script], { windowsHide: true, encoding: 'utf8' });
+  return lib.interpretLaunchResult({ status: r.status, stdout: r.stdout, stderr: r.stderr });
 });

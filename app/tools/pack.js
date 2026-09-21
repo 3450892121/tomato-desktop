@@ -116,6 +116,12 @@ fs.copyFileSync(path.join(appRoot, 'tests', 'imghide-ui-test.js'), path.join(app
 fs.copyFileSync(path.join(appRoot, 'tests', 'tujia-oracle.js'), path.join(appTarget, 'tests', 'tujia-oracle.js'));
 // v2.6.0 起：导航手动排序（排序净化纯逻辑，挂 npm test）
 fs.copyFileSync(path.join(appRoot, 'tests', 'navorder.test.mjs'), path.join(appTarget, 'tests', 'navorder.test.mjs'));
+// v2.8.0 起：软件卸载（自检 + 提权命令构造纯逻辑）
+// ★ 注意：这里是**逐个文件的白名单**——新增测试文件必须同步加一行，
+//   否则产物里缺文件：主进程 require 失败会抛在 try 之外，表现为「窗口开着、测试不跑、也不退出」的静默卡住
+//   （v2.8.0 首次打包就踩到过，详见 CHANGELOG）。
+fs.copyFileSync(path.join(appRoot, 'tests', 'uninstall-test.js'), path.join(appTarget, 'tests', 'uninstall-test.js'));
+fs.copyFileSync(path.join(appRoot, 'tests', 'uninstall.test.mjs'), path.join(appTarget, 'tests', 'uninstall.test.mjs'));
 
 // —— 4b) 复制 PDF 工具运行时依赖（纯 JS，界面进程按相对路径直接引用） ——
 // 说明：本项目没有打包器，工具代码里写的是 ../../../../node_modules/pdfjs-dist/... 这样的
@@ -314,6 +320,19 @@ if (fs.existsSync(path.join(sevenZipAddon, '7z.exe')) && fs.existsSync(path.join
   copyTree(sevenZipAddon, path.join(outDir, 'addons', '7zip'));
 } else {
   log('警告：未发现 app/addons/7zip（或缺 7z.exe / 7z.dll）—— 产物中「压缩与解压」除 ZSTD/BROTLI 外将不可用');
+}
+
+// —— 5h) HiBit Uninstaller 加装包（「软件卸载」必需，随主包分发） ——
+// 说明：官方原版便携版单文件 exe（约 15.4MB，官网标注个人与商业使用均免费），放在 app/addons/hibit/
+//      （不进 git，见 spec/modules/uninstall.md）。该 exe 清单声明 requireAdministrator，
+//      工具页用 Windows 标准提权（RunAs）启动它。
+//      缺失时工具页显示「未检测到软件卸载加装包」与放置说明，其余工具不受影响。
+const hibitAddon = path.join(appRoot, 'addons', 'hibit');
+if (fs.existsSync(path.join(hibitAddon, 'HiBitUninstaller-Portable.exe'))) {
+  log('步骤5h：复制 HiBit Uninstaller 加装包（约 15MB）…');
+  copyTree(hibitAddon, path.join(outDir, 'addons', 'hibit'));
+} else {
+  log('警告：未发现 app/addons/hibit/HiBitUninstaller-Portable.exe —— 产物中「软件卸载」将提示需加装');
 }
 
 // —— 6) 设置 exe 图标与版本信息（需要 build/rcedit.exe，缺失则跳过） ——

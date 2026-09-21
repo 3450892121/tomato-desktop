@@ -129,6 +129,11 @@ contextBridge.exposeInMainWorld('desktop', {
     return () => ipcRenderer.removeListener('asr:progress', handler);
   },
 
+  // 软件卸载（「软件卸载」工具；随包内置 HiBit 便携版，见 spec/modules/uninstall.md）
+  // launch 由主进程走 Windows 标准提权（RunAs，系统弹 UAC）；测试模式下只空跑、不真的启动
+  hibitStatus: () => ipcRenderer.invoke('hibit:status'),
+  hibitLaunch: () => ipcRenderer.invoke('hibit:launch'),
+
   // PDF 工具：专用文件对话框与 LibreOffice 加装包
   openPdfs: () => ipcRenderer.invoke('dialog:open-pdfs'),
   openDocuments: () => ipcRenderer.invoke('dialog:open-documents'),

@@ -13,9 +13,9 @@
 - `app/`：Electron 应用源码：
   - `main.js` / `preload.js`：主进程与安全桥（窗口、文件对话框等系统能力）。
   - `src/shell/`：工具箱框架（工具页容器、左侧导航、`registry.js` 工具注册表、`theme.css` 设计令牌、`components.css` 通用组件库）。**工具页保活（只保「动过」的页）**：切换工具不销毁页面，切回时列表/输入/预览/滚动位置与顶栏提示全部保留；没动过的页（只是点开看看）切走即静默释放、不占额度，免得「随便看看」挤掉别处用过的东西；动过的页上限 5 页，超出按 LRU 回收最久没用过的那页（当前页不回收，回收时提示「已自动释放」）；工具里的全局交互要用 `ctx.isActive()` 让位，被释放/回收时会走 `unmount()` 清理。
-  - `src/tools/<工具名>/`：各工具自包含目录（声明 + 界面 + 逻辑 + 样式）。现有：`obfuscate` 图片混淆、`pdf-convert` PDF 转格式、`compress` 图片压缩、`enhance` 图片变清晰、`img-convert` 图片格式转换、`batch-rename` 批量重命名、`watermark` 加水印、`stitch` 长图拼接、`grid-slice` 九宫格切图、`player` 视频播放器、`video-convert` 视频格式转换、`video-compress` 视频压缩、`sticker` 动图与视频互转、`audio-convert` 音频格式转换、`audio-edit` 音频剪辑、`transcribe` 语音转文字、`pdf-edit` PDF 编辑整理、`ocr` 文字识别、`archive` 压缩与解压、`imghide` 文件藏图；`_template` 为新工具模板。
+  - `src/tools/<工具名>/`：各工具自包含目录（声明 + 界面 + 逻辑 + 样式）。现有：`obfuscate` 图片混淆、`pdf-convert` PDF 转格式、`compress` 图片压缩、`enhance` 图片变清晰、`img-convert` 图片格式转换、`batch-rename` 批量重命名、`watermark` 加水印、`stitch` 长图拼接、`grid-slice` 九宫格切图、`player` 视频播放器、`video-convert` 视频格式转换、`video-compress` 视频压缩、`sticker` 动图与视频互转、`audio-convert` 音频格式转换、`audio-edit` 音频剪辑、`transcribe` 语音转文字、`pdf-edit` PDF 编辑整理、`ocr` 文字识别、`archive` 压缩与解压、`imghide` 文件藏图、`uninstall` 软件卸载；`_template` 为新工具模板。
   - `src/shared/`：跨工具复用能力（图片读写、ffmpeg 封装与编码参数、文件封装、设置）。
-  - `addons/`：随包加装包（不进 git）：`libreoffice/`（PDF→Word 与高保真 Office→PDF，可选）、`ffmpeg/`（视频/动图工具必需，单文件 83MB，GPL v3）、`realesrgan/`（「图片变清晰」的 AI 放大，约 50MB，BSD 3-Clause，需 Vulkan 显卡）、`asr/`（「语音转文字」的 FunASR·SenseVoice 识别引擎，约 246MB，MIT，纯 CPU）、`ocr/`（「文字识别」的 PP-OCRv5 mobile ONNX 模型，约 20MB，Apache-2.0 模型 + MIT 运行时，纯 CPU）；许可与来源见各自目录的 LICENSE/说明.txt。
+  - `addons/`：随包加装包（不进 git）：`libreoffice/`（PDF→Word 与高保真 Office→PDF，可选）、`ffmpeg/`（视频/动图工具必需，单文件 83MB，GPL v3）、`realesrgan/`（「图片变清晰」的 AI 放大，约 50MB，BSD 3-Clause，需 Vulkan 显卡）、`asr/`（「语音转文字」的 FunASR·SenseVoice 识别引擎，约 246MB，MIT，纯 CPU）、`ocr/`（「文字识别」的 PP-OCRv5 mobile ONNX 模型，约 20MB，Apache-2.0 模型 + MIT 运行时，纯 CPU）、`hibit/`（「软件卸载」随包内置的 HiBit Uninstaller 4.0.10 官方便携版，单文件 15.4MB，官网标注个人与商业使用均免费，**启动需管理员权限**——exe 清单即 `requireAdministrator`）、`7zip/`（「压缩与解压」引擎，约 2.4MB，LGPL 2.1+）；许可与来源见各自目录的 LICENSE/说明.txt。
 - `docs/`：开发指南（如《新增工具指南》）。
 - `app/release/`：打包产物（不进 git）。
 - `番茄图片混淆.apk`：参考实现样本（只读，不修改、不覆盖）。
@@ -44,7 +44,7 @@
 - Node 环境：`.tools/node/node.exe`（便携版 v22.20.0，不进 git；命令行里先把 `.tools/node` 加入 PATH）。
 - 安装依赖：`cd app` → `npm install`（npm registry 用 `https://registry.npmmirror.com`；Electron 二进制需设 `ELECTRON_MIRROR=https://registry.npmmirror.com/-/binary/electron/`）。
 - 启动调试：`cd app` → `npm start`。
-- 算法测试：`cd app` → `npm test`（连跑纯逻辑单测共 203 项：算法 55 项（MD5 对照、洗牌、Gilbert 覆盖、六模式往返、填充规则、密钥校验）+ 任务队列 13 项 + 压缩与解压 68 项 + 文件藏图 38 项 + 导航排序 29 项（v2.6.0 起，`tests/navorder.test.mjs`））。
+- 算法测试：`cd app` → `npm test`（连跑纯逻辑单测共 222 项：算法 55 项（MD5 对照、洗牌、Gilbert 覆盖、六模式往返、填充规则、密钥校验）+ 任务队列 13 项 + 压缩与解压 68 项 + 文件藏图 38 项 + 导航排序 29 项（v2.6.0 起，`tests/navorder.test.mjs`）+ 软件卸载 19 项（v2.8.0 起，`tests/uninstall.test.mjs`）。
 - 冒烟自检：`cd app` → `.\node_modules\electron\dist\electron.exe . --smoke-test`（输出 `SMOKE_TEST_OK tools=9 options=6 …` 与 `SMOKE_UI {...}`，界面元素完整、按钮可点即正常）。
 - 端到端自检：`cd app` → `.\node_modules\electron\dist\electron.exe . --self-test`（在界面进程里跑「PNG 无损往返 + 算法链路 + JPG 保存 + 方块填充」，输出 `SELF_TEST {...}`）。
 - 界面自动测试：`cd app` → `.\node_modules\electron\dist\electron.exe . --ui-test`（模拟真人点按钮走完整流程：选图→混淆→保存→还原→批量→清空，逐步截图并做像素级校验，输出 `UI_TEST {..., "pass":true}`；截图落在 `%TEMP%\tomato-uitest`）。
@@ -67,11 +67,13 @@
 - 视频播放器自检：`cd app` → `.\node_modules\electron\dist\electron.exe . --player-test`（纯逻辑 29 项 + 本地媒体协议 200/206/Range/404 + 7 种格式夹具端到端「探测→计划→准备副本→真实 `<video>` 播放」+ 缓存命中 + 无效文件报错；结果写 `%TEMP%\tomato-player-test.json`，`ok:true` 为通过）。
 - 视频播放器界面自动测试：`cd app` → `.\node_modules\electron\dist\electron.exe . --player-ui-test`（切工具→打开 MP4 直接播→播放/暂停/拖动/音量/静音/全屏/快捷键→MKV 换封装→AVI 重编码（含进度覆盖层）→切走自动暂停与状态保留→LRU 回收后缓存清空→拖入非视频给出提示；截图 `shot-3x-播放器-*.png` 落 `%TEMP%\tomato-uitest`，结果写 `%TEMP%\tomato-player-ui-test.json`，`pass:true` 为通过）。
 - 文件藏图自检：`cd app` → `.\node_modules\electron\dist\electron.exe . --imghide-test`（**两套容器都验**：动态混淆（极速）整文件往返 + 官方 `action='decrypt'` 不解密直接读（证明网页版不弹密码框）；图夹 PRO 的 PNG/GIF 往返 + 密码 + 官方双向互通（裁判放 `.tools/tujia-oracle/decryptWorker.js`，不进 git）+ 容错与路径穿越；结果写 `%TEMP%\tomato-imghide-test.json`，`ok:true` 为通过）。
+- 软件卸载自检：`cd app` → `.\node_modules\electron\dist\electron.exe . --uninstall-test`（加装包在位 + **SHA-256 与 `addons/hibit/说明.txt` 记录一致** + exe 清单权限 `requireAdministrator` + 提权命令构造 + `hibit:status` IPC + 界面走查（分组/按钮/状态卡/顶栏）+ **测试模式空跑并用 `tasklist` 断言进程未拉起** + 缺失降级（临时藏起 exe 再还原，带自愈）；截图 `shot-uninstall-*.png` 落 `%TEMP%\tomato-uitest`，结果写 `%TEMP%\tomato-uninstall-test.json`，`pass:true` 为通过）。
 - 文件藏图界面自动测试：`cd app` → `.\node_modules\electron\dist\electron.exe . --imghide-ui-test`（切工具→随机表图→加文件→打包→产物校验与解码→解包比对→自定义表图+水印→图夹 PRO+密码往返（错误密码被拒）→体积提示两模式→清空；截图 `shot-imghide-*.png` 落 `%TEMP%\tomato-uitest`，结果写 `%TEMP%\tomato-imghide-ui-test.json`，`pass:true` 为通过）。
-- 交付前必须全绿：算法测试 + 冒烟自检 + 端到端自检 + 界面自动测试 + PDF 工具自检 + PDF 工具界面自动测试 + 媒体工具自检 + 媒体工具界面自动测试 + 音频工具自检 + 音频工具界面自动测试 + 语音转文字自检 + 语音转文字界面自动测试 + 外观主题自检 + OCR 引擎闸门 + 媒体工具（A 批）自检 + 图片批量工具（B 批）自检 + 设置导入导出自检 + C 批工具自检 + 视频播放器自检 + 视频播放器界面自动测试 + 文件藏图自检 + 文件藏图界面自动测试，且截图人工过目一遍；打包产物需再跑一次冒烟与各界面自测。
+- 交付前必须全绿：算法测试 + 冒烟自检 + 端到端自检 + 界面自动测试 + PDF 工具自检 + PDF 工具界面自动测试 + 媒体工具自检 + 媒体工具界面自动测试 + 音频工具自检 + 音频工具界面自动测试 + 语音转文字自检 + 语音转文字界面自动测试 + 外观主题自检 + OCR 引擎闸门 + 媒体工具（A 批）自检 + 图片批量工具（B 批）自检 + 设置导入导出自检 + C 批工具自检 + 视频播放器自检 + 视频播放器界面自动测试 + 文件藏图自检 + 文件藏图界面自动测试 + 软件卸载自检，且截图人工过目一遍；打包产物需再跑一次冒烟与各界面自测。
 - 生成图标：`cd app` → `npm run icon`（产出 `src/assets/icon.png` 与 `build/icon.ico`）。
 - 打包免安装版：`cd app` → `npm run pack`（产物：`app/release/番茄图片混淆-桌面版-v<版本>-win64/` 免安装文件夹 + 同名 `.zip`；exe 图标与版本信息由 `build/rcedit.exe` 写入，缺失则跳过）。打包顺序：步骤 8b 同步桌面快捷方式 → **步骤 8c 迁移上一版的用户设置**（`userdata/settings.json`，升级不丢排序/折叠偏好）→ 步骤 9 删旧版。
   - 重复打包**同一版本号**会先清空产物目录，此时 8c 找不到旧版目录可迁移（旧版已被步骤 9 删掉）——需要在 pack 前把上一步备份的用户设置放回一个旧版本命名的目录（本机实测流程见 CHANGELOG v2.7.1），或 pack 后手工放回新产物的 `userdata/`。
+  - **`pack.js` 步骤 4 的 `tests/` 是「逐个文件白名单」**：新增测试文件必须同步加一行，否则产物里缺文件；而主进程 `require('./tests/xxx.js')` 在 try 之外，缺文件会表现为「窗口开着、测试不跑、也不退出」的**静默卡住**（不是报错）——v2.8.0 首次打包实际踩到过。新增测试后请 grep 确认：产物 `resources/app/tests/` 里文件齐全。
 - 兼容性样本工具（锁定 variants.js 用）：
   - 造样本：`electron . --make-samples <目录> --mode <模式> [--key <密钥>]`
   - 验样本：`electron . --verify-samples <目录> --key <密钥>` → 输出 `verdict`，`meanDiff` 接近 0 即为手机版所用的模式与变体。

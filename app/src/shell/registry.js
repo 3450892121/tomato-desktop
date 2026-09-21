@@ -21,6 +21,7 @@ import audioConvert from '../tools/audio-convert/index.js';
 import audioEdit from '../tools/audio-edit/index.js';
 import transcribe from '../tools/transcribe/index.js';
 import archive from '../tools/archive/index.js';
+import uninstall from '../tools/uninstall/index.js';
 
 /**
  * 左侧导航分组（按此顺序显示；工具声明里的 group 对应这里的 id）。
@@ -32,7 +33,8 @@ export const GROUPS = [
   { id: 'video', name: '视频', icon: '🎬' },
   { id: 'audio', name: '音频', icon: '🎵' },
   { id: 'doc', name: '文档', icon: '🗂️' },
-  { id: 'archive', name: '压缩', icon: '📦' }
+  { id: 'archive', name: '压缩', icon: '📦' },
+  { id: 'system', name: '系统', icon: '🧰' }
 ];
 
 /** 所有工具（左侧按 GROUPS 分组显示，组内按 order 升序） */
@@ -56,5 +58,6 @@ export const TOOLS = [
   audioConvert,
   audioEdit,
   transcribe,
-  archive
+  archive,
+  uninstall
 ];

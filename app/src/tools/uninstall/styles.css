@@ -1,0 +1,119 @@
+/* 工具：软件卸载 —— 专属样式
+   约定：颜色 / 字号 / 间距一律引用 shell/theme.css 的变量，类名统一 uns- 前缀 */
+.uns-tool {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  height: 100%;
+  min-height: 0;
+  overflow-y: auto;
+  padding-right: var(--space-1);
+}
+
+/* 头图区：图标 + 标题 + 一句话说明 */
+.uns-hero {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  padding: var(--space-4);
+  flex: none;
+}
+
+.uns-hero-icon {
+  flex: none;
+  width: 56px;
+  height: 56px;
+  border-radius: var(--radius-lg);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 28px;
+  line-height: 1;
+  background: var(--glass-bg-soft);
+  border: 1px solid var(--glass-border);
+  backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
+  box-shadow: var(--glass-inner-highlight), var(--shadow-btn);
+}
+
+.uns-hero-text { min-width: 0; }
+
+.uns-title {
+  margin: 0;
+  font-size: var(--font-size-xl);
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.uns-desc {
+  margin: var(--space-1) 0 0;
+  font-size: var(--font-size-sm);
+  line-height: 1.7;
+  color: var(--color-text-secondary);
+}
+
+/* 启动区 */
+.uns-action-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-4);
+  flex: none;
+}
+
+.uns-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+
+.uns-hint {
+  margin: 0;
+  font-size: var(--font-size-sm);
+  color: var(--color-text-secondary);
+  min-height: 1.2em;
+}
+
+/* 引擎状态卡 */
+.uns-engine {
+  padding: var(--space-3) var(--space-4);
+  flex: none;
+}
+
+.uns-engine-line {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  font-size: var(--font-size-sm);
+  color: var(--color-text-secondary);
+  line-height: 1.6;
+  word-break: break-all;
+}
+
+.uns-engine-name { color: var(--color-text); }
+
+.uns-engine.is-missing .uns-engine-line { color: var(--color-deobfuscate); }
+
+/* 用法要点 */
+.uns-tips {
+  padding: var(--space-4);
+  flex: none;
+}
+
+.uns-subtitle {
+  margin: 0 0 var(--space-2);
+  font-size: var(--font-size-md);
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.uns-tip-list {
+  margin: 0;
+  padding-left: var(--space-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  font-size: var(--font-size-sm);
+  line-height: 1.7;
+  color: var(--color-text-secondary);
+}
