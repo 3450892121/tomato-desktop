@@ -360,43 +360,47 @@ async function run() {
 }
 
 async function onRunClick() {
-  if (state.busy) {
+  // await 期间本页可能被 LRU 回收（unmount 把 state 置空）：全程用局部 st，界面收尾前再核对
+  const st = state;
+  if (st.busy) {
     // 运行中：点击＝取消（结束识别进程并停止队列）
-    state.cancelRequested = true;
-    const jobId = state.currentJobId;
+    st.cancelRequested = true;
+    const jobId = st.currentJobId;
     if (jobId) {
       try { await cancelTranscribe(jobId); } catch { /* 任务可能刚结束，忽略 */ }
     }
-    state.ctx.setStatus('正在取消…');
+    st.ctx.setStatus('正在取消…');
     return;
   }
-  if (!state.asr || !state.asr.found) {
-    state.ctx.setStatus('未检测到语音识别加装包：把 addons/asr 放回软件目录后重开本工具');
+  if (!st.asr || !st.asr.found) {
+    st.ctx.setStatus('未检测到语音识别加装包：把 addons/asr 放回软件目录后重开本工具');
     return;
   }
-  if (!state.asr.ffmpeg) {
-    state.ctx.setStatus('未检测到 ffmpeg：把加装包解压到软件目录的 addons/ffmpeg 后重开本工具');
+  if (!st.asr.ffmpeg) {
+    st.ctx.setStatus('未检测到 ffmpeg：把加装包解压到软件目录的 addons/ffmpeg 后重开本工具');
     return;
   }
-  if (state.files.length === 0) {
-    state.ctx.setStatus('请先添加音频或视频');
+  if (st.files.length === 0) {
+    st.ctx.setStatus('请先添加音频或视频');
     return;
   }
 
-  state.busy = true;
-  state.cancelRequested = false;
+  st.busy = true;
+  st.cancelRequested = false;
   updateRunButton();
   try {
     await run();
   } catch (err) {
-    state.ctx.hideProgress();
-    state.ctx.setStatus(`处理失败：${err.message}`);
+    st.ctx.hideProgress();
+    st.ctx.setStatus(`处理失败：${err.message}`);
     console.error('[transcribe] 处理失败', err);
   } finally {
-    state.busy = false;
-    state.cancelRequested = false;
-    state.currentJobId = null;
-    updateRunButton();
+    if (state === st) {
+      st.busy = false;
+      st.cancelRequested = false;
+      st.currentJobId = null;
+      updateRunButton();
+    }
   }
 }
 

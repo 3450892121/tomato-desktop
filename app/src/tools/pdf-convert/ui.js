@@ -614,15 +614,17 @@ async function runConvert(targetFormat) {
 
 async function run() {
   if (state.busy) return;
+  // await 期间本页可能被 LRU 回收（unmount 把 state 置空）：全程用局部 st，界面收尾前再核对
+  const st = state;
   const files = currentFiles();
   if (files.length === 0) {
-    state.ctx.setStatus('请先添加文件');
+    st.ctx.setStatus('请先添加文件');
     return;
   }
-  state.busy = true;
+  st.busy = true;
   updateRunButton();
   try {
-    switch (state.direction) {
+    switch (st.direction) {
       case 'pdf-to-image': await runPdfToImage(); break;
       case 'image-to-pdf': await runImageToPdf(); break;
       case 'page-ops': await runPageOps(); break;
@@ -631,12 +633,14 @@ async function run() {
       default: break;
     }
   } catch (err) {
-    state.ctx.hideProgress();
-    state.ctx.setStatus(`处理失败：${err.message}`);
+    st.ctx.hideProgress();
+    st.ctx.setStatus(`处理失败：${err.message}`);
     console.error('[pdf-convert] 处理失败', err);
   } finally {
-    state.busy = false;
-    updateRunButton();
+    if (state === st) {
+      st.busy = false;
+      updateRunButton();
+    }
   }
 }
 

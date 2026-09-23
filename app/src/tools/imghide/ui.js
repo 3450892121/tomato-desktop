@@ -513,9 +513,11 @@ function clearUnpackResult() {
 // —— 打包 / 解包 ——
 
 async function runPack() {
-  const { ctx, els } = state;
-  if (!state.cover || state.items.length === 0) return;
-  state.busy = true;
+  // await 期间本页可能被 LRU 回收（unmount 把 state 置空）：全程用局部 st，界面刷新前再核对
+  const st = state;
+  const { ctx, els } = st;
+  if (!st.cover || st.items.length === 0) return;
+  st.busy = true;
   refreshRunState();
   ctx.showProgress('正在打包…', 0);
   try {
@@ -523,17 +525,17 @@ async function runPack() {
     const mode = isProMode() ? 'pro' : 'fast';
     const password = mode === 'pro' ? els.password.value.trim() : '';
     let coverBytes = null;
-    let coverKind = state.cover.kind;
+    let coverKind = st.cover.kind;
     let outputDir;
     let baseName;
 
-    const raw = state.cover.bytes || (state.cover.path ? await ctx.readFile(state.cover.path) : null);
+    const raw = st.cover.bytes || (st.cover.path ? await ctx.readFile(st.cover.path) : null);
     // 「防查」要把数据塞进 IDAT 流，所以表图必须是 8 位 PNG（或 GIF）；「极速」直接追加在尾部，什么格式都行
-    const needConvert = watermark !== '' || (mode === 'pro' && state.cover.source !== 'random' && state.cover.needsReencode);
+    const needConvert = watermark !== '' || (mode === 'pro' && st.cover.source !== 'random' && st.cover.needsReencode);
     if (needConvert) {
       ctx.showProgress(watermark ? '正在给表图加水印…' : '正在把表图转成 PNG…', 5);
       let png = raw;
-      if (watermark || state.cover.needsReencode) {
+      if (watermark || st.cover.needsReencode) {
         const { pixels, width, height } = await decodeImageFromBytes(raw);
         png = await encodeImageToBytes(pixels, width, height, { format: 'png' });
       }
@@ -542,7 +544,7 @@ async function runPack() {
       coverKind = 'png';
     }
 
-    if (state.cover.source === 'random') {
+    if (st.cover.source === 'random') {
       // 随机表图没有磁盘文件：字节得交给主进程；产物落系统「图片」文件夹（由主进程决定），名字带时间戳
       if (!coverBytes) coverBytes = raw;
       baseName = `随机表图-${stamp()}`;
@@ -551,56 +553,63 @@ async function runPack() {
 
     const res = await ctx.hidePack({
       mode,
-      coverPath: state.cover.path || undefined,
+      coverPath: st.cover.path || undefined,
       coverBytes,
       coverKind,
-      items: state.items.map((item) => ({ path: item.path, name: item.name })),
+      items: st.items.map((item) => ({ path: item.path, name: item.name })),
       password,
       outputDir,
       baseName
     });
     if (!res || !res.ok) throw new Error((res && res.message) || '打包失败');
-    state.packed = res;
-    showPackResult(
-      `已生成：${res.path}（${humanBytes(res.size)}，${res.files} 个文件）—— 直接发给别人即可`,
-      'is-ok',
-      res.path
-    );
+    st.packed = res;
+    if (state === st) {
+      showPackResult(
+        `已生成：${res.path}（${humanBytes(res.size)}，${res.files} 个文件）—— 直接发给别人即可`,
+        'is-ok',
+        res.path
+      );
+    }
     ctx.setStatus(`打包完成：${res.path}`);
   } catch (err) {
-    showPackResult(`打包失败：${err.message}`, 'is-error', '');
+    if (state === st) showPackResult(`打包失败：${err.message}`, 'is-error', '');
     ctx.setStatus(`打包失败：${err.message}`);
   } finally {
-    state.busy = false;
+    if (state === st) st.busy = false;
     ctx.hideProgress();
-    refreshRunState();
+    if (state === st) refreshRunState();
   }
 }
 
 async function runUnpack() {
-  const { ctx, els } = state;
-  if (!state.unpackImage) return;
-  state.busy = true;
+  const st = state;
+  const { ctx, els } = st;
+  if (!st.unpackImage) return;
+  st.busy = true;
   refreshRunState();
   ctx.showProgress('正在解包…', 0);
   try {
     const res = await ctx.hideUnpack({
-      imagePath: state.unpackImage.path,
+      imagePath: st.unpackImage.path,
       password: els.passwordX.value.trim()
     });
     if (!res || !res.ok) throw new Error((res && res.message) || '解包失败');
-    state.unpackResult = res;
-    renderUnpackFiles(res);
-    showUnpackResult(`解出 ${res.files.length} 个文件 → ${res.dir}`, 'is-ok');
+    st.unpackResult = res;
+    if (state === st) {
+      renderUnpackFiles(res);
+      showUnpackResult(`解出 ${res.files.length} 个文件 → ${res.dir}`, 'is-ok');
+    }
     ctx.setStatus(`解包完成：${res.files.length} 个文件 → ${res.dir}`);
   } catch (err) {
-    clearUnpackResult();
-    showUnpackResult(`解包失败：${err.message}`, 'is-error');
+    if (state === st) {
+      clearUnpackResult();
+      showUnpackResult(`解包失败：${err.message}`, 'is-error');
+    }
     ctx.setStatus(`解包失败：${err.message}`);
   } finally {
-    state.busy = false;
+    if (state === st) st.busy = false;
     ctx.hideProgress();
-    refreshRunState();
+    if (state === st) refreshRunState();
   }
 }
 

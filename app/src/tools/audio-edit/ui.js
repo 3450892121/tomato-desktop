@@ -857,41 +857,45 @@ async function run() {
 }
 
 async function onRunClick() {
-  if (state.busy) {
+  // await 期间本页可能被 LRU 回收（unmount 把 state 置空）：全程用局部 st，界面收尾前再核对
+  const st = state;
+  if (st.busy) {
     // 运行中：点击＝取消（取消本工具入队的任务；队列会让 ffmpeg 进程树结束）
-    state.cancelRequested = true;
-    for (const id of state.taskIds) state.ctx.tasks.cancel(id);
-    state.ctx.setStatus('正在取消…');
+    st.cancelRequested = true;
+    for (const id of st.taskIds) st.ctx.tasks.cancel(id);
+    st.ctx.setStatus('正在取消…');
     return;
   }
-  if (!state.ffmpeg || !state.ffmpeg.found) {
-    state.ctx.setStatus('未检测到 ffmpeg：把加装包解压到软件目录的 addons/ffmpeg 后重开本工具');
+  if (!st.ffmpeg || !st.ffmpeg.found) {
+    st.ctx.setStatus('未检测到 ffmpeg：把加装包解压到软件目录的 addons/ffmpeg 后重开本工具');
     return;
   }
-  if (state.files.length === 0) {
-    state.ctx.setStatus('请先添加音频或视频');
+  if (st.files.length === 0) {
+    st.ctx.setStatus('请先添加音频或视频');
     return;
   }
-  if (state.els.concat.checked && state.files.length < 2) {
-    state.ctx.setStatus('拼接至少需要 2 个文件：请再添加一个');
+  if (st.els.concat.checked && st.files.length < 2) {
+    st.ctx.setStatus('拼接至少需要 2 个文件：请再添加一个');
     return;
   }
 
-  state.busy = true;
-  state.cancelRequested = false;
-  state.taskIds = [];
+  st.busy = true;
+  st.cancelRequested = false;
+  st.taskIds = [];
   updateRunButton();
   try {
     await run();
   } catch (err) {
-    state.ctx.hideProgress();
-    state.ctx.setStatus(`处理失败：${err.message}`);
+    st.ctx.hideProgress();
+    st.ctx.setStatus(`处理失败：${err.message}`);
     console.error('[audio-edit] 处理失败', err);
   } finally {
-    state.busy = false;
-    state.cancelRequested = false;
-    state.taskIds = [];
-    updateRunButton();
+    if (state === st) {
+      st.busy = false;
+      st.cancelRequested = false;
+      st.taskIds = [];
+      updateRunButton();
+    }
   }
 }
 

@@ -324,14 +324,17 @@ function renderPreview() {
 // —— 添加文件 ——
 
 async function addFromPaths(paths) {
+  // await 期间本页可能被 LRU 回收（unmount 把 state 置空）：全程用局部 st，界面收尾前再核对。
+  // 加文件夹时逐个文件都要 await，这段窗口并不短。
+  const st = state;
   const failures = [];
   let added = 0;
 
   const pushOne = async (p) => {
-    const info = await state.ctx.pathInfo(p);
+    const info = await st.ctx.pathInfo(p);
     if (info.isDirectory) return;
-    if (state.files.some((f) => f.path === p)) return; // 重复添加同一个文件，忽略
-    state.files.push({
+    if (st.files.some((f) => f.path === p)) return; // 重复添加同一个文件，忽略
+    st.files.push({
       path: p,
       name: info.name,
       baseName: info.baseName,
@@ -346,9 +349,9 @@ async function addFromPaths(paths) {
 
   for (const p of paths) {
     try {
-      const info = await state.ctx.pathInfo(p);
+      const info = await st.ctx.pathInfo(p);
       if (info.isDirectory) {
-        const list = await state.ctx.listFiles(p, null); // null = 不按扩展名过滤，全部文件
+        const list = await st.ctx.listFiles(p, null); // null = 不按扩展名过滤，全部文件
         if (list.length === 0) failures.push(`${info.name}：文件夹是空的`);
         for (const one of list) {
           try {
@@ -365,12 +368,15 @@ async function addFromPaths(paths) {
     }
   }
 
+  // 下面全是界面收尾：refreshExisting() 开头就会读 state.files，所以必须先确认本页还在
+  if (state !== st) return;
   await refreshExisting();
+  if (state !== st) return;
   renderPreview();
   if (added > 0) {
-    state.ctx.setStatus(`已添加 ${added} 个文件${failures.length ? `，${failures.length} 项失败` : ''}`);
+    st.ctx.setStatus(`已添加 ${added} 个文件${failures.length ? `，${failures.length} 项失败` : ''}`);
   } else {
-    state.ctx.setStatus(failures.length ? `添加失败：${failures[0]}` : '没有可添加的文件');
+    st.ctx.setStatus(failures.length ? `添加失败：${failures[0]}` : '没有可添加的文件');
   }
 }
 
@@ -583,6 +589,7 @@ async function run() {
   state.els.runBtn.textContent = '开始重命名';
 
   await refreshExisting();
+  if (!state) return; // 上面这个 await 期间本页也可能被回收，后面整段界面收尾都得跳过
   renderPreview();
 
   // 统计 + 日志导出入口（导出按钮在第一次执行后才可用）

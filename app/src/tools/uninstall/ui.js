@@ -125,28 +125,31 @@ function renderEngine(st) {
 async function doLaunch() {
   if (!state || state.busy) return;
   if (!state.status || !state.status.found) return;
-  state.busy = true;
-  state.els.launch.disabled = true;
-  state.els.hint.textContent = '正在启动……如果系统弹出权限确认框，请点「是」。';
-  state.ctx.setStatus('正在启动卸载工具…');
+  // await 期间本页可能被 LRU 回收（unmount 把 state 置空）：全程用局部 st，界面收尾前再核对
+  const st = state;
+  st.busy = true;
+  st.els.launch.disabled = true;
+  st.els.hint.textContent = '正在启动……如果系统弹出权限确认框，请点「是」。';
+  st.ctx.setStatus('正在启动卸载工具…');
   try {
     const res = await window.desktop.hibitLaunch();
+    if (state !== st) return; // 本页已被回收：跳过界面收尾
     if (res && res.ok) {
-      state.els.hint.textContent = res.dryRun
+      st.els.hint.textContent = res.dryRun
         ? '（自动化测试模式：未真正启动卸载工具）'
         : '卸载工具已启动。若没看到窗口，请检查任务栏；它可能在系统权限确认框后面。';
-      state.ctx.setStatus(res.dryRun ? '（测试模式）卸载工具未真正启动' : '卸载工具已启动（请在 UAC 里点「是」）');
+      st.ctx.setStatus(res.dryRun ? '（测试模式）卸载工具未真正启动' : '卸载工具已启动（请在 UAC 里点「是」）');
     } else if (res && res.canceled) {
-      state.els.hint.textContent = '已取消管理员授权，卸载工具没有启动。需要时再点一次即可。';
-      state.ctx.setStatus('已取消管理员授权');
+      st.els.hint.textContent = '已取消管理员授权，卸载工具没有启动。需要时再点一次即可。';
+      st.ctx.setStatus('已取消管理员授权');
     } else {
-      state.els.hint.textContent = `启动失败：${(res && res.message) || '未知原因'}`;
-      state.ctx.setStatus(`启动卸载工具失败：${(res && res.message) || '未知原因'}`);
+      st.els.hint.textContent = `启动失败：${(res && res.message) || '未知原因'}`;
+      st.ctx.setStatus(`启动卸载工具失败：${(res && res.message) || '未知原因'}`);
     }
   } finally {
-    if (state) {
-      state.busy = false;
-      state.els.launch.disabled = !(state.status && state.status.found);
+    if (state === st) {
+      st.busy = false;
+      st.els.launch.disabled = !(st.status && st.status.found);
     }
   }
 }
