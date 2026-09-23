@@ -110,18 +110,25 @@ fs.copyFileSync(path.join(appRoot, 'tests', 'archive-ui-test.js'), path.join(app
 // v2.3.0 起：视频播放器（自检 + 界面自动测试）
 fs.copyFileSync(path.join(appRoot, 'tests', 'player-test.js'), path.join(appTarget, 'tests', 'player-test.js'));
 fs.copyFileSync(path.join(appRoot, 'tests', 'player-ui-test.js'), path.join(appTarget, 'tests', 'player-ui-test.js'));
-// v2.4.0 起：文件藏图（自检 + 界面自动测试；互通裁判是对方的代码，**不随包分发**，自检会如实标注 skipped）
+// v2.4.0 起：文件藏图（自检 + 界面自动测试；互通裁判是对方的代码，**不随包分发**，
+//   所以产物上跑自检必然得到 ok:true / verified:false —— 官方互通只能在开发树上验证）
 fs.copyFileSync(path.join(appRoot, 'tests', 'imghide-test.js'), path.join(appTarget, 'tests', 'imghide-test.js'));
 fs.copyFileSync(path.join(appRoot, 'tests', 'imghide-ui-test.js'), path.join(appTarget, 'tests', 'imghide-ui-test.js'));
 fs.copyFileSync(path.join(appRoot, 'tests', 'tujia-oracle.js'), path.join(appTarget, 'tests', 'tujia-oracle.js'));
 // v2.6.0 起：导航手动排序（排序净化纯逻辑，挂 npm test）
 fs.copyFileSync(path.join(appRoot, 'tests', 'navorder.test.mjs'), path.join(appTarget, 'tests', 'navorder.test.mjs'));
 // v2.8.0 起：软件卸载（自检 + 提权命令构造纯逻辑）
-// ★ 注意：这里是**逐个文件的白名单**——新增测试文件必须同步加一行，
-//   否则产物里缺文件：主进程 require 失败会抛在 try 之外，表现为「窗口开着、测试不跑、也不退出」的静默卡住
-//   （v2.8.0 首次打包就踩到过，详见 CHANGELOG）。
+// ★ 注意：这里是**逐个文件的白名单**——新增测试文件必须同步加一行，否则产物里缺文件、
+//   该测试在产物上跑不起来（v2.8.0 首次打包就踩到过，详见 CHANGELOG）。
+//   v2.8.1 起主进程的 require 已包在 try 里、且 finally 必 app.quit()，所以缺文件现在是
+//   「打 <TAG>_FAIL + 堆栈后退出」，不再是当年那种「窗口开着、不跑也不退」的静默卡住。
 fs.copyFileSync(path.join(appRoot, 'tests', 'uninstall-test.js'), path.join(appTarget, 'tests', 'uninstall-test.js'));
 fs.copyFileSync(path.join(appRoot, 'tests', 'uninstall.test.mjs'), path.join(appTarget, 'tests', 'uninstall.test.mjs'));
+// 兼容性样本工具（--make-samples / --verify-samples，锁定 variants.js 用；见 AGENTS.md）。
+// main.js 里是独立 if 分支 require 它们、不走 AUTO_TESTS 表，所以白名单容易漏——
+// 漏了产物上这两个命令只会打 MAKE_SAMPLES_FAIL / VERIFY_SAMPLES_FAIL。
+fs.copyFileSync(path.join(appRoot, 'tests', 'make-samples.js'), path.join(appTarget, 'tests', 'make-samples.js'));
+fs.copyFileSync(path.join(appRoot, 'tests', 'verify-samples.js'), path.join(appTarget, 'tests', 'verify-samples.js'));
 // v2.10.0 起：HEIC/HEIF 解码引擎（「图片格式转换」的手机格式输入）——worker 线程脚本 + media-test 的 HEIC 夹具
 fs.copyFileSync(path.join(appRoot, 'heic-worker.js'), path.join(appTarget, 'heic-worker.js'));
 copyTree(path.join(appRoot, 'tests', 'assets'), path.join(appTarget, 'tests', 'assets'));

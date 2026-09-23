@@ -296,7 +296,7 @@ const AUTO_TESTS = [
   { flag: queueUiTest, tag: 'QUEUE_UI_TEST', file: './tests/queue-ui-test.js', runner: 'runQueueUiTest', args: (win) => [win], log: (r) => JSON.stringify({ pass: r.pass, failures: r.failures }), write: true },
   { flag: archiveTest, tag: 'ARCHIVE_TEST', file: './tests/archive-test.js', runner: 'runArchiveTest', args: () => [{ portableDir: PORTABLE_DIR }], log: (r) => JSON.stringify({ ok: r.ok, failedFormats: r.failedFormats, formatsTested: r.formatsTested, ms: r.ms }) },
   { flag: archiveUiTest, tag: 'ARCHIVE_UI_TEST', file: './tests/archive-ui-test.js', runner: 'runArchiveUiTest', args: (win) => [win], log: (r) => JSON.stringify({ pass: r.pass, failures: r.failures }), write: true },
-  { flag: imgHideTest, tag: 'IMGHIDE_TEST', file: './tests/imghide-test.js', runner: 'runImgHideTest', args: (win) => [{ portableDir: PORTABLE_DIR, mainWindow: win }], log: (r) => JSON.stringify({ ok: r.ok }) },
+  { flag: imgHideTest, tag: 'IMGHIDE_TEST', file: './tests/imghide-test.js', runner: 'runImgHideTest', args: (win) => [{ portableDir: PORTABLE_DIR, mainWindow: win }], log: (r) => JSON.stringify({ ok: r.ok, verified: r.verified, skipped: r.skipped }) },
   { flag: uninstallTest, tag: 'UNINSTALL_TEST', file: './tests/uninstall-test.js', runner: 'runUninstallTest', args: (win) => [win, { portableDir: PORTABLE_DIR }], log: (r) => JSON.stringify({ pass: r.pass, failures: r.failures }), write: true },
   { flag: imgHideUiTest, tag: 'IMGHIDE_UI_TEST', file: './tests/imghide-ui-test.js', runner: 'runImgHideUiTest', args: (win) => [win, { portableDir: PORTABLE_DIR }], log: (r) => JSON.stringify({ pass: r.pass, failures: r.failures }), write: true },
   { flag: playerTest, tag: 'PLAYER_TEST', file: './tests/player-test.js', runner: 'runPlayerTest', args: (win) => [win], log: (r) => JSON.stringify({ ok: r.ok, failures: r.failures }) },
@@ -359,17 +359,31 @@ function createMainWindow() {
   mainWindow.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
 
   if (smokeTest) {
+    // 退出码：app.quit() 不带 process.exitCode，而 app.exit() 会跳过 will-quit
+    // （那里有「测试模式还原用户设置」与「终止 HEIC 线程」，跳不得）。
+    // 所以挂在 will-quit 末尾——它注册得最晚，前面两个清理都已经跑完。
+    let smokeFailed = false;
+    app.on('will-quit', () => { if (smokeFailed) process.exit(1); });
     mainWindow.webContents.once('did-finish-load', async () => {
       try {
         // 工具列表是异步渲染的，这里等一下（最多 2 秒），避免刚打开时误判为空
-        const toolCount = await mainWindow.webContents.executeJavaScript(`
+        const navInfo = await mainWindow.webContents.executeJavaScript(`
           (async () => {
             for (let i = 0; i < 20; i++) {
-              const n = document.querySelectorAll('#toolNav .tool-item').length;
-              if (n > 0) return n;
+              if (document.querySelectorAll('#toolNav .tool-item').length > 0) break;
               await new Promise((r) => setTimeout(r, 100));
             }
-            return document.querySelectorAll('#toolNav .tool-item').length;
+            // 期望值取自 registry.js 本身（与 shell 共用同一个模块实例），不写死数字：
+            // 新增工具后冒烟自检自动跟上，只有「漏渲染 / 漏注册」才会被抓出来。
+            const reg = await import('./registry.js');
+            const ids = reg.TOOLS.map((t) => t.id);
+            const rendered = [...document.querySelectorAll('#toolNav .tool-item')].map((b) => b.dataset.toolId);
+            return JSON.stringify({
+              expected: ids.length,
+              rendered: rendered.length,
+              notRendered: ids.filter((id) => !rendered.includes(id)),
+              unknown: rendered.filter((id) => !ids.includes(id))
+            });
           })()
         `);
         // 启动默认工具随用户排序变化（v2.7.1，见 spec/modules/toolkit.md「启动默认工具」）：
@@ -402,9 +416,32 @@ function createMainWindow() {
             return JSON.stringify({ missing, buttons: buttons.length, clickErrors: clicks });
           })()
         `);
-        console.log(`SMOKE_TEST_OK tools=${toolCount} options=${optionCount} status="${statusText}"`);
+
+        // 硬断言：过去这里只把 missing / clickErrors / 工具数打印出来就报 OK，
+        // 哪怕只渲染出 3 个工具、按钮全点击报错也照样「全绿」，等于没有自检。
+        const nav = JSON.parse(navInfo);
+        const ui = JSON.parse(uiCheck);
+        const failures = [];
+        if (!(nav.expected > 0)) failures.push('registry.js 里一个工具都没有');
+        if (nav.rendered !== nav.expected) failures.push(`导航只渲染出 ${nav.rendered}/${nav.expected} 个工具`);
+        if (nav.notRendered.length) failures.push(`未渲染的工具：${nav.notRendered.join(', ')}`);
+        if (nav.unknown.length) failures.push(`导航里出现 registry 未登记的工具：${nav.unknown.join(', ')}`);
+        if (ui.missing.length) failures.push(`图片混淆页缺少界面元素：${ui.missing.join(', ')}`);
+        if (!(ui.buttons > 0)) failures.push('图片混淆页一个可点按钮都没有');
+        if (ui.clickErrors.length) failures.push(`点击按钮报错：${ui.clickErrors.join(' ｜ ')}`);
+        if (!(optionCount > 0)) failures.push(`模式下拉框是空的（options=${optionCount}）`);
+        if (!String(statusText || '').trim()) failures.push('顶栏状态文字为空');
+
+        console.log(`SMOKE_NAV ${navInfo}`);
         console.log(`SMOKE_UI ${uiCheck}`);
+        if (failures.length) {
+          smokeFailed = true; // 让调用方（脚本 / CI）能靠退出码判定，不必去读输出文本
+          console.log(`SMOKE_TEST_FAIL ${failures.length} 项：${failures.join(' ｜ ')}`);
+        } else {
+          console.log(`SMOKE_TEST_OK tools=${nav.rendered} options=${optionCount} status="${statusText}"`);
+        }
       } catch (err) {
+        smokeFailed = true;
         console.log(`SMOKE_TEST_FAIL ${err.message}`);
       }
       app.quit();

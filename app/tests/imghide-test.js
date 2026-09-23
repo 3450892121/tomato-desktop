@@ -302,7 +302,8 @@ async function runImgHideTest({ portableDir, mainWindow } = {}) {
     };
     const loaded = oracle.loadOracle(APP_DIR);
     if (!loaded.ok) {
-      checks.interopFast = { ok: true, oracle: 'skipped', reason: loaded.reason };
+      // 裁判缺失 ≠ 通过：记 skipped，并让汇总的 verified 变 false（详见收尾处）。
+      checks.interopFast = { ok: true, skipped: true, oracle: 'skipped', reason: loaded.reason };
     } else {
       // 官方客户端不填密码走的就是 action='decrypt'（先在文件里找 PRO 指纹，没有才按 DYNAMIC_V2_ 解析）
       const officialPng = await oracle.oracleLegacyDecrypt(APP_DIR, new Uint8Array(pngBytes));
@@ -317,15 +318,15 @@ async function runImgHideTest({ portableDir, mainWindow } = {}) {
         officialPngFiles: officialPng.map((f) => `${f.name}(${f.bytes.length})`)
       };
     }
-    log(`极速模式（动态混淆）：往返 ${checks.roundTripFast.ok ? '✅' : '❌'}；官方不解密直接读 ${checks.interopFast.ok ? '✅' : '❌'}（${(checks.interopFast.officialPngFiles || []).join(', ') || checks.interopFast.reason || ''}）`);
+    log(`极速模式（动态混淆）：往返 ${checks.roundTripFast.ok ? '✅' : '❌'}；官方不解密直接读 ${checks.interopFast.skipped ? '⚠️ 未验证' : (checks.interopFast.ok ? '✅' : '❌')}（${(checks.interopFast.officialPngFiles || []).join(', ') || checks.interopFast.reason || ''}）`);
   }
 
   // —— ④ 双向互通（官方实现当裁判） ——
   {
     const loaded = oracle.loadOracle(APP_DIR);
     if (!loaded.ok) {
-      checks.interop = { ok: true, oracle: 'skipped', reason: loaded.reason };
-      log(`互通验证：跳过（${loaded.reason}）`);
+      checks.interop = { ok: true, skipped: true, oracle: 'skipped', reason: loaded.reason };
+      log(`互通验证：⚠️ 未验证（${loaded.reason}）——与官方互通是本工具的核心卖点，跳过不等于通过；裁判放 .tools/tujia-oracle/decryptWorker.js`);
     } else {
       const detail = {};
       // ① 我们打的图 → 官方解
@@ -438,15 +439,27 @@ async function runImgHideTest({ portableDir, mainWindow } = {}) {
   await fsp.rm(WORK, { recursive: true, force: true });
 
   const ok = Object.values(checks).every((c) => c.ok);
+  // ok 与 verified 分开报：ok = 跑过的项全过；verified = 且没有任何一项因缺裁判被跳过。
+  // 打包产物上裁判不随包分发（那是对方客户端的代码），interop 必然 skipped → ok:true 但
+  // verified:false，这是预期状态；交付前必须在带裁判的开发树上跑到 verified:true。
+  const skipped = Object.entries(checks).filter(([, c]) => c.skipped).map(([k]) => k);
+  const verified = ok && skipped.length === 0;
   const result = {
     ok,
+    verified,
+    skipped,
     checks,
     notes,
     ms: Date.now() - t00,
     at: new Date().toISOString()
   };
   fs.writeFileSync(OUT_JSON, JSON.stringify(result, null, 2), 'utf8');
-  log(`结果：${ok ? '✅ 全部通过' : '❌ 有失败项'} → ${OUT_JSON}`);
+  const verdict = !ok
+    ? '❌ 有失败项'
+    : (skipped.length
+      ? `⚠️ 跑过的项全过，但 ${skipped.length} 项未验证（${skipped.join(', ')}）——不算完整验证`
+      : '✅ 全部通过（含官方互通验证）');
+  log(`结果：${verdict} → ${OUT_JSON}`);
   return result;
 }
 
@@ -456,7 +469,7 @@ module.exports = { runImgHideTest, ensureFixtures, cleanFixtures, WORK, OUT_JSON
 if (require.main === module) {
   runImgHideTest()
     .then((r) => {
-      console.log(`\nIMGHIDE_TEST ${JSON.stringify({ ok: r.ok })}`);
+      console.log(`\nIMGHIDE_TEST ${JSON.stringify({ ok: r.ok, verified: r.verified, skipped: r.skipped })}`);
       process.exit(r.ok ? 0 : 1);
     })
     .catch((err) => {
