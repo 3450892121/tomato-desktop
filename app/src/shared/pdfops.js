@@ -113,7 +113,31 @@ async function encodeJpeg(pixels, width, height, quality) {
  *                    preset: string, grayscale: boolean, attempts: number, cancelled: boolean}>}
  */
 export async function compressPdf(bytes, options = {}) {
-  const { grayscale = false, maxMB = 0, pages = null, password = '', onProgress, shouldCancel } = options;
+  const src = await openPdfDoc(bytes, options.password || '');
+  try {
+    return await compressPdfWithDoc(src, bytes, options);
+  } finally {
+    await releasePdfDoc(src);
+  }
+}
+
+/**
+ * 释放 pdfjs 文档。不释放的话页面与字体缓存会留在 worker 侧只涨不落，
+ * 批量压缩几十个 PDF 的长批次可能 OOM（pdf-edit 的 closePdfDoc 只管它自己打开的那些）。
+ * 与 pdf-edit/core/ops.js 的同名逻辑一致：pdfjs 6 起 PDFDocumentProxy 上不再有 destroy()，
+ * 要经 loadingTask.destroy()。（shared 不能反向 import 工具目录，所以这里各自实现。）
+ */
+async function releasePdfDoc(doc) {
+  try {
+    if (!doc) return;
+    if (typeof doc.destroy === 'function') await doc.destroy();
+    else if (doc.loadingTask && typeof doc.loadingTask.destroy === 'function') await doc.loadingTask.destroy();
+  } catch { /* 已经释放过了 */ }
+}
+
+/** 源文档已打开后的压缩主流程；文档由 compressPdf 负责释放，这里不要动它 */
+async function compressPdfWithDoc(src, bytes, options) {
+  const { grayscale = false, maxMB = 0, pages = null, onProgress, shouldCancel } = options;
   const originalBytes = (bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes)).length;
 
   // 档位序列：从用户选的档位开始，若设了目标体积则依次降档重试
@@ -122,7 +146,6 @@ export async function compressPdf(bytes, options = {}) {
   const startIdx = Math.max(0, order.indexOf(preset.value));
   const ladder = PDF_COMPRESS_PRESETS.slice(startIdx);
 
-  const src = await openPdfDoc(bytes, password);
   const totalPages = src.numPages;
   const targets = Array.isArray(pages) && pages.length
     ? pages.filter((n) => Number.isInteger(n) && n >= 1 && n <= totalPages)

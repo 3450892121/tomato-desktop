@@ -9,6 +9,7 @@ const fsSync = require('fs');
 const os = require('os');
 const crypto = require('crypto');
 const { Readable } = require('stream');
+const { StringDecoder } = require('string_decoder');
 const { spawn, spawnSync } = require('child_process');
 const { pathToFileURL } = require('url');
 const { Worker } = require('worker_threads');
@@ -700,12 +701,29 @@ ipcMain.handle('fs:remove-file', async (_event, filePath) => {
 
 // —— 设置读写（绿色版：存在软件目录的 userdata/settings.json） ——
 
+/**
+ * 原子写设置文件：先写同目录的临时文件，再 rename 覆盖过去。
+ * 直接 writeFile 的话，写到一半被杀（或磁盘满）会留下一个截断的 JSON，
+ * 而 readSettingsFile 解析失败后返回 {} —— 用户的排序/主题/输出目录等设置就静默全丢了，
+ * 且看不出原因。rename 在同一卷上是原子的，任何时刻读到的都是完整的旧值或完整的新值。
+ */
+async function writeSettingsFile(data) {
+  await fs.mkdir(USER_DATA_DIR, { recursive: true });
+  const tmp = `${SETTINGS_FILE}.${process.pid}.${Date.now()}.tmp`;
+  try {
+    await fs.writeFile(tmp, JSON.stringify(data, null, 2), 'utf8');
+    await fs.rename(tmp, SETTINGS_FILE);
+  } catch (err) {
+    await fs.rm(tmp, { force: true }).catch(() => {});
+    throw err;
+  }
+}
+
 ipcMain.handle('settings:read', async () => readSettingsFile());
 
 ipcMain.handle('settings:write', async (_event, patch) => {
   const next = { ...(await readSettingsFile()), ...patch };
-  await fs.mkdir(USER_DATA_DIR, { recursive: true });
-  await fs.writeFile(SETTINGS_FILE, JSON.stringify(next, null, 2), 'utf8');
+  await writeSettingsFile(next);
   return next;
 });
 
@@ -792,8 +810,7 @@ ipcMain.handle('settings:import', async () => {
   }
 
   const merged = { ...(await readSettingsFile()), ...patch };
-  await fs.mkdir(USER_DATA_DIR, { recursive: true });
-  await fs.writeFile(SETTINGS_FILE, JSON.stringify(merged, null, 2), 'utf8');
+  await writeSettingsFile(merged);
   return { ok: true, applied, skipped, settings: merged, source };
 });
 
@@ -1085,8 +1102,9 @@ ipcMain.handle('libreoffice:convert', async (_event, options) => {
     if (wanted) outPath = path.join(workDir, wanted);
   } catch { /* 读不到就按“无输出”处理 */ }
 
-  // 超时时即便临时目录里已有半成品文件也不能当成功——那是个被中断的残缺文档
-  if (res.timedOut || !outPath) {
+  // 超时或退出码非零时，即便临时目录里已有半成品文件也不能当成功——那是个被中断/损坏的文档，
+  // 交出去用户打开才发现是坏的（ffmpeg 那三条通道一直都查 code，这里以前漏了）。
+  if (res.timedOut || res.code !== 0 || !outPath) {
     await fs.rm(workDir, { recursive: true, force: true }).catch(() => {});
     const minutes = Math.max(1, Math.round(timeoutMs / 60000));
     const detail = res.timedOut
@@ -1586,6 +1604,10 @@ function runFfmpeg(args, { jobId, onStdout, timeoutMs } = {}) {
     let stdout = '';
     let stderr = '';
     let timedOut = false;
+    // 逐块 d.toString() 会把跨管道块边界的多字节字符解成 U+FFFD：ffmpeg 的 stderr 里
+    // 带的是用户文件名（中文很常见），那段文本会原样显示给用户当失败原因，不能是乱码。
+    const outDec = new StringDecoder('utf8');
+    const errDec = new StringDecoder('utf8');
     const timer = timeoutMs ? setTimeout(() => { timedOut = true; killConvertTree(child); }, timeoutMs) : null;
     const finish = (payload) => {
       if (timer) clearTimeout(timer);
@@ -1593,16 +1615,16 @@ function runFfmpeg(args, { jobId, onStdout, timeoutMs } = {}) {
       resolve(payload);
     };
     child.stdout.on('data', (d) => {
-      const s = d.toString();
+      const s = outDec.write(d);
       stdout += s;
-      if (onStdout) onStdout(s);
+      if (s && onStdout) onStdout(s);
     });
     child.stderr.on('data', (d) => {
-      stderr += d.toString();
+      stderr += errDec.write(d);
       if (stderr.length > 200000) stderr = stderr.slice(-100000); // 只留尾部，避免异常时撑爆内存
     });
-    child.on('error', (err) => finish({ code: -1, stdout, stderr: String((err && err.message) || err), timedOut }));
-    child.on('close', (code) => finish({ code, stdout, stderr, timedOut }));
+    child.on('error', (err) => finish({ code: -1, stdout: stdout + outDec.end(), stderr: String((err && err.message) || err), timedOut }));
+    child.on('close', (code) => finish({ code, stdout: stdout + outDec.end(), stderr: stderr + errDec.end(), timedOut }));
   });
 }
 

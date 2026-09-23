@@ -374,10 +374,23 @@ export function safeEntryName(raw) {
   return name;
 }
 
-/** 目录内重名时加序号（名字.txt → 名字(2).txt） */
+/**
+ * 目录内重名时加序号（名字.txt → 名字(2).txt）。
+ * Windows / macOS 的文件系统大小写不敏感：容器里同时有 `Photo.jpg` 与 `photo.jpg` 时
+ * （官方客户端打的包完全可能这样），两个名字会落到同一个文件上——后写的静默覆盖先写的，
+ * 而界面照样列两条，用户以为都解出来了。所以判重时按平台把大小写折起来。
+ * 只在解包落盘这一步用；打包时不改名，容器内容与官方实现保持一致。
+ */
+// 注意：本模块也会被界面进程引入（imghide/ui.js），而渲染进程是 sandbox:true、**没有 process**。
+// 顶层直接读 process.platform 会抛 ReferenceError，进而拖垮整个 shell（所有工具都加载不出来）。
+// uniqueEntryName 只在主进程解包落盘时调用，所以这里取不到 process 就按大小写敏感处理。
+const CASE_INSENSITIVE_FS = typeof process !== 'undefined'
+  && (process.platform === 'win32' || process.platform === 'darwin');
+const nameKey = (n) => (CASE_INSENSITIVE_FS ? String(n).toLowerCase() : n);
+
 export function uniqueEntryName(usedNames, name) {
-  if (!usedNames.has(name)) {
-    usedNames.add(name);
+  if (!usedNames.has(nameKey(name))) {
+    usedNames.add(nameKey(name));
     return name;
   }
   const dot = name.lastIndexOf('.');
@@ -385,13 +398,13 @@ export function uniqueEntryName(usedNames, name) {
   const ext = dot > 0 ? name.slice(dot) : '';
   for (let i = 2; i < 10000; i += 1) {
     const candidate = `${base}(${i})${ext}`;
-    if (!usedNames.has(candidate)) {
-      usedNames.add(candidate);
+    if (!usedNames.has(nameKey(candidate))) {
+      usedNames.add(nameKey(candidate));
       return candidate;
     }
   }
   const fallback = `${base}(${Date.now()})${ext}`;
-  usedNames.add(fallback);
+  usedNames.add(nameKey(fallback));
   return fallback;
 }
 

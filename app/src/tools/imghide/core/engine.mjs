@@ -181,7 +181,14 @@ export async function packImage(options) {
   await fsp.mkdir(path.dirname(target), { recursive: true });
   const tmp = `${target}${TMP_SUFFIX}`;
   report(85, '写文件');
-  await fsp.writeFile(tmp, outBytes);
+  try {
+    await fsp.writeFile(tmp, outBytes);
+  } catch (err) {
+    // 写失败（磁盘满 / 杀软占用 / 路径被占）时把 .part 半成品删掉：
+    // 藏大文件时那是几百 MB 垃圾，留在用户目录里既占地方又没人会去清。
+    await fsp.rm(tmp, { force: true }).catch(() => {});
+    throw err;
+  }
   await renameWithRetry(tmp, target);
   report(100, '完成');
 

@@ -14,6 +14,7 @@ import zlib from 'node:zlib';
 import { spawn, spawnSync } from 'node:child_process';
 import { pipeline } from 'node:stream/promises';
 import { Transform } from 'node:stream';
+import { StringDecoder } from 'node:string_decoder';
 import { createReadStream, createWriteStream } from 'node:fs';
 
 import {
@@ -128,16 +129,24 @@ function run7z(binPath, args, { cwd, jobId, onStdout, timeoutMs = 6 * 3600 * 100
     let canceled = false;
     let timedOut = false;
     let stdoutIncomplete = false;
+    // 必须用 StringDecoder 而不是逐块 d.toString()：7-Zip 带 -sccUTF-8 输出中文条目名，
+    // 一个汉字的多字节序列被 64KB 管道块切断时，逐块解码会得到 U+FFFD 乱码——
+    // 而这份 stdout 正是「查可疑路径」安全闸门的输入，乱码路径会绕过 zip-slip 判断。
+    const outDec = new StringDecoder('utf8');
+    const errDec = new StringDecoder('utf8');
     const timer = setTimeout(() => { timedOut = true; killTree(child); }, timeoutMs);
 
     const finish = (code) => {
       clearTimeout(timer);
       if (jobId) jobs.delete(jobId);
+      stdout += outDec.end(); // 冲掉末尾可能残留的不完整多字节序列
+      stderr += errDec.end();
       resolve({ code, stdout, stderr, canceled, timedOut, stdoutIncomplete });
     };
 
     child.stdout.on('data', (d) => {
-      const s = d.toString();
+      const s = outDec.write(d);
+      if (!s) return; // 整块都是半个字符：等下一块拼齐再说
       if (keepFullStdout) {
         if (stdout.length < FULL_STDOUT_CAP) {
           stdout += s;
@@ -152,7 +161,7 @@ function run7z(binPath, args, { cwd, jobId, onStdout, timeoutMs = 6 * 3600 * 100
       if (onStdout) onStdout(s, stdout);
     });
     child.stderr.on('data', (d) => {
-      stderr += d.toString();
+      stderr += errDec.write(d);
       if (stderr.length > 200000) stderr = stderr.slice(-100000);
     });
     child.on('error', (err) => { stderr += String((err && err.message) || err); finish(-1); });
@@ -413,6 +422,7 @@ export async function extractArchive({ steps = [], binPath, jobId, onProgress, i
   const t0 = Date.now();
   const total = steps.length || 1;
   const results = [];
+  const failures = []; // 逐包记录失败原因：一个包坏了不该拖垮整批，也不该把已成功的结果丢掉
 
   for (let i = 0; i < steps.length; i += 1) {
     const step = steps[i];
@@ -439,13 +449,28 @@ export async function extractArchive({ steps = [], binPath, jobId, onProgress, i
       const namesBefore = hadBefore ? new Set(fs.readdirSync(step.outputDir)) : new Set();
       const filesBefore = snapshotFiles(step.outputDir);
       await fsp.mkdir(step.outputDir, { recursive: true });
-      const outPath = path.join(step.outputDir, outName);
-      try {
-        await nodeDecompress({ src: target, target: outPath, engine: codec, onProgress: (p) => share(p) });
-      } catch (err) {
-        await fsp.rm(outPath, { force: true }).catch(() => {});
-        r = { ok: false, message: `解压失败：${(err && err.message) || err}（文件可能不是有效的 ${codec.toUpperCase()} 数据）` };
-        if (!r.ok) return r;
+      // 这条 Node 流式分支必须自己实现覆盖策略：7-Zip 分支有 -aos/-aoa，而
+      // createWriteStream 是无条件截断——不拦就会把用户目录里的同名文件悄悄覆盖掉，
+      // 而且覆盖后 countFilesSince 记 0 新增，反而报「没有解出任何文件」。
+      const replace = step.overwrite === 'replace';
+      let outPath = path.join(step.outputDir, outName);
+      if (!isCompoundTarFlavor && !replace && fs.existsSync(outPath)) {
+        r = { ok: false, skippedExisting: true, message: `已跳过：${outName} 已存在（覆盖策略是「跳过已存在文件」）` };
+      } else {
+        // 复合格式这一步产出的只是中间 .tar：另起一个不重名的名字，绝不覆盖用户的同名 tar，
+        // 用完（成功或失败）都会删掉。
+        if (isCompoundTarFlavor) outPath = uniqueArchivePath(outPath);
+        try {
+          await nodeDecompress({ src: target, target: outPath, engine: codec, onProgress: (p) => share(p) });
+        } catch (err) {
+          await fsp.rm(outPath, { force: true }).catch(() => {});
+          r = { ok: false, message: `解压失败：${(err && err.message) || err}（文件可能不是有效的 ${codec.toUpperCase()} 数据）` };
+        }
+      }
+      if (r && !r.ok) {
+        failures.push({ source: step.source, message: r.message });
+        share(100);
+        continue;
       }
 
       if (isCompoundTarFlavor && /\.tar$/i.test(outPath)) {
@@ -454,7 +479,9 @@ export async function extractArchive({ steps = [], binPath, jobId, onProgress, i
           const g = await guardBeforeExtract({ archivePath: outPath, password: step.password || '', binPath });
           if (g) {
             await fsp.rm(outPath, { force: true }).catch(() => {});
-            return g;
+            failures.push({ source: step.source, message: g.message });
+            share(100);
+            continue;
           }
         }
         const res2 = await run7z(binPath, extractArgs({
@@ -465,7 +492,9 @@ export async function extractArchive({ steps = [], binPath, jobId, onProgress, i
         if (res2.code !== 0) {
           await fsp.rm(outPath, { force: true }).catch(() => {});
           await cleanupFailedOutput(step.outputDir, hadBefore, namesBefore);
-          return { ok: false, message: translateSevenZipError(res2) };
+          failures.push({ source: step.source, message: translateSevenZipError(res2) });
+          share(100);
+          continue;
         }
         await fsp.rm(outPath, { force: true }).catch(() => {}); // 中间 tar 不留给用户
       }
@@ -480,16 +509,40 @@ export async function extractArchive({ steps = [], binPath, jobId, onProgress, i
     } else {
       r = await extractOne({ ...step, source: target, binPath, jobId, share, isCancelled });
     }
-    if (!r.ok) return r;
+    // 一个包失败不该让整批中止、更不该把已经解成功的结果丢掉：
+    // 记下来继续跑，最后如实汇总「成功几个、失败几个、失败原因」。
+    if (r.canceled) return { ok: false, canceled: true };
+    if (!r.ok) {
+      failures.push({ source: step.source, message: r.message });
+      share(100);
+      continue;
+    }
     results.push(r);
     share(100);
   }
 
   const files = results.reduce((s, r) => s + (r.files || 0), 0);
+  const dirs = results.map((r) => r.dir);
+  if (failures.length) {
+    const doneNote = results.length
+      ? `；另有 ${results.length} 个已解出（共 ${files} 个文件，产物已保留）`
+      : '';
+    return {
+      ok: false,
+      dirs,
+      dir: results.length === 1 ? dirs[0] : '',
+      files,
+      failures,
+      message: failures.length === 1
+        ? `${failures[0].message}${doneNote}`
+        : `${steps.length} 个压缩包里有 ${failures.length} 个失败（首个原因：${failures[0].message}）${doneNote}`,
+      ms: Date.now() - t0
+    };
+  }
   return {
     ok: true,
-    dirs: results.map((r) => r.dir),
-    dir: results.length === 1 ? results[0].dir : '',
+    dirs,
+    dir: results.length === 1 ? dirs[0] : '',
     files,
     ms: Date.now() - t0
   };

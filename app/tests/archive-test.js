@@ -531,6 +531,122 @@ async function runArchiveTest(options = {}) {
     log(`失败清理保住用户文件：${checks.failedCleanupKeepsUserFiles.ok ? '✅' : '❌'} 闸门放行=${listed.ok} 解压失败=${!ex.ok} 原有文件保留=${kept}（${ex.message || ''}）`);
   }
 
+  // —— 7c) .zst / .br 的 Node 流式分支也要遵守覆盖策略（以前会无条件截断同名文件） ——
+  {
+    const src = path.join(WORK, 'codec-src.bin');
+    fs.writeFileSync(src, Buffer.from(Array.from({ length: 50000 }, (_, i) => (i * 13) % 251)));
+    const zstDir = path.join(WORK, 'out-zst-policy');
+    fs.mkdirSync(zstDir, { recursive: true });
+    const built = plan.buildCreatePlan({ inputs: [{ path: src, isDirectory: false }], formatId: 'zst', level: 'small', outputDir: zstDir });
+    const created = await engine.createArchive({ steps: built.steps, archivePath: built.archivePath, binPath, jobId: 'zst-policy', onProgress: () => {} });
+    const zstFile = created.paths[0];
+    const outName = path.basename(zstFile).replace(/\.zst$/i, '');
+
+    const runOnce = async (overwrite) => {
+      const root = path.join(WORK, `ex-zst-policy-${overwrite}`);
+      const exPlan = plan.buildExtractPlan({ archives: [{ path: zstFile, name: path.basename(zstFile) }], outputDir: root, overwrite });
+      const outDir = exPlan.steps[0].outputDir;
+      const outPath = path.join(outDir, outName);
+      // 输出目录里预先放一个同名文件，内容是用户自己的东西
+      fs.mkdirSync(outDir, { recursive: true });
+      fs.writeFileSync(outPath, '用户原来的内容', 'utf8');
+      const res = await engine.extractArchive({ steps: exPlan.steps, binPath, jobId: `zst-policy-${overwrite}`, onProgress: () => {} });
+      const after = fs.readFileSync(outPath, 'utf8');
+      return { res, after, outPath, sameAsSource: fs.existsSync(outPath) && sameFile(src, outPath) };
+    };
+
+    const skip = await runOnce('skip');
+    const repl = await runOnce('replace');
+    checks.zstOverwritePolicy = {
+      ok: !skip.res.ok && /已跳过/.test(skip.res.message || '') && skip.after === '用户原来的内容'
+        && repl.res.ok && repl.sameAsSource,
+      skipRejected: !skip.res.ok,
+      skipMessage: skip.res.message || '',
+      skipKeptUserFile: skip.after === '用户原来的内容',
+      replaceOk: !!repl.res.ok,
+      replaceMatchesSource: repl.sameAsSource
+    };
+    log(`zst 覆盖策略：${checks.zstOverwritePolicy.ok ? '✅' : '❌'} 跳过模式保住用户文件=${checks.zstOverwritePolicy.skipKeptUserFile}（${skip.res.message || ''}）；替换模式正确覆盖=${checks.zstOverwritePolicy.replaceMatchesSource}`);
+  }
+
+  // —— 7d) 批量解压：一个包坏了不许拖垮整批，也不许丢掉已成功的结果 ——
+  {
+    const goodSrc = path.join(WORK, 'batch-good.txt');
+    fs.writeFileSync(goodSrc, 'batch-good-content', 'utf8');
+    const goodOut = path.join(WORK, 'out-batch-good');
+    fs.mkdirSync(goodOut, { recursive: true });
+    const goodBuilt = plan.buildCreatePlan({ inputs: [{ path: goodSrc, isDirectory: false }], formatId: 'zip', level: 'small', outputDir: goodOut });
+    const goodCreated = await engine.createArchive({ steps: goodBuilt.steps, archivePath: goodBuilt.archivePath, binPath, jobId: 'batch-good', onProgress: () => {} });
+    const goodZip = goodCreated.paths[0];
+    const badZip = path.join(WORK, 'batch-bad.zip');
+    fs.writeFileSync(badZip, 'not a zip at all', 'utf8');
+
+    const root = path.join(WORK, 'ex-batch');
+    const exPlan = plan.buildExtractPlan({
+      archives: [{ path: badZip, name: 'batch-bad.zip' }, { path: goodZip, name: path.basename(goodZip) }],
+      outputDir: root
+    });
+    const res = await engine.extractArchive({ steps: exPlan.steps, binPath, jobId: 'batch-mixed', onProgress: () => {} });
+    const goodDir = exPlan.steps[1].outputDir;
+    const goodLanded = fs.existsSync(path.join(goodDir, 'batch-good.txt'))
+      && fs.readFileSync(path.join(goodDir, 'batch-good.txt'), 'utf8') === 'batch-good-content';
+    checks.batchContinues = {
+      ok: !res.ok && Array.isArray(res.failures) && res.failures.length === 1
+        && res.dirs.includes(goodDir) && res.files >= 1 && goodLanded,
+      okFlag: res.ok,
+      failures: (res.failures || []).length,
+      message: res.message || '',
+      dirs: res.dirs || [],
+      files: res.files || 0,
+      goodLanded
+    };
+    log(`批量解压不中止：${checks.batchContinues.ok ? '✅' : '❌'} 失败 ${checks.batchContinues.failures} 个、成功产物保留=${checks.batchContinues.goodLanded}（${(res.message || '').slice(0, 80)}）`);
+  }
+
+  // —— 7e) 中文条目名跨管道块边界不许乱码（乱码路径会绕过 zip-slip 闸门判断） ——
+  {
+    // 造一个条目名全是中文的大 tar：stdout 远超 64KB，多字节序列必然被管道块切断。
+    // 旧实现逐块 d.toString()，被切断的汉字会变成 U+FFFD。
+    const mkCjkTar = (target, count) => {
+      const parts = [];
+      const pushEntry = (name, content) => {
+        const block = Buffer.alloc(512);
+        const w = (off, len, s) => { block.write(s, off, len, 'utf8'); };
+        w(0, 100, name);
+        w(100, 8, '0000644\0'); w(108, 8, '0000000\0'); w(116, 8, '0000000\0');
+        w(124, 12, `${content.length.toString(8).padStart(11, '0')}\0`);
+        w(136, 12, '00000000000\0');
+        block.write('        ', 148, 8, 'ascii');
+        let sum = 0;
+        for (const b of block) sum += b;
+        w(148, 8, `${sum.toString(8).padStart(6, '0')}\0 `);
+        parts.push(block, content, Buffer.alloc((512 - (content.length % 512)) % 512));
+      };
+      for (let i = 0; i < count; i += 1) {
+        pushEntry(`第${String(i).padStart(5, '0')}号测试文件名称.txt`, Buffer.from(`内容-${i}`, 'utf8'));
+      }
+      parts.push(Buffer.alloc(1024));
+      fs.writeFileSync(target, Buffer.concat(parts));
+    };
+    const cjkTar = path.join(WORK, 'cjk-names.tar');
+    const COUNT = 3000;
+    mkCjkTar(cjkTar, COUNT);
+    const listed = await engine.listArchive({ archivePath: cjkTar, password: '', binPath });
+    const names = (listed.entries || []).map((e) => e.path || e.name || '');
+    const blob = names.join('\n');
+    const expected = `第${String(COUNT - 1).padStart(5, '0')}号测试文件名称.txt`;
+    checks.cjkListing = {
+      ok: listed.ok && names.length === COUNT && !blob.includes('\uFFFD') && names.includes(expected),
+      listOk: listed.ok,
+      entries: names.length,
+      expectedCount: COUNT,
+      hasReplacementChar: blob.includes('\uFFFD'),
+      lastNameExact: names.includes(expected),
+      sample: names.slice(0, 2)
+    };
+    log(`中文条目名不乱码：${checks.cjkListing.ok ? '✅' : '❌'} 列出 ${names.length}/${COUNT} 条，含 U+FFFD=${checks.cjkListing.hasReplacementChar}，末条精确命中=${checks.cjkListing.lastNameExact}`);
+  }
+
   // —— 8) 无效文件与取消 ——
   {
     const badFile = path.join(WORK, 'not-an-archive.zip');
@@ -583,6 +699,9 @@ async function runArchiveTest(options = {}) {
     && checks.largeFile.ok
     && checks.nodeCodecs.ok
     && checks.failedCleanupKeepsUserFiles.ok
+    && checks.zstOverwritePolicy.ok
+    && checks.batchContinues.ok
+    && checks.cjkListing.ok
     && checks.invalidFile.ok
     && checks.cancel.ok
     && checks.passwordHeaderHidden.ok

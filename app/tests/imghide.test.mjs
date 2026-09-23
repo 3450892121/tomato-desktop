@@ -429,6 +429,26 @@ test('重名条目自动加序号', () => {
   assert.equal(uniqueEntryName(used, '无扩展名'), '无扩展名(2)');
 });
 
+test('重名条目：Windows 大小写不敏感，Photo.jpg 与 photo.jpg 不互相覆盖', () => {
+  // 官方客户端打的包里完全可能同时有这两种写法；解包落到 Windows 磁盘上是同一个文件，
+  // 不拦就会后写覆盖先写，而界面照样列两条（用户以为都解出来了）。
+  const used = new Set();
+  const a = uniqueEntryName(used, 'Photo.jpg');
+  const b = uniqueEntryName(used, 'photo.jpg');
+  const c = uniqueEntryName(used, 'PHOTO.JPG');
+  assert.equal(a, 'Photo.jpg');
+  if (process.platform === 'win32' || process.platform === 'darwin') {
+    assert.equal(b, 'photo(2).jpg');
+    assert.equal(c, 'PHOTO(3).JPG');
+    const folded = new Set([a, b, c].map((n) => n.toLowerCase()));
+    assert.equal(folded.size, 3, '三个条目必须落到三个不同文件上，否则就是静默覆盖');
+  } else {
+    // 大小写敏感的文件系统上三者本就是不同文件，不该改名
+    assert.equal(b, 'photo.jpg');
+    assert.equal(c, 'PHOTO.JPG');
+  }
+});
+
 test('输出命名：重名加序号，目录同理', async () => {
   await fsp.rm(WORK, { recursive: true, force: true });
   await fsp.mkdir(WORK, { recursive: true });
