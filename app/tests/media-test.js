@@ -1,5 +1,6 @@
 // 媒体工具自检（仅 `electron . --media-test` 时运行）
 // 覆盖：图片压缩（核心逻辑 + 目标大小逼近）、图片变清晰（锐度指标提升）、图片格式转换（BMP/ICO/TIFF/GIF/AVIF 产物校验）、
+//       HEIC/HEIF 手机格式输入（主进程 libheif 引擎：尺寸/旋转方向/坏文件报错/HEIC→PNG 产物可解码）、
 //       视频格式转换（MP4→WebM/MKV/AVI 真实转码 + 解码校验）、动图与视频互转（MP4→GIF/WebP/APNG、GIF→MP4）。
 // 说明：通过 window.desktop.* 走真实 IPC 链路（与界面点按钮同一条路），产物用 ffmpeg 完整解码一遍才算通过。
 // 结果写入 %TEMP%/tomato-media-test.json，同时打印 MEDIA_TEST {...}。
@@ -203,6 +204,66 @@ async function runMediaTest(win) {
     result.checks.convert = { ok: false, error: err.message };
   }
 
+  // —— 3b) 图片：HEIC/HEIF 输入（手机拍照格式 → 主进程 libheif 引擎 → 转换管线） ——
+  // 夹具见 tests/assets/说明.txt：nokiatech 公开样例 + 注入 irot(90°) 的旋转变体。
+  // 断言：尺寸正确、旋转方向正确（逆时针 90°，irot=1）、坏文件明确报错、转 PNG 后 ffmpeg 可完整解码。
+  try {
+    const sampleB64 = (await fs.readFile(path.join(__dirname, 'assets', 'heic-sample.heic'))).toString('base64');
+    const rotatedB64 = (await fs.readFile(path.join(__dirname, 'assets', 'heic-sample-rotated.heic'))).toString('base64');
+    const out = JSON.parse(await evalJs(`(async () => {
+      const fromB64 = (s) => Uint8Array.from(atob(s), c => c.charCodeAt(0));
+      const { heicStatus, decodeHeicFromBytes } = await import('../shared/heic.js');
+      const out = {};
+      out.status = await heicStatus();
+      const normal = await decodeHeicFromBytes(fromB64(${JSON.stringify(sampleB64)}));
+      out.normal = { width: normal.width, height: normal.height, len: normal.pixels.length };
+      const rotated = await decodeHeicFromBytes(fromB64(${JSON.stringify(rotatedB64)}));
+      out.rotated = { width: rotated.width, height: rotated.height, len: rotated.pixels.length };
+      // 旋转断言：rotated(x,y) 应等于 normal(width_r - 1 - y, x)（irot=1 = 逆时针 90°，逐像素精确）
+      const px = (img, x, y) => { const i = (y * img.width + x) * 4; return [img.pixels[i], img.pixels[i+1], img.pixels[i+2]]; };
+      let maxDiff = 0;
+      for (let k = 0; k < 300; k++) {
+        const x = (k * 37) % rotated.width, y = (k * 53) % rotated.height;
+        const a = px(rotated, x, y), b = px(normal, normal.width - 1 - y, x);
+        maxDiff = Math.max(maxDiff, Math.abs(a[0]-b[0]), Math.abs(a[1]-b[1]), Math.abs(a[2]-b[2]));
+      }
+      out.rotationMaxDiff = maxDiff;
+      // 像素内容非平凡（不是全黑）
+      let sum = 0;
+      for (let i = 0; i < normal.pixels.length; i += 4096 * 4) sum += normal.pixels[i] + normal.pixels[i+1] + normal.pixels[i+2];
+      out.contentSum = sum;
+      // 完整转换链路：HEIC → PNG（与工具同款内核编码）→ 落盘
+      const { encodeImageToBytes } = await import('../shared/imageio.js');
+      const png = await encodeImageToBytes(rotated.pixels, rotated.width, rotated.height, { format: 'png' });
+      window.desktop.writeFile(${JSON.stringify(path.join(TEST_DIR, 'mt-heic-rotated.png'))}, png);
+      // 坏字节 → 明确报错（引擎不崩溃、worker 不挂）
+      try { await decodeHeicFromBytes(new Uint8Array(64).fill(7)); out.garbage = 'no-error'; }
+      catch (e) { out.garbage = String(e && e.message || e).slice(0, 60); }
+      // 坏文件之后引擎仍可用（worker 自愈）
+      const again = await decodeHeicFromBytes(fromB64(${JSON.stringify(sampleB64)}));
+      out.recover = again.width === normal.width && again.height === normal.height;
+      return JSON.stringify(out);
+    })()`));
+    const heicPngCheck = ffmpeg && fsSync.existsSync(path.join(TEST_DIR, 'mt-heic-rotated.png'))
+      ? decodeCheck(ffmpeg, path.join(TEST_DIR, 'mt-heic-rotated.png'))
+      : null;
+    result.checks.heic = {
+      ...out,
+      pngDecodable: !!(heicPngCheck && heicPngCheck.ok),
+      ok: out.status.found === true
+        && out.normal.width === 1440 && out.normal.height === 960 && out.normal.len === 1440 * 960 * 4
+        && out.rotated.width === 960 && out.rotated.height === 1440 && out.rotated.len === 960 * 1440 * 4
+        && out.rotationMaxDiff <= 2
+        && out.contentSum > 0
+        && out.garbage !== 'no-error'
+        && out.recover === true
+        && (!ffmpeg || !!(heicPngCheck && heicPngCheck.ok))
+    };
+    if (!ffmpeg) result.notes.push('未检测到 ffmpeg：HEIC→PNG 产物未做解码校验');
+  } catch (err) {
+    result.checks.heic = { ok: false, error: err.message };
+  }
+
   // —— 4) 视频与动图：ffmpeg 造夹具后走真实 IPC 转码 ——
   result.checks.video = { conversions: [], ok: false };
   result.checks.sticker = { conversions: [], ok: false };
@@ -363,7 +424,7 @@ async function runMediaTest(win) {
   }
 
   // —— 汇总 ——
-  const names = ['compress', 'enhance', 'convert', 'video', 'sticker', 'ai'];
+  const names = ['compress', 'enhance', 'convert', 'heic', 'video', 'sticker', 'ai'];
   result.summary = Object.fromEntries(names.map((n) => [n, !!(result.checks[n] && result.checks[n].ok)]));
   result.ok = names.every((n) => result.summary[n]);
   writeResult({ ok: result.ok, at: new Date().toISOString(), result });

@@ -122,6 +122,9 @@ fs.copyFileSync(path.join(appRoot, 'tests', 'navorder.test.mjs'), path.join(appT
 //   （v2.8.0 首次打包就踩到过，详见 CHANGELOG）。
 fs.copyFileSync(path.join(appRoot, 'tests', 'uninstall-test.js'), path.join(appTarget, 'tests', 'uninstall-test.js'));
 fs.copyFileSync(path.join(appRoot, 'tests', 'uninstall.test.mjs'), path.join(appTarget, 'tests', 'uninstall.test.mjs'));
+// v2.10.0 起：HEIC/HEIF 解码引擎（「图片格式转换」的手机格式输入）——worker 线程脚本 + media-test 的 HEIC 夹具
+fs.copyFileSync(path.join(appRoot, 'heic-worker.js'), path.join(appTarget, 'heic-worker.js'));
+copyTree(path.join(appRoot, 'tests', 'assets'), path.join(appTarget, 'tests', 'assets'));
 
 // —— 4b) 复制 PDF 工具运行时依赖（纯 JS，界面进程按相对路径直接引用） ——
 // 说明：本项目没有打包器，工具代码里写的是 ../../../../node_modules/pdfjs-dist/... 这样的
@@ -229,6 +232,24 @@ for (const [src, dst] of ocrRuntimeDirs) {
   } else {
     log('警告：未发现 node_modules/onnxruntime-node —— 产物中「文字识别」将不可用');
   }
+}
+// —— 4d) HEIC/HEIF 解码引擎依赖（「图片格式转换」的手机格式输入；v2.10.0 起） ——
+// 说明：heic-decode（ISC 壳）+ libheif-js（LGPL-3.0，官方 libheif 1.23 的 WASM 构建）由
+//      主进程 worker 线程 require（heic-worker.js），必须按 npm 目录结构带过去。
+//      libheif-js 的 asm.js 变体（libheif/libheif.js，约 3MB）运行时用不到，不复制；
+//      只带 wasm-bundle 所需的文件 + 两级 LICENSE（LGPL 合规：以独立未修改包分发并附许可文本）。
+log('步骤4d：复制 HEIC 解码引擎依赖（heic-decode + libheif-js/wasm）');
+{
+  const need = (rel) => {
+    const from = path.join(nmSrc, rel);
+    if (!fs.existsSync(from)) throw new Error(`缺少 HEIC 依赖文件：node_modules/${rel}（请先在 app 目录 npm install）`);
+    copyTree(from, path.join(nmDst, rel));
+  };
+  need(path.join('heic-decode')); // 整包仅 3 个 JS 文件 + README/package.json
+  need(path.join('libheif-js', 'package.json'));
+  need(path.join('libheif-js', 'LICENSE'));
+  need(path.join('libheif-js', 'wasm-bundle.js'));
+  need(path.join('libheif-js', 'libheif-wasm')); // libheif-bundle.js + libheif.wasm + LICENSE（约 3.4MB）
 }
 
 fs.writeFileSync(

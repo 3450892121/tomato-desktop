@@ -11,6 +11,7 @@ const crypto = require('crypto');
 const { Readable } = require('stream');
 const { spawn, spawnSync } = require('child_process');
 const { pathToFileURL } = require('url');
+const { Worker } = require('worker_threads');
 
 // 本地媒体协议（工具：视频播放器；见 spec/modules/player.md）
 // 为什么不用 file://：界面进程处于沙箱 + CSP（default-src 'self'），file:// 会被拦；
@@ -1086,6 +1087,9 @@ ipcMain.handle('libreoffice:convert', async (_event, options) => {
 // —— 图片/视频/动图 专用文件对话框（图片格式转换、视频格式转换、动图与视频互转 工具用） ——
 
 const IMAGE_ANY_EXTS = ['png', 'jpg', 'jpeg', 'webp', 'gif', 'bmp', 'ico', 'avif', 'svg'];
+// 图片格式转换额外收手机拍照格式（HEIC/HEIF/HIF，解码走主进程 libheif 引擎）；
+// 其它图片工具（加水印/拼接/切图等）还不能解 HEIC，继续用 IMAGE_ANY_EXTS
+const IMAGE_ANY_EXTS_WITH_HEIC = [...IMAGE_ANY_EXTS, 'heic', 'heif', 'hif'];
 const VIDEO_EXTS = ['mp4', 'mov', 'mkv', 'avi', 'webm', 'flv', 'wmv', 'm4v', 'ts', '3gp', 'mpg', 'mpeg', 'vob', 'rmvb', 'ogv'];
 const ANIMATED_EXTS = ['gif', 'webp', 'apng'];
 // 音频格式转换工具：音频扩展名 + 视频（视频会自动提取声音）
@@ -1117,7 +1121,7 @@ const OPEN_FILE_DIALOGS = {
   'dialog:open-pdfs': { title: '选择 PDF 文件', name: 'PDF 文件', exts: ['pdf'] },
   'dialog:open-documents': { title: '选择 Word / Excel 文件', name: 'Word / Excel', exts: ['doc', 'docx', 'xls', 'xlsx'] },
   'dialog:open-image-any': {
-    title: '选择图片', name: '图片（含 ICO/AVIF/SVG）', exts: IMAGE_ANY_EXTS,
+    title: '选择图片', name: '图片（含 HEIC/ICO/AVIF/SVG）', exts: IMAGE_ANY_EXTS_WITH_HEIC,
     // 测试模式只返回固定夹具「测试原图C」：避免把历次测试产生的副本/产物一起选进来（曾导致一次载入上千张）
     fixture: { exact: '测试原图C' }
   },
@@ -1779,6 +1783,119 @@ ipcMain.handle('ffmpeg:transform', async (_event, options) => {
     return { ok: true, bytes: await fs.readFile(outPath) };
   } finally {
     await fs.rm(workDir, { recursive: true, force: true }).catch(() => {});
+  }
+});
+
+// —— HEIC/HEIF 解码（工具：图片格式转换 的「手机拍照格式」输入；见 spec/modules/image-convert.md） ——
+// 引擎 = heic-decode + libheif-js（官方 libheif 1.23 的 WASM 构建），跑在 worker 线程（heic-worker.js）：
+// WASM 解码是同步计算，放主进程事件循环会卡住整窗 IPC（Chromium 内核与 ffmpeg 6.1 都解不了 HEIC，
+// 实测依据见 spec 的「技术选型与依据」）。不依赖系统 HEIF 编解码器扩展，纯离线开箱即用。
+const HEIC_DECODE_TIMEOUT_MS = 60 * 1000;
+
+let heicWorker = null;
+let heicWorkerStarting = null;
+let heicSeq = 0;
+const heicPending = new Map(); // id → { resolve, reject, timer }
+
+/** worker 崩溃/超时：结束等待中的请求并置空引用，下次请求时自动重建 */
+function heicWorkerCrash(reason) {
+  const worker = heicWorker;
+  heicWorker = null;
+  if (worker) {
+    try { worker.terminate(); } catch { /* 已退出 */ }
+  }
+  for (const [, p] of heicPending) {
+    clearTimeout(p.timer);
+    p.reject(new Error(reason));
+  }
+  heicPending.clear();
+}
+
+async function getHeicWorker() {
+  if (heicWorker) return heicWorker;
+  if (heicWorkerStarting) return heicWorkerStarting;
+  heicWorkerStarting = (async () => {
+    const worker = new Worker(path.join(__dirname, 'heic-worker.js'));
+    worker.on('message', (m) => {
+      const p = heicPending.get(m.id);
+      if (!p) return;
+      heicPending.delete(m.id);
+      clearTimeout(p.timer);
+      if (m.ok) p.resolve({ width: m.width, height: m.height, pixels: m.pixels });
+      else p.reject(new Error(m.message || '解码失败'));
+    });
+    worker.on('error', (err) => heicWorkerCrash(`HEIC 解码线程异常：${err.message}`));
+    worker.on('exit', (code) => {
+      if (heicWorker === worker) heicWorkerCrash(`HEIC 解码线程已退出（码 ${code}）`);
+    });
+    heicWorker = worker;
+    return worker;
+  })();
+  try {
+    return await heicWorkerStarting;
+  } finally {
+    heicWorkerStarting = null;
+  }
+}
+
+/** 解码引擎状态：{found, version}（npm 依赖随包分发，正常恒为 found） */
+let heicStatusCache = null;
+ipcMain.handle('heic:status', async () => {
+  if (heicStatusCache) return heicStatusCache;
+  let found = false;
+  let version = null;
+  try {
+    require.resolve('heic-decode');
+    found = true;
+    try {
+      version = require('heic-decode/package.json').version;
+    } catch { /* exports 字段可能拦住子路径，版本号拿不到不影响功能 */ }
+  } catch {
+    found = false;
+  }
+  heicStatusCache = { found, version };
+  return heicStatusCache;
+});
+
+/**
+ * HEIC/HEIF/HIF 字节 → RGBA 像素
+ * 返回：{ok, width, height, pixels} 或 {ok:false, message}
+ * 像素总量上限与 shared/imageio.js 保持一致（4000 万像素），超出明确报错而不是吃光内存。
+ */
+ipcMain.handle('heic:decode', async (_event, bytes) => {
+  if (!bytes || !bytes.byteLength) return { ok: false, message: '缺少图片数据' };
+  try {
+    const worker = await getHeicWorker();
+    const id = ++heicSeq;
+    const result = await new Promise((resolve, reject) => {
+      const timer = setTimeout(() => {
+        heicPending.delete(id);
+        heicWorkerCrash('HEIC 解码超时（60 秒），已重建解码线程');
+        reject(new Error('HEIC 解码超时（60 秒）'));
+      }, HEIC_DECODE_TIMEOUT_MS);
+      heicPending.set(id, { resolve, reject, timer });
+      worker.postMessage({ id, bytes });
+    });
+    if (result.width * result.height > 40_000_000) {
+      return {
+        ok: false,
+        message: `图片过大（${result.width}×${result.height}，超过 4000 万像素上限），已停止处理以免内存不足。`
+      };
+    }
+    return { ok: true, width: result.width, height: result.height, pixels: result.pixels };
+  } catch (err) {
+    const msg = String((err && err.message) || err);
+    return {
+      ok: false,
+      message: /not a HEIC/i.test(msg) ? '不是有效的 HEIC/HEIF 文件（或文件已损坏）' : `HEIC 解码失败：${msg}`
+    };
+  }
+});
+
+app.on('will-quit', () => {
+  if (heicWorker) {
+    try { heicWorker.terminate(); } catch { /* 已退出 */ }
+    heicWorker = null;
   }
 });
 

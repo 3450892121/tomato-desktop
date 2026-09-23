@@ -1,10 +1,12 @@
 // 工具：图片格式转换 —— 界面与交互
 // 分层：本文件只做界面与流程编排；各格式的编码实现与转换规则在 core/（encoders.js / convert.js），
-//       图片解码复用 shared/imageio.js，TIFF/GIF/AVIF 经 shared/ffmpeg.js 调主进程 ffmpeg。
+//       图片解码复用 shared/imageio.js，TIFF/GIF/AVIF 经 shared/ffmpeg.js 调主进程 ffmpeg，
+//       HEIC/HEIF/HIF（手机拍照格式）经 shared/heic.js 调主进程 libheif 引擎解码。
 import { decodeImageFromBytes, encodeImageToBytes } from '../../shared/imageio.js';
 import { ffmpegStatus, transformImageBytes } from '../../shared/ffmpeg.js';
+import { decodeHeicFromBytes } from '../../shared/heic.js';
 import {
-  TARGETS, INPUT_EXTS, UNSUPPORTED_EXTS, DECODE_FAIL_MESSAGE,
+  TARGETS, INPUT_EXTS, HEIF_EXTS, DECODE_FAIL_MESSAGE,
   targetInfo, needsFfmpeg, hasQuality, defaultQuality,
   fitLongEdge, flattenOnColor, resizePixels, encodeWebp, encodeIcon, encodeBmp, ffmpegArgs, outputBaseName
 } from './core/convert.js';
@@ -42,7 +44,7 @@ const MARKUP = `
     <main class="card conv-files" id="convFiles">
       <div class="conv-drop" id="convDrop">
         <button class="btn btn-primary btn-lg" id="convAddBtn" data-add="1">添加图片</button>
-        <div class="conv-hint">也可以把图片或整个文件夹拖进窗口；支持多选（含 ICO / AVIF / SVG）</div>
+        <div class="conv-hint">也可以把图片或整个文件夹拖进窗口；支持多选（含 HEIC / ICO / AVIF / SVG，手机拍照格式可直接转）</div>
       </div>
       <div class="conv-list-wrap" id="convListWrap" hidden>
         <div class="conv-list-head">
@@ -189,7 +191,6 @@ async function addOne(path) {
   const info = await state.ctx.pathInfo(path);
   const ext = (info.ext || '').toLowerCase();
   const bare = ext.replace('.', '');
-  if (UNSUPPORTED_EXTS.includes(bare)) throw new Error(DECODE_FAIL_MESSAGE);
   if (!INPUT_EXTS.includes(bare)) throw new Error('不是支持的图片格式');
   if (state.files.some((f) => f.path === path)) return false;
 
@@ -301,11 +302,17 @@ async function run() {
       if (state && state.ctx.isActive()) state.ctx.showProgress(step, (index / total) * 100);
       try {
         const bytes = await ctx.readFile(f.path);
+        const bare = (f.ext || '').replace('.', '').toLowerCase();
         let img;
-        try {
-          img = await decodeImageFromBytes(bytes);
-        } catch {
-          throw new Error(DECODE_FAIL_MESSAGE);
+        if (HEIF_EXTS.includes(bare)) {
+          // 手机拍照格式：走主进程 libheif 引擎（引擎报错自带可读原因，直接透传）
+          img = await decodeHeicFromBytes(bytes);
+        } else {
+          try {
+            img = await decodeImageFromBytes(bytes);
+          } catch {
+            throw new Error(DECODE_FAIL_MESSAGE);
+          }
         }
 
         let pixels = img.pixels;

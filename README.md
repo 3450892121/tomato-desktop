@@ -45,7 +45,7 @@
 | PDF → Word / 高保真 Office→PDF（LibreOffice 加装包） | ✅ 已实测，**随主包附带、开箱即用** |
 | **图片压缩**：画质/尺寸/目标大小、批量 | ✅ 可用（实测 18 KB → 7 KB / -61%） |
 | **图片变清晰**：6 档预设 + 自定义、原图对比预览 | ✅ 可用（锐度指标 52.6 → 81.2，+54%） |
-| **图片格式转换**：PNG/JPG/WebP/BMP/ICO/TIFF/GIF/AVIF | ✅ 可用（BMP/ICO 自研编码器，产物经解码校验） |
+| **图片格式转换**：PNG/JPG/WebP/BMP/ICO/TIFF/GIF/AVIF，输入另支持 HEIC/HEIF/HIF 手机拍照格式 | ✅ 可用（BMP/ICO 自研编码器，产物经解码校验；HEIC 解码走内置 libheif 引擎，纯离线） |
 | **视频格式转换**：MP4/WebM/MKV/MOV/AVI | ✅ 可用（真实转码 + 逐个解码校验，进度可取消） |
 | **动图与视频互转**：GIF/WebP 动图/APNG ↔ 视频 | ✅ 可用（含聊天表情预设与目标大小自动降档） |
 | ffmpeg / Real-ESRGAN / FunASR / OCR / 7-Zip / HiBit 加装包 | ✅ **全部随主包附带**（见 `addons/` 各目录的许可与来源） |

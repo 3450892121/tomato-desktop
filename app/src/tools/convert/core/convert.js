@@ -16,12 +16,12 @@ export const TARGETS = [
   { value: 'avif', ext: '.avif', label: 'AVIF（体积最小，需 ffmpeg）' }
 ];
 
-/** 拖入 / 选择时认可的输入扩展名（内核解不了 HEIC/HEIF，见下方错误提示） */
-export const INPUT_EXTS = ['png', 'jpg', 'jpeg', 'webp', 'gif', 'bmp', 'ico', 'avif', 'svg'];
-/** 内核无法解码、需要明确提示的扩展名 */
-export const UNSUPPORTED_EXTS = ['heic', 'heif'];
-/** 解码失败的统一提示（HEIC/HEIF 是最常见的原因） */
-export const DECODE_FAIL_MESSAGE = '解码失败：暂不支持 HEIC/HEIF 等格式（内核无法解码），或文件已损坏';
+/** 拖入 / 选择时认可的输入扩展名（HEIC/HEIF/HIF 经主进程 libheif 引擎解码，见 shared/heic.js） */
+export const INPUT_EXTS = ['png', 'jpg', 'jpeg', 'webp', 'gif', 'bmp', 'ico', 'avif', 'svg', 'heic', 'heif', 'hif'];
+/** 手机拍照格式：解码走主进程 HEIC 引擎（Chromium 内核解不了，见 spec/modules/image-convert.md） */
+export const HEIF_EXTS = ['heic', 'heif', 'hif'];
+/** 解码失败的统一提示 */
+export const DECODE_FAIL_MESSAGE = '解码失败：文件已损坏或格式不支持';
 
 /** 按 value 取格式信息；未知值回落到 PNG */
 export function targetInfo(value) {

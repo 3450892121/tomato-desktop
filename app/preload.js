@@ -109,6 +109,11 @@ contextBridge.exposeInMainWorld('desktop', {
     return () => ipcRenderer.removeListener('ffmpeg:progress', handler);
   },
 
+  // HEIC/HEIF 解码引擎（「图片格式转换」的手机拍照格式输入；见 spec/modules/image-convert.md）
+  // 引擎在主进程 worker 线程里跑（heic-decode + libheif WASM），Chromium 内核解不了 HEIC
+  heicStatus: () => ipcRenderer.invoke('heic:status'),
+  heicDecode: (bytes) => ipcRenderer.invoke('heic:decode', bytes),
+
   // Real-ESRGAN 加装包（「图片变清晰」的 AI 放大；见 spec/modules/image-enhance.md）
   aiStatus: () => ipcRenderer.invoke('ai:status'),
   aiUpscale: (options) => ipcRenderer.invoke('ai:upscale', options),

@@ -14,7 +14,7 @@
   - `main.js` / `preload.js`：主进程与安全桥（窗口、文件对话框等系统能力）。
   - `src/shell/`：工具箱框架（工具页容器、左侧导航、`registry.js` 工具注册表、`theme.css` 设计令牌、`components.css` 通用组件库）。**工具页保活（只保「动过」的页）**：切换工具不销毁页面，切回时列表/输入/预览/滚动位置与顶栏提示全部保留；没动过的页（只是点开看看）切走即静默释放、不占额度，免得「随便看看」挤掉别处用过的东西；动过的页上限 5 页，超出按 LRU 回收最久没用过的那页（当前页不回收，回收时提示「已自动释放」）；工具里的全局交互要用 `ctx.isActive()` 让位，被释放/回收时会走 `unmount()` 清理。
   - `src/tools/<工具名>/`：各工具自包含目录（声明 + 界面 + 逻辑 + 样式）。现有：`obfuscate` 图片混淆、`pdf-convert` PDF 转格式、`compress` 图片压缩、`enhance` 图片变清晰、`img-convert` 图片格式转换、`batch-rename` 批量重命名、`watermark` 加水印、`stitch` 长图拼接、`grid-slice` 九宫格切图、`player` 视频播放器、`video-convert` 视频格式转换、`video-compress` 视频压缩、`sticker` 动图与视频互转、`audio-convert` 音频格式转换、`audio-edit` 音频剪辑、`transcribe` 语音转文字、`pdf-edit` PDF 编辑整理、`ocr` 文字识别、`archive` 压缩与解压、`imghide` 文件藏图、`uninstall` 软件卸载；`_template` 为新工具模板。
-  - `src/shared/`：跨工具复用能力（图片读写、ffmpeg 封装与编码参数、文件封装、设置、设置键值校验、HTML 转义）。
+  - `src/shared/`：跨工具复用能力（图片读写、ffmpeg 封装与编码参数、HEIC/HEIF 解码封装、文件封装、设置、设置键值校验、HTML 转义）。
   - `vendor/`：不走 npm 的第三方库（进 git）：`xlsx/`（SheetJS 0.20.3，「PDF 转格式」内置降级解析 Excel 用；npm 版停在 0.18.5 有已知漏洞，官方分发货道是 cdn.sheetjs.com，来源与升级方法见 `vendor/xlsx/说明.txt`）。
   - `addons/`：随包加装包（不进 git）：`libreoffice/`（PDF→Word 与高保真 Office→PDF，可选）、`ffmpeg/`（视频/动图工具必需，单文件 83MB，GPL v3）、`realesrgan/`（「图片变清晰」的 AI 放大，约 50MB，BSD 3-Clause，需 Vulkan 显卡）、`asr/`（「语音转文字」的 FunASR·SenseVoice 识别引擎，约 246MB，MIT，纯 CPU）、`ocr/`（「文字识别」的 PP-OCRv5 mobile ONNX 模型，约 20MB，Apache-2.0 模型 + MIT 运行时，纯 CPU）、`hibit/`（「软件卸载」随包内置的 HiBit Uninstaller 4.0.10 官方便携版，单文件 15.4MB，官网标注个人与商业使用均免费，**启动需管理员权限**——exe 清单即 `requireAdministrator`）、`7zip/`（「压缩与解压」引擎，约 2.4MB，LGPL 2.1+）；许可与来源见各自目录的 LICENSE/说明.txt。
 - `docs/`：开发指南（如《新增工具指南》）。
@@ -51,7 +51,7 @@
 - 界面自动测试：`cd app` → `.\node_modules\electron\dist\electron.exe . --ui-test`（模拟真人点按钮走完整流程：选图→混淆→保存→还原→批量→清空，逐步截图并做像素级校验，输出 `UI_TEST {..., "pass":true}`；截图落在 `%TEMP%\tomato-uitest`）。
 - PDF 工具自检：`cd app` → `.\node_modules\electron\dist\electron.exe . --pdf-test`（pdfjs 渲染 / 图片↔PDF 往返 / 合并拆分提取 / 内置降级 docx·xlsx→PDF / 界面接线；结果写 `%TEMP%\tomato-pdf-test.json`，`ok:true` 为通过）。
 - PDF 工具界面自动测试：`cd app` → `.\node_modules\electron\dist\electron.exe . --pdf-ui-test`（五个方向真人操作 + 截图；结果写 `%TEMP%\tomato-pdf-ui-test.json`，`pass:true` 为通过）。
-- 媒体工具自检：`cd app` → `.\node_modules\electron\dist\electron.exe . --media-test`（图片压缩/变清晰/格式转换的核心逻辑 + 视频↔动图链路：ffmpeg 造夹具、真实转码、逐个解码校验；结果写 `%TEMP%\tomato-media-test.json`，`ok:true` 为通过）。
+- 媒体工具自检：`cd app` → `.\node_modules\electron\dist\electron.exe . --media-test`（图片压缩/变清晰/格式转换的核心逻辑 + HEIC/HEIF 手机格式输入（主进程 libheif 引擎：尺寸/旋转/坏文件/HEIC→PNG 产物，夹具在 `tests/assets/`）+ 视频↔动图链路：ffmpeg 造夹具、真实转码、逐个解码校验；结果写 `%TEMP%\tomato-media-test.json`，`ok:true` 为通过）。
 - 媒体工具界面自动测试：`cd app` → `.\node_modules\electron\dist\electron.exe . --media-ui-test`（5 个新工具逐个「切工具→添加→运行」，截图并校验新增产物可被 ffmpeg 完整解码；结果写 `%TEMP%\tomato-media-ui-test.json`，`pass:true` 为通过）。
 - 音频工具自检：`cd app` → `.\node_modules\electron\dist\electron.exe . --audio-test`（21 种输出格式真实转码 + 逐个回读校验 + 视频提取音频 + 标签保留 + 无效文件报错 + 计划逻辑单测；结果写 `%TEMP%\tomato-audio-test.json`，`ok:true` 为通过）。
 - 音频工具界面自动测试：`cd app` → `.\node_modules\electron\dist\electron.exe . --audio-ui-test`（切工具→选输出格式→两轮转码 M4A/OGG→清空，截图并校验产物可完整解码；结果写 `%TEMP%\tomato-audio-ui-test.json`，`pass:true` 为通过）。
