@@ -246,21 +246,39 @@ async function runQueueUiTest(win) {
     const wait = (ms) => new Promise((r) => setTimeout(r, ms));
     const nav = (id) => [...document.querySelectorAll('#toolNav .tool-item')].find((b) => b.dataset.toolId === id);
     const badgeBefore = (document.getElementById('taskBadge') || {}).textContent || '';
+    // 进度遮罩全局只有一个，切走还在跑的工具时必须关掉（否则它会僵在新工具页面上，
+    // 而该页随后被 LRU 回收 → 工具里的 hideProgress 被 ctx 的 active() 拦住，就永久卡住了）
+    const barVisible = () => { const b = document.getElementById('progressBar'); return !!b && !b.hidden; };
+    const progressVisibleBefore = barVisible();
+    let progressAfterFirstSwitch = null;
     for (const id of ['compress', 'img-convert', 'video-convert', 'sticker', 'enhance']) {
       nav(id).click();
       await wait(700);
+      if (progressAfterFirstSwitch === null) progressAfterFirstSwitch = barVisible();
       document.querySelector('.tool-page.is-active').click(); // 在页里点一下 = 用户「动过」这页
       await wait(200);
     }
     const badge = document.getElementById('taskBadge');
     return JSON.stringify({
       badgeBefore,
+      progressVisibleBefore,
+      progressAfterFirstSwitch,
+      progressAfterAllSwitches: barVisible(),
       evicted: !document.querySelector('.tool-page[data-tool-id="video-compress"]'),
       activeTool: (document.querySelector('.tool-page.is-active') || { dataset: {} }).dataset.toolId || '',
       badgeDuring: badge ? badge.textContent : '',
       badgeHiddenDuring: badge ? badge.hidden : null
     });
   })()`));
+  if (result.checks.switchedAway.progressVisibleBefore !== true) {
+    fail('进度条断言未覆盖：切走前进度条没显示（夹具太快或该工具没开进度）');
+  }
+  if (result.checks.switchedAway.progressAfterFirstSwitch !== false) {
+    fail('切走仍在跑的工具后，全局进度条没有关闭（会僵在新工具页面上，回收后永久卡住）');
+  }
+  if (result.checks.switchedAway.progressAfterAllSwitches !== false) {
+    fail('连切 5 个工具后进度条仍显示着');
+  }
   if (result.checks.switchedAway.evicted !== true) {
     // 没被回收不算失败（说明保活页数没超），但要记下来；下面仍会验证任务跑完
     result.checks.evictionNote = '切走 5 个工具后 video-compress 页面未被回收（保活未超限时的正常情况）';

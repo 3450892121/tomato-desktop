@@ -662,24 +662,23 @@ ipcMain.handle('fs:list-files', async (_event, dirPath, exts) => {
     .sort();
 });
 
-/** 在目标目录里挑一个不重名的文件名（原名 → 原名(1) → 原名(2)…），绝不覆盖已有文件 */
-function uniqueTargetPath(dir, baseName, ext) {
-  const suffix = ext.startsWith('.') ? ext : `.${ext}`;
-  let target = path.join(dir, `${baseName}${suffix}`);
-  let i = 1;
-  while (fsSync.existsSync(target)) {
-    target = path.join(dir, `${baseName}(${i})${suffix}`);
-    i += 1;
-  }
-  return target;
-}
+// 输出文件名分配（原名 → 原名(1) → 原名(2)…，绝不覆盖已有文件）。
+// 抽成独立模块是因为「挑名字」必须与「占住名字」原子完成，否则任务队列 io 通道并发 2 时
+// 两个任务会拿到同一个名字、后写的静默覆盖先写的；这段逻辑不依赖 Electron，
+// 抽出来才能用 `node tests/uniquepath.test.mjs` 直接钉住（细节见该文件注释）。
+const { uniqueTargetPath } = require('./src/shared/unique-target-path.cjs');
 
 // 保存图片（默认存到原图同目录；可指定输出目录；重名自动加序号，绝不覆盖已有文件）
 ipcMain.handle('fs:save-image', async (_event, { sourcePath, targetDir, baseName, ext, bytes }) => {
   const dir = targetDir || (sourcePath ? path.dirname(sourcePath) : app.getPath('pictures'));
   const target = uniqueTargetPath(dir, baseName, ext);
-  await fs.mkdir(dir, { recursive: true });
-  await fs.writeFile(target, Buffer.from(bytes));
+  try {
+    await fs.writeFile(target, Buffer.from(bytes));
+  } catch (err) {
+    // 写失败就别把占位用的 0 字节文件留在用户目录里
+    await fs.rm(target, { force: true }).catch(() => {});
+    throw err;
+  }
   return target;
 });
 
@@ -2366,8 +2365,13 @@ ipcMain.handle('asr:save', async (_event, options) => {
     for (const f of files) {
       const ext = String(f.ext || '.txt');
       const target = uniqueTargetPath(dir, base, ext);
-      // UTF-8 带 BOM：Windows 记事本/字幕工具双击即正常显示中文
-      await fs.writeFile(target, `\uFEFF${String(f.text == null ? '' : f.text)}`, 'utf8');
+      try {
+        // UTF-8 带 BOM：Windows 记事本/字幕工具双击即正常显示中文
+        await fs.writeFile(target, `\uFEFF${String(f.text == null ? '' : f.text)}`, 'utf8');
+      } catch (err) {
+        await fs.rm(target, { force: true }).catch(() => {}); // 别把占位文件留给用户
+        throw err;
+      }
       paths.push(target);
     }
     return { ok: true, paths };

@@ -271,7 +271,7 @@ function pageFor(tool) {
     const el = document.createElement('div');
     el.className = 'tool-page';
     el.dataset.toolId = tool.id;
-    page = { el, status: `${tool.name} 已打开`, info: {}, mounted: false, scrollTop: 0, lastUsed: 0, touched: false };
+    page = { el, status: `${tool.name} 已打开`, info: {}, progress: null, mounted: false, scrollTop: 0, lastUsed: 0, touched: false };
     // 捕获阶段监听：工具里 stopPropagation 也拦不住这次「动过」判定
     const markTouched = () => {
       if (page.touched) return;
@@ -336,7 +336,10 @@ function evictPages() {
  * 每个工具一份 ctx：在通用能力之上加「当前页」感知。
  * - ctx.isActive()：工具是否正显示在右侧（隐藏时不要抢全局交互，如窗口快捷键）；
  * - setStatus / setInfo：始终记到本页（切回来能恢复），但只有当前页才改顶栏；
- * - showProgress / hideProgress：只有当前页才动全屏进度遮罩，避免隐藏的工具误开/误关。
+ * - showProgress / hideProgress：同样「始终记到本页、只有当前页才动遮罩」，避免隐藏的
+ *   工具误开/误关。**记录这一步是关键**：进度遮罩是全局唯一一个，如果切走时不记下
+ *   「这一页正开着进度」，切回来就恢复不了；反过来，切走时也必须把它关掉——否则
+ *   上一工具的进度条会僵在新工具页面上（该页被 LRU 回收后就再也没人来关了）。
  */
 function makeToolCtx(tool) {
   const active = () => !!(activeTool && activeTool.id === tool.id);
@@ -354,9 +357,13 @@ function makeToolCtx(tool) {
       if (active()) setInfo(info);
     },
     showProgress: (text, percent) => {
+      const page = pages.get(tool.id);
+      if (page) page.progress = { text, percent };
       if (active()) showProgress(text, percent);
     },
     hideProgress: () => {
+      const page = pages.get(tool.id);
+      if (page) page.progress = null;
       if (active()) hideProgress();
     }
   };
@@ -652,6 +659,10 @@ function switchTool(id) {
     const wasReleased = releasedTools.delete(tool.id);
     setStatus(wasReleased ? `${page.status}（用过的工具较多，上次的内容已自动释放）` : page.status);
     setInfo(page.info);
+    // 进度遮罩全局只有一个：按这一页记下的状态恢复，没记就确保关掉。
+    // 于是「切走时一定关掉、切回仍在跑的工具时又能接上」两头都成立。
+    if (page.progress) showProgress(page.progress.text, page.progress.percent);
+    else hideProgress();
     evictPages(); // 新页进来后再回收，保证「当前页永不淘汰」
   } catch (err) {
     page.mounted = false;
