@@ -101,6 +101,8 @@ contextBridge.exposeInMainWorld('desktop', {
   // 多输入转码（「音频剪辑」的拼接：多个 -i + concat 滤镜）
   ffmpegConvertMulti: (options) => ipcRenderer.invoke('ffmpeg:convert-multi', options),
   ffmpegTransform: (options) => ipcRenderer.invoke('ffmpeg:transform', options),
+  // 按路径转（源文件不进界面进程内存；GB 级视频取波形必须走这条）
+  ffmpegTransformFile: (options) => ipcRenderer.invoke('ffmpeg:transform-file', options),
   ffmpegCancel: (jobId) => ipcRenderer.invoke('ffmpeg:cancel', jobId),
   // 进度订阅（返回取消订阅函数，工具 unmount 时必须调用）
   ffmpegOnProgress: (callback) => {

@@ -46,6 +46,14 @@ export function transformImageBytes(bytes, ext, args) {
   return window.desktop.ffmpegTransform({ bytes, ext, args });
 }
 
+/**
+ * 本地文件「按路径」→ 字节：源文件由主进程直接交给 ffmpeg，不读进界面进程内存。
+ * 从大文件（视频/长音频）里只取一点小产物时必须用这个，别用 transformImageBytes。
+ */
+export function transformFileToBytes(inputPath, ext, args) {
+  return window.desktop.ffmpegTransformFile({ inputPath, ext, args });
+}
+
 /** 取消某个正在跑的任务（jobId 用 convertMedia 里传入的同一个） */
 export function cancelMediaJob(jobId) {
   return window.desktop.ffmpegCancel(jobId);

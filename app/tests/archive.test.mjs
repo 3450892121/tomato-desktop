@@ -3,6 +3,9 @@
 // 覆盖：格式矩阵自洽性、级别映射、分卷参数、参数拼装、输出解析、路径安全、计划生成、命名与文案。
 // 计划与规格：spec/modules/archive.md
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
 import {
   BIDIRECTIONAL, EXTRACT_ONLY, ALL_FORMATS, LEVELS, VOLUME_SIZES,
   formatById, formatByExt, supportsPassword, supportsVolume, isNodeFormat,
@@ -19,20 +22,25 @@ import {
   baseNameOf, dirNameOf, stripArchiveExt, suggestArchiveBase, suggestArchiveName,
   validateCreate, validateExtract, buildCreatePlan, buildExtractPlan, humanBytes, ratioText
 } from '../src/tools/archive/core/plan.mjs';
+import { cleanupFailedOutput } from '../src/tools/archive/core/engine.mjs';
 
 let pass = 0;
 let fail = 0;
 const results = [];
+const pending = [];
 
+// 同步与异步用例共用一个登记器：异步用例（失败清理要碰真实临时目录）先入队，汇总前统一 await。
 function test(name, fn) {
-  try {
-    fn();
-    pass += 1;
-    results.push(`  ✅ ${name}`);
-  } catch (err) {
-    fail += 1;
-    results.push(`  ❌ ${name}\n       ${err.message}`);
-  }
+  pending.push((async () => {
+    try {
+      await fn();
+      pass += 1;
+      results.push(`  ✅ ${name}`);
+    } catch (err) {
+      fail += 1;
+      results.push(`  ❌ ${name}\n       ${err.message}`);
+    }
+  })());
 }
 
 console.log('「文件压缩与解压」纯逻辑测试\n');
@@ -660,8 +668,65 @@ test('ratioText：压小为负、变大为正、无输入为空', () => {
   assert.equal(ratioText(0, 100), '');
 });
 
+// —— 八、失败清理（cleanupFailedOutput）：绝不能碰用户原有的东西 ——
+// 回归钉子：tar.zst / tar.br 的第二趟解压失败时曾传入空快照，导致「已存在的输出目录」被整个删光。
+
+/** 建一个真实临时目录，返回 { dir, cleanup }；fill 为「用户原本就有的内容」 */
+async function makeTempOutput(fill) {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'tomato-archive-test-'));
+  const dir = path.join(root, 'out');
+  fs.mkdirSync(dir, { recursive: true });
+  for (const [name, kind] of Object.entries(fill)) {
+    if (kind === 'dir') {
+      fs.mkdirSync(path.join(dir, name), { recursive: true });
+      fs.writeFileSync(path.join(dir, name, '里面.txt'), '用户原有的子目录内容');
+    } else {
+      fs.writeFileSync(path.join(dir, name), '用户原有的文件');
+    }
+  }
+  return { root, dir, cleanup: () => fs.rmSync(root, { recursive: true, force: true }) };
+}
+
+test('失败清理：目录原本不存在 → 整个删掉，不留垃圾', async () => {
+  const { root, dir, cleanup } = await makeTempOutput({});
+  try {
+    fs.rmSync(dir, { recursive: true, force: true });
+    fs.mkdirSync(dir, { recursive: true });
+    fs.writeFileSync(path.join(dir, '半成品.txt'), 'x');
+    await cleanupFailedOutput(dir, false, new Set());
+    assert.equal(fs.existsSync(dir), false, '目录本来不存在时应被整个删掉');
+  } finally { cleanup(); }
+});
+
+test('失败清理：目录原本存在 → 只删本次新增的顶层项', async () => {
+  const { dir, cleanup } = await makeTempOutput({ '原有.txt': 'file', '原有文件夹': 'dir' });
+  try {
+    const namesBefore = new Set(fs.readdirSync(dir));
+    fs.writeFileSync(path.join(dir, '半成品.txt'), 'x');
+    fs.mkdirSync(path.join(dir, '半成品夹'), { recursive: true });
+    await cleanupFailedOutput(dir, true, namesBefore);
+    const left = fs.readdirSync(dir).sort();
+    assert.deepEqual(left, ['原有.txt', '原有文件夹'].sort(), `应只剩原有内容，实际：${left.join(',')}`);
+    assert.ok(fs.existsSync(path.join(dir, '原有文件夹', '里面.txt')), '原有子目录的内容不应被动到');
+  } finally { cleanup(); }
+});
+
+test('失败清理：目录原本存在却没给快照 → 一个都不删（宁可留半成品）', async () => {
+  const { dir, cleanup } = await makeTempOutput({ '原有.txt': 'file', '原有文件夹': 'dir' });
+  try {
+    fs.writeFileSync(path.join(dir, '半成品.txt'), 'x');
+    // 注意：空 Set 不在此列——那是「目录原本就是空的」的合法快照，此时删掉半成品才对。
+    for (const bad of [undefined, null]) {
+      await cleanupFailedOutput(dir, true, bad);
+      assert.ok(fs.existsSync(path.join(dir, '原有.txt')), `快照缺失（${String(bad)}）时不得删用户原有文件`);
+      assert.ok(fs.existsSync(path.join(dir, '原有文件夹', '里面.txt')), '快照缺失时不得删用户原有子目录');
+    }
+  } finally { cleanup(); }
+});
+
 // —— 汇总 ——
 
+await Promise.all(pending);
 console.log(results.join('\n'));
 console.log(`\n结果：${pass} 通过 / ${fail} 失败（共 ${pass + fail} 项）`);
 if (fail > 0) process.exit(1);

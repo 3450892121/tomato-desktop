@@ -434,6 +434,9 @@ export async function extractArchive({ steps = [], binPath, jobId, onProgress, i
       const codec = /\.br$/i.test(target) ? 'br' : 'zst';
       const outName = path.basename(target).replace(/\.(zst|br)$/i, '') || '解压结果';
       const hadBefore = fs.existsSync(step.outputDir);
+      // 顶层名快照：失败清理时必须靠它豁免「用户原本就有的东西」。
+      // 少了这一份，cleanupFailedOutput 会把整个目录当成「全是本次产物」删光（含用户既有文件）。
+      const namesBefore = hadBefore ? new Set(fs.readdirSync(step.outputDir)) : new Set();
       const filesBefore = snapshotFiles(step.outputDir);
       await fsp.mkdir(step.outputDir, { recursive: true });
       const outPath = path.join(step.outputDir, outName);
@@ -461,7 +464,7 @@ export async function extractArchive({ steps = [], binPath, jobId, onProgress, i
         if (res2.canceled) return { ok: false, canceled: true };
         if (res2.code !== 0) {
           await fsp.rm(outPath, { force: true }).catch(() => {});
-          await cleanupFailedOutput(step.outputDir, hadBefore, new Set());
+          await cleanupFailedOutput(step.outputDir, hadBefore, namesBefore);
           return { ok: false, message: translateSevenZipError(res2) };
         }
         await fsp.rm(outPath, { force: true }).catch(() => {}); // 中间 tar 不留给用户
@@ -614,12 +617,15 @@ async function guardBeforeExtract({ archivePath, password, binPath }) {
 }
 
 /** 解压失败时清理：目录本来不存在就整个删掉；本来就存在则只删本次新增的顶层项 */
-async function cleanupFailedOutput(outputDir, existedBefore, namesBefore) {
+export async function cleanupFailedOutput(outputDir, existedBefore, namesBefore) {
   try {
     if (!existedBefore) {
       await fsp.rm(outputDir, { recursive: true, force: true });
       return;
     }
+    // 目录是用户原本就有的，却没有拿到「解压前顶层名」快照：宁可留半成品也绝不动手。
+    // 少这一道闸就会退化成「把整个目录删光」（本函数只被失败路径调用，静默且不可恢复）。
+    if (!(namesBefore instanceof Set)) return;
     for (const name of fs.readdirSync(outputDir)) {
       if (namesBefore.has(name)) continue;
       await fsp.rm(path.join(outputDir, name), { recursive: true, force: true }).catch(() => {});

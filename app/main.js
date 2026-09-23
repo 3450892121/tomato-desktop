@@ -1786,6 +1786,38 @@ ipcMain.handle('ffmpeg:transform', async (_event, options) => {
   }
 });
 
+/**
+ * 本地文件「按路径」→ 字节（音频剪辑的波形降采样走这里）。
+ * 与 ffmpeg:transform 的区别：源文件不经过界面进程、也不读进主进程内存，直接让 ffmpeg 按路径读。
+ * 波形只需要几 MB 的降采样结果，而源可能是 GB 级视频——走 ffmpeg:transform 会把整份源文件
+ * 在「主进程 Buffer + IPC 克隆 + 回程 IPC + 临时文件」上翻好几倍，必崩。
+ * options: { inputPath, ext, args[] }
+ */
+ipcMain.handle('ffmpeg:transform-file', async (_event, options) => {
+  const opt = options || {};
+  if (!opt.inputPath) return { ok: false, message: '缺少输入文件路径' };
+  if (!fsSync.existsSync(opt.inputPath)) return { ok: false, message: '找不到输入文件' };
+  const bin = findFfmpeg();
+  if (!bin.found) return { ok: false, message: '未检测到 ffmpeg（把加装包解压到软件目录的 addons/ffmpeg 后重开本工具）' };
+
+  const workDir = path.join(os.tmpdir(), `tomato-ffmpeg-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`);
+  await fs.mkdir(workDir, { recursive: true });
+  const ext = String(opt.ext || '.bin');
+  const outPath = path.join(workDir, `out${ext.startsWith('.') ? ext : `.${ext}`}`);
+  try {
+    const res = await runFfmpeg(['-hide_banner', '-nostdin', '-y', '-i', opt.inputPath, ...(opt.args || []), outPath], {
+      timeoutMs: 3 * 60 * 1000
+    });
+    if (res.code !== 0 || !fsSync.existsSync(outPath)) {
+      const tail = (res.stderr || '').trim().split(/\r?\n/).slice(-2).join(' ｜ ').slice(0, 240);
+      return { ok: false, message: `转换失败：${tail || 'ffmpeg 未生成输出文件'}` };
+    }
+    return { ok: true, bytes: await fs.readFile(outPath) };
+  } finally {
+    await fs.rm(workDir, { recursive: true, force: true }).catch(() => {});
+  }
+});
+
 // —— HEIC/HEIF 解码（工具：图片格式转换 的「手机拍照格式」输入；见 spec/modules/image-convert.md） ——
 // 引擎 = heic-decode + libheif-js（官方 libheif 1.23 的 WASM 构建），跑在 worker 线程（heic-worker.js）：
 // WASM 解码是同步计算，放主进程事件循环会卡住整窗 IPC（Chromium 内核与 ffmpeg 6.1 都解不了 HEIC，

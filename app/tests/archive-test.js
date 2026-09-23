@@ -473,6 +473,64 @@ async function runArchiveTest(options = {}) {
     log(`Node 原生 zstd/brotli：${checks.nodeCodecs.ok ? '✅' : '❌'} zst ${results.zst.bytes}B / br ${results.br.bytes}B`);
   }
 
+  // —— 7b) tar.zst 第二趟失败时，绝不能删掉「输出目录里用户原有的东西」 ——
+  // 回归钉子：cleanupFailedOutput 曾被传入空快照，导致整目录被当成「全是本次产物」删光（不可逆）。
+  // 触发条件要「内层 tar 能列目录（安全闸门放行）但解不出来」→ 用符号链接条目：
+  // Windows 无特权时 7-Zip 报「Cannot create symbolic link」并以非零码退出。
+  {
+    const mkTar = (target, entries) => {
+      const parts = [];
+      for (const [name, typeflag, data] of entries) {
+        const b = Buffer.alloc(512);
+        b.write(name, 0, Buffer.byteLength(name, 'utf8'), 'utf8');
+        b.write('000644 ', 100, 8, 'utf8');
+        b.write('000000 ', 108, 8, 'utf8');
+        b.write('000000 ', 116, 8, 'utf8');
+        b.write((data ? data.length : 0).toString(8).padStart(11, '0') + ' ', 124, 12, 'utf8');
+        b.write('14000000000', 136, 12, 'utf8');
+        b.write('        ', 148, 8, 'utf8');
+        b.write(typeflag, 156, 1, 'utf8');
+        let sum = 0;
+        for (const x of b) sum += x;
+        b.write(sum.toString(8).padStart(6, '0') + '\0 ', 148, 8, 'utf8');
+        parts.push(b);
+        if (data) {
+          parts.push(data);
+          parts.push(Buffer.alloc((512 - (data.length % 512)) % 512));
+        }
+      }
+      parts.push(Buffer.alloc(1024)); // tar 结束块
+      fs.writeFileSync(target, Buffer.concat(parts));
+    };
+
+    const zlib = require('zlib');
+    const tarPath = path.join(WORK, 'symlink.tar');
+    mkTar(tarPath, [['link.txt', '2', Buffer.from('inner.txt')]]);
+    const listed = await engine.listArchive({ archivePath: tarPath, password: '', binPath });
+    const zstPath = path.join(WORK, 'symlink.tar.zst');
+    fs.writeFileSync(zstPath, zlib.zstdCompressSync(fs.readFileSync(tarPath)));
+
+    const exRoot = path.join(WORK, 'ex-corrupt-compound');
+    const exPlan = plan.buildExtractPlan({ archives: [{ path: zstPath, name: 'symlink.tar.zst' }], outputDir: exRoot });
+    const outDir = exPlan.steps[0].outputDir;
+    // 输出目录「原本就存在且非空」——里面是用户自己的东西，与本次解压无关
+    fs.mkdirSync(path.join(outDir, '用户原有文件夹'), { recursive: true });
+    fs.writeFileSync(path.join(outDir, '用户原有文件.txt'), '不要删我', 'utf8');
+    fs.writeFileSync(path.join(outDir, '用户原有文件夹', '里面.txt'), '也不要删我', 'utf8');
+
+    const ex = await engine.extractArchive({ steps: exPlan.steps, binPath, jobId: 'corrupt-compound', onProgress: () => {} });
+    const survivors = fs.existsSync(outDir) ? walk(outDir) : new Map();
+    const kept = ['用户原有文件.txt', '用户原有文件夹/里面.txt'].every((k) => survivors.has(k));
+    checks.failedCleanupKeepsUserFiles = {
+      ok: listed.ok && !ex.ok && kept,
+      guardPassed: listed.ok,          // 必须是「闸门放行、解压阶段才失败」，否则测不到目标分支
+      extractRejected: !ex.ok,
+      extractMessage: ex.message || '',
+      survivors: [...survivors.keys()]
+    };
+    log(`失败清理保住用户文件：${checks.failedCleanupKeepsUserFiles.ok ? '✅' : '❌'} 闸门放行=${listed.ok} 解压失败=${!ex.ok} 原有文件保留=${kept}（${ex.message || ''}）`);
+  }
+
   // —— 8) 无效文件与取消 ——
   {
     const badFile = path.join(WORK, 'not-an-archive.zip');
@@ -524,6 +582,7 @@ async function runArchiveTest(options = {}) {
     && checks.traversalBigList.ok
     && checks.largeFile.ok
     && checks.nodeCodecs.ok
+    && checks.failedCleanupKeepsUserFiles.ok
     && checks.invalidFile.ok
     && checks.cancel.ok
     && checks.passwordHeaderHidden.ok

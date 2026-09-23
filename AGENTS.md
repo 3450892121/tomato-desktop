@@ -45,7 +45,7 @@
 - Node 环境：`.tools/node/node.exe`（便携版 v22.20.0，不进 git；命令行里先把 `.tools/node` 加入 PATH）。
 - 安装依赖：`cd app` → `npm install`（npm registry 用 `https://registry.npmmirror.com`；Electron 二进制需设 `ELECTRON_MIRROR=https://registry.npmmirror.com/-/binary/electron/`）。
 - 启动调试：`cd app` → `npm start`。
-- 算法测试：`cd app` → `npm test`（连跑纯逻辑单测共 247 项：算法 55 项（MD5 对照、洗牌、Gilbert 覆盖、六模式往返、填充规则、密钥校验）+ 任务队列 13 项 + 压缩与解压 68 项 + 文件藏图 40 项 + 导航排序 33 项（v2.6.0 起，`tests/navorder.test.mjs`）+ 软件卸载 19 项（v2.8.0 起，`tests/uninstall.test.mjs`）+ 设置校验与转义 19 项（v2.8.1 起，`tests/settingsschema.test.mjs`）。
+- 算法测试：`cd app` → `npm test`（连跑纯逻辑单测共 250 项：算法 55 项（MD5 对照、洗牌、Gilbert 覆盖、六模式往返、填充规则、密钥校验）+ 任务队列 13 项 + 压缩与解压 71 项 + 文件藏图 40 项 + 导航排序 33 项（v2.6.0 起，`tests/navorder.test.mjs`）+ 软件卸载 19 项（v2.8.0 起，`tests/uninstall.test.mjs`）+ 设置校验与转义 19 项（v2.8.1 起，`tests/settingsschema.test.mjs`）。
 - 冒烟自检：`cd app` → `.\node_modules\electron\dist\electron.exe . --smoke-test`（输出 `SMOKE_TEST_OK tools=9 options=6 …` 与 `SMOKE_UI {...}`，界面元素完整、按钮可点即正常）。
 - 端到端自检：`cd app` → `.\node_modules\electron\dist\electron.exe . --self-test`（在界面进程里跑「PNG 无损往返 + 算法链路 + JPG 保存 + 方块填充」，输出 `SELF_TEST {...}`）。
 - 界面自动测试：`cd app` → `.\node_modules\electron\dist\electron.exe . --ui-test`（模拟真人点按钮走完整流程：选图→混淆→保存→还原→批量→清空，逐步截图并做像素级校验，输出 `UI_TEST {..., "pass":true}`；截图落在 `%TEMP%\tomato-uitest`）。

@@ -1,10 +1,10 @@
 // 工具：音频剪辑 —— 界面与交互
 // 分层：本文件只做界面与流程编排；波形计算与参数拼装在 core/waveform.js，
 //       编码与转码复用 shared/ffmpeg.js（单文件 convertMedia / 拼接 convertMediaMulti /
-//       probeMedia / transformImageBytes / cancelMediaJob / onMediaProgress）。
+//       probeMedia / transformFileToBytes / cancelMediaJob / onMediaProgress）。
 import {
   AUDIO_TARGETS, AUDIO_QUALITY_PRESETS, AUDIO_GAIN_PRESETS, AUDIO_FADE_PRESETS,
-  convertMedia, convertMediaMulti, ffmpegStatus, probeMedia, transformImageBytes, cancelMediaJob, onMediaProgress
+  convertMedia, convertMediaMulti, ffmpegStatus, probeMedia, transformFileToBytes, cancelMediaJob, onMediaProgress
 } from '../../shared/ffmpeg.js';
 import {
   AUDIO_EXTS, VIDEO_INPUT_EXTS, WAVE_BUCKETS, WAVE_SAMPLE_ARGS, WAVE_SLOW_MS,
@@ -443,12 +443,16 @@ async function ensureWaveform(item) {
   const slow = (item.durationSec || 0) * 1000 > WAVE_SLOW_MS;
   setWaveNote(slow ? '正在生成波形…（该文件超过 30 分钟，可能较慢，请耐心等待）' : '正在生成波形…');
   try {
-    const bytes = await state.ctx.readFile(item.path);
+    // 按路径交给 ffmpeg 降采样：源文件可能是 GB 级视频，读进内存会把主进程与 IPC 一起撑爆，
+    // 这里只回传几 MB 的 8kHz 单声道 WAV。
+    const res = await transformFileToBytes(item.path, '.wav', WAVE_SAMPLE_ARGS);
     if (!state || token !== state.waveToken) return;
-    // 体积优先用 pathInfo 给的（列表添加时就有）；读不到时用实际字节数兜底
-    if (!item.sizeBytes) item.sizeBytes = bytes ? bytes.byteLength : 0;
-    const res = await transformImageBytes(bytes, '.wav', WAVE_SAMPLE_ARGS);
-    if (!state || token !== state.waveToken) return;
+    // 体积优先用 pathInfo 给的（列表添加时就有）；读不到时补一次元信息（不读文件本体）
+    if (!item.sizeBytes) {
+      const info = await state.ctx.pathInfo(item.path).catch(() => null);
+      if (!state || token !== state.waveToken) return;
+      item.sizeBytes = Number(info && info.size) || 0;
+    }
     if (!res || !res.ok) {
       setWaveNote(`无法生成波形（${(res && res.message) || '该格式不支持预览'}），仍可按下方时间框截取。`, 'warn');
       renderList();
