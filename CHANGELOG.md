@@ -2,6 +2,49 @@
 
 本项目遵循语义化版本（x.y.z）：修 bug → z+1；加功能 → y+1；重要改动 → x+1。
 
+## v2.10.1（2026-09-24）全项目审查后的一批修复：数据丢失、必崩路径、测试假绿、并发覆盖
+
+> 起因：对整个项目做了一轮四路审查（安全 / 架构与规范一致性 / 核心逻辑正确性 / 测试与打包），代理报告的结论**逐条亲自核实**后才动手（其中一条「`imghide:reveal` 可被用来启动任意 exe」经核实是错的，已剔除——该处 `shell.openPath` 只在目录分支走，文件走 `showItemInFolder`）。本版只修确认成立的问题；安全加固（收窄文件类 IPC、媒体协议白名单、zip-slip 闸门去掉调用方可关的开关、office 隐藏窗口导航防护）经用户确认**本版不做**，留作独立一轮。
+
+**会造成用户损失的（最高优先）**
+
+- **解压失败会删光用户已有目录**（`archive/core/engine.mjs`）：`tar.zst` / `tar.br` 的第二趟解压失败时，`cleanupFailedOutput` 被传入**空快照**，而该函数的语义是「凡不在快照里的顶层项都当本次产物删掉」——空快照等于无一豁免。用户往「已存在且非空」的目录里解压时，原有文件被静默删光且不可恢复。改为传入 mkdir 前的顶层名快照（与 `extractOne` 一致），并在函数内加一道闸：目录原本存在却没拿到快照时，宁可留半成品也绝不动手。
+- **音频剪辑添加大视频即崩**：波形生成走 `ctx.readFile` 把整个源文件读进内存，再把全部字节经 IPC 送回主进程写临时文件；该工具支持视频输入（1–2GB 常见），峰值内存数倍于文件体积，而且是「添加文件就自动触发」的默认路径，不需要用户误操作。新增 `ffmpeg:transform-file`（按路径把源文件交给 ffmpeg，只回传几 MB 的 8kHz 单声道 WAV），`shared/ffmpeg.js` 暴露 `transformFileToBytes`，波形改走这条。
+- **并发转码静默覆盖同名产物**：`uniqueTargetPath` 只用 `existsSync` 探测，而「探测」与「落盘」之间隔着 await；任务队列 io 通道并发 2，`A\IMG_01.jpg` 与 `B\IMG_01.jpg` 同时转到同一目录会拿到同一个输出名，后写的覆盖先写的（ffmpeg 那条还带 `-y`），**两条都报成功**——直接违反函数自己注释里写的「绝不覆盖已有文件」。改为 `openSync(..,'wx')` 原子占位（名字被占即 EEXIST、换下一个序号；占位是 0 字节，随后被真正的写入覆盖，ffmpeg 三条通道的失败分支本来就会删产物）。函数抽到 `src/shared/unique-target-path.cjs`，不依赖 Electron，main.js 与 Node 单测共用。
+
+**测试体系的「假绿」（不修就没法验证上面那些修复）**
+
+- **冒烟自检过去只打印、不判定**：`missing` / `clickErrors` / 工具数收集完就直接输出 `SMOKE_TEST_OK`，哪怕 21 个工具只渲染出 3 个、按钮全部点击报错也照样「全绿」。现改为 9 条硬断言：导航渲染数必须等于 `registry.js` 的 `TOOLS` 数（期望值取自 registry 本身，新增工具自动跟上，不写死数字）、必需元素不缺、`[data-action]` 按钮逐个点击不报错、模式下拉框非空、顶栏状态非空；任一不满足输出 `SMOKE_TEST_FAIL <原因>` 且**进程退出码 1**，可直接给脚本/CI 用。退出码挂在 `will-quit` 末尾——`app.quit()` 不带 `process.exitCode`，而 `app.exit()` 会跳过「测试模式还原用户设置」与「终止 HEIC 线程」，都跳不得。
+- **文件藏图的「官方互通」在裁判缺失时记 `ok:true`**：裁判在 `.tools/tujia-oracle/`（不进 git），换台机器跑就是「核心卖点根本没测却计入通过」。改为 `ok` / `verified` 双字段：`ok` = 跑过的项全过，`verified` = 且没有任何一项被跳过，`skipped` 列出跳过项，汇总行醒目标注「不算完整验证」。裁判不随包分发，所以**打包产物上必然是 `ok:true / verified:false`（预期状态）**，官方互通只能在开发树上验证，交付前必须跑到 `verified:true`。
+- **`pack.js` 的 `tests/` 白名单漏了 `make-samples.js` / `verify-samples.js`**：这两个文件由 main.js 的独立 if 分支 require、不走 `AUTO_TESTS` 表，所以容易漏；漏了产物上 AGENTS.md 宣称的「兼容性样本工具」只会打 `MAKE_SAMPLES_FAIL`。已补齐，并用脚本交叉核对：`AUTO_TESTS` 表 23 项与所有 require 依赖现已全部在白名单内。
+
+**界面与状态**
+
+- **进度遮罩僵在别的工具页面上**：根因不在工具侧——`ctx.showProgress/hideProgress` 被 shell 的 `active()` 拦住，而 `switchTool` 从不关遮罩。于是切走还在跑的工具时，上一工具的进度条会僵在新页面上；该页随后被 LRU 回收（`unmount` 置 `state=null`）就再也没人够得着它，永久卡住。所以「把 `hideProgress()` 提到 `if (!state) return` 之前」这种工具侧改法是**无效的**（回收后 `active()` 为假，调了也是空操作）。改为在 shell 中心化处理，与 `setStatus`/`setInfo` 已有的「记到本页、切回恢复」一致：`page.progress` 记账，`switchTool` 按新页状态恢复或关闭。顺带修好了更常见的场景——不回收、只是切走，进度条同样会僵住。
+- **工具页被回收后抛空引用**（10 个工具）：`unmount` 把模块级 `state` 置 null，而「任务归队列、不归工具页」是硬契约，在跑的任务不会被取消，跑完回到收尾代码就面对 `state === null`；以前直接解引用 `state.ctx` / `state.busy` / `state.els`，抛 TypeError 变成静默的 unhandled rejection，且 finally 里第一行一抛，后面的 `updateRunButton()` 再也跑不到。统一按 `pdf-edit` 已有的写法：入口抓 `const st = state`，对 state 的写操作与读模块级 state 的内部函数一律包进 `if (state === st)`，`ctx.xxx()` 放守卫外（per-page，页面没了会安全空转），原有调用顺序不变。涉及 audio-convert / audio-edit / sticker / transcribe / video-compress / video-convert / pdf-convert / imghide / uninstall / batch-rename。其中 batch-rename 漏得最远：加文件夹时逐个文件都要 await，而 `refreshExisting()` 开头就裸读 `state.files`，守卫必须加在**调用它之前**。
+
+**其余确认成立的 bug**
+
+- 压缩与解压：`zst`/`br` 的 Node 流式分支以前无条件 `createWriteStream` 截断同名文件，等于无视「跳过已存在」策略（7-Zip 分支有 `-aos`，这条没有），覆盖后还因 `countFilesSince` 记 0 新增而误报「没有解出任何文件」；复合格式的中间 `.tar` 改为另起不重名的名字，绝不覆盖用户的同名 tar。
+- 压缩与解压：批量解压首个失败即 `return`，后面的包静默跳过、已成功的结果也被丢掉，用户判断不了实际状态。改为逐包记录 `failures` 并继续跑，汇总「成功几个、失败几个、失败原因」，已解出的产物保留在 `dirs`（取消仍然立即中止）。
+- 压缩与解压 + ffmpeg：逐块 `d.toString()` 会把跨管道块边界的多字节字符解成 U+FFFD，而 7z 的这份 stdout 正是「查可疑路径」安全闸门的输入——**乱码路径会绕过 zip-slip 判断**；ffmpeg 的 stderr 带用户文件名，会原样显示给用户当失败原因。两处都改用 `StringDecoder`。
+- LibreOffice 转 PDF 以前只判 `timedOut` 与产物是否存在，退出码非零但临时目录里有截断文件时照样当成功交付（ffmpeg 三条通道一直都查 code，这里漏了）。补上 `res.code !== 0`；实测 docx→pdf / pdf→docx / pdf→可编辑文本三个方向成功时都返回 0，不会误伤。
+- 文件藏图：`uniqueEntryName` 的判重 Set 大小写敏感，而 Windows 文件系统不敏感——容器里同时有 `Photo.jpg` 与 `photo.jpg` 时（官方客户端打的包完全可能）解包会互相覆盖，界面却照样列两条。按平台折叠大小写判重；只在解包落盘这步用，打包不改名，容器与官方保持一致。写 `.part` 失败（磁盘满/杀软占用）以前不清理，藏大文件时几百 MB 垃圾永久留在用户目录，已补 try/catch 删除后重抛。
+- PDF：`compressPdf` 打开的 pdfjs 文档从不 destroy，页面与字体缓存留在 worker 侧只涨不落，批量压缩几十个 PDF 的长批次可能 OOM。拆出 `compressPdfWithDoc`，由外层 finally 释放（pdfjs 6 起要经 `loadingTask.destroy()`）。
+- 设置：`settings:write` 与导入都是直接 `writeFile`，写一半被杀会留下截断 JSON，而读取解析失败后返回 `{}`——用户的排序/主题/输出目录静默全丢且看不出原因。改为写同目录临时文件再 `rename`（同卷原子），两个写入口共用 `writeSettingsFile`。
+
+**测试**
+
+- 新增 `tests/uniquepath.test.mjs`（11 项，挂进 `npm test`）：钉住「挑名字与占名字必须原子完成」。**做过变异测试**——把实现换回「占位后立刻删掉」，两条并发用例立刻报红。
+- `tests/archive.test.mjs` 新增 3 项失败清理契约（68→71）；`tests/imghide.test.mjs` 新增大小写重名 1 项（40→41）。`npm test` 247→262 项。
+- `tests/archive-test.js`（真实 7-Zip 引擎）新增 4 组断言：失败清理保住用户原有文件、zst/br 遵守覆盖策略（跳过模式不得截断、替换模式要正确覆盖）、批量解压一个包坏了不拖垮整批、中文条目名跨管道块不乱码（3000 条中文名，断言无 U+FFFD）。**其中乱码那条做过变异测试**：换回 `d.toString()` 立刻检出 U+FFFD 并报红。
+- `tests/queue-ui-test.js` 的核心断言补上进度条检查（切走前显示、首次切走后关闭、连切 5 个后关闭，且该页确实被回收 `evicted=true`）。**做过变异测试**：去掉 shell 里那句关闭，测试立刻报红并给出准确原因。
+- 交付前全绿清单跑完（见 AGENTS.md），并把此前已接线但未记录的 `--archive-test` / `--archive-ui-test` 补进文档与清单。
+
+**踩到的坑（记下来免得再犯）**
+
+- `src/tools/imghide/core/format.mjs` 也会被**沙箱渲染进程**引入（`imghide/ui.js`），在模块顶层读 `process.platform` 会抛 `ReferenceError: process is not defined`，进而拖垮整个 shell（所有工具都加载不出来，界面只剩空壳）。已加 `typeof process !== 'undefined'` 守卫。**教训：改 `src/` 下任何可能被工具 `ui.js` 引到的模块后，必须跑一次 `--smoke-test`**——纯逻辑单测跑在 Node 里（有 `process`），照不出这个问题。这次正是靠 v2.10.1 新加的冒烟硬断言发现的。
+
 ## v2.10.0（2026-09-23）「图片格式转换」支持手机拍照格式：HEIC/HEIF/HIF 输入，纯离线解码
 
 > 用户需求：「图片格式转换目前不支持手机自带的格式转成通用格式」。iPhone（及部分安卓的「高效」模式、索尼/佳能的 .hif）拍出来的是 HEIC/HEIF，此前工具明确拒绝（内核与 ffmpeg 都解不了），用户得先在手机上转 JPG。
