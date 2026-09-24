@@ -217,6 +217,16 @@
 - 体积控制：`onnxruntime-node` 只带 Windows x64，其余平台二进制在打包时剔除（省约 220MB）。
 - 证据：v2.0.0 产物 2468.2 MB / zip 1041.6 MB；产物结构自检（OCR 模型与字体、cantoo CJS+ESM 产物、onnxruntime 仅 win32）全部 OK；**产物上复检** `--smoke-test`（tools=17）、`--self-test`、`--ui-test`、`--theme-test`、`--av-test`、`--imgbatch-test`、`--pdf-ocr-test`、`--queue-ui-test`、`--settingsio-test`、`--media-ui-test`、`--audio-ui-test`、`--pdf-ui-test`、`--asr-ui-test` 全部通过。
 
+### A36.1 产物瘦身（v2.11.1）
+- **体积**：产物文件夹 **2548 MB → 1487.5 MB**（降 42%），zip **1050 MB → 771.2 MB**；`addons/` 1994→1070 MB（其中 LibreOffice 1565→约 630 MB）、`resources/` 181→116 MB、`locales/` 49→2 MB。瘦身合计 1004.3 MB，由 `pack.js` 步骤 5i 完成。
+- **zip 降幅（279 MB）远小于文件夹降幅（1060 MB）**属预期：删掉的主要是 gettext 翻译、XML 语言包、拼写字典这类高度可压缩的文本，在 zip 里本就占比很小。用户实际感知的是文件夹体积（解压后占用、拷贝、备份）。
+- **功能不变的判据（实测）**：
+  - LibreOffice 三条转换路径在裁剪前后产物**逐字节相同**——`docxToPdf` 30346 B、`pdfToDocx` 6272 B、`pdfToWordText` 5102 B；`--pdf-test` `failures:[]`。
+  - 删掉 onnxruntime 的 DirectML 三件套后 OCR 仍真实可用——产物上 `--pdf-ocr-test` 的 `识别_图片A` recall=1、多页可搜索 PDF 核心词全命中、`可搜索PDF_图片` embedded=17 / missing=0。依据：`ppu-paddle-ocr` 的 `DEFAULT_SESSION_OPTIONS.executionProviders` 为 `['cpu']`，DML EP 从不被请求。
+  - 中文资源未被误删——`pack.js` 内建硬断言，裁完必须仍存在 `program/resource/zh_CN`、`res/registry_zh-CN.xcd`、`res/fcfg_langpack_zh-CN.xcd`、`program/soffice.exe`、`locales/zh-CN.pak`，缺任一项**构建直接失败**。
+- **仍随包附带、刻意不裁的大件**：`asr/models/sensevoice-small-q8.gguf` 242 MB（已是 q8 量化）、`ffmpeg.exe` 79 MB（单文件静态构建）、`realesrgan` 全部 5 个模型（界面均暴露给用户选）、`ocr/fonts/NotoSansSC-VF.ttf` 17 MB（隐形文字层需全 CJK 覆盖）、`LICENSES.chromium.html` 20 MB（Chromium BSD 署名要求）。
+- **产物复检**：23 项自检通过（`--smoke-test`/`--self-test`/`--ui-test`/`--theme-test`/`--pdf-test`/`--pdf-ui-test`/`--pdf-ocr-test`/`--ocr-poc`/`--media-test`/`--media-ui-test`/`--imgbatch-test`/`--audio-test`/`--audio-ui-test`/`--asr-test`/`--asr-ui-test`/`--av-test`/`--settingsio-test`/`--queue-ui-test`/`--player-test`/`--player-ui-test`/`--archive-test`/`--archive-ui-test`/`--imghide-test`/`--imghide-ui-test`）。跑 `--ui-test` 前须清空产物 `userdata/settings.json`（该测试的 `navSort.resetHiddenInitially` 断言要求默认档案）。
+
 ## A37 文件压缩与解压（新工具，需 7zip 加装包）
 - **双向覆盖**：ZIP / 7Z / TAR / GZIP 四个主流格式 + BZIP2 / XZ / ZSTANDARD / BROTLI 四个非主流格式，各自「压缩 → 列目录 → 解压 → 逐字节比对」全部一致（≥8 个双向格式，满足「主流全覆盖 + 非主流 ≥2 种」）。
 - **仅解压格式如实标注**：RAR/RAR5、CAB、ISO、ARJ、LZH、CPIO、Z、WIM、MSI、DEB、RPM、CHM、DMG、XAR、UDF、VHD、VMDK、SquashFS 等在界面标注「仅解压」，选中后「开始压缩」禁用并给出原因（RAR 无法由免费工具创建）。

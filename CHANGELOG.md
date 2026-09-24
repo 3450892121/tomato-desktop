@@ -2,6 +2,24 @@
 
 本项目遵循语义化版本（x.y.z）：修 bug → z+1；加功能 → y+1；重要改动 → x+1。
 
+## v2.11.1（2026-09-25）产物瘦身 1005MB、「添加图片」不再冻结界面，并修掉一个产物上的中文字体缺陷
+
+> 起因：用户要求审查「流畅度与体积」，硬前提是**不能影响现有功能**。先出审查报告并逐项说明后果，经确认只做有把握的两批（体积裁剪 + 缩略图路径），OCR 进程隔离、工具懒加载、任务队列淘汰、图片混淆双份像素这四项因改动面大或缺测试兜底**本版不做**。审查过程中另发现一个产物上的真实功能缺陷，一并修掉。
+
+- **打包产物瘦身 1005MB**（`tools/pack.js` 新增步骤 5i）：文件夹 **2548MB → 1487.5MB**（降 42%），zip **1050MB → 771.2MB**。删掉的都是运行期用不到的东西——LibreOffice 的 57 种语言拼写字典 455MB（**不含中文**，而本项目只跑 `soffice --headless --convert-to`，全程不做拼写检查）、123 种语言的界面翻译与语言包注册项 341MB、Python 脚本 provider 40MB（转换不跑宏）、帮助/图库/模板/自动图文集/向导/自述 42MB、**躺在运行目录里的安装器 msi 19MB**；另有 Electron 52 个多余语言包 47MB、onnxruntime 的 DirectML 三件套 36MB（引擎默认 `executionProviders:['cpu']`，从不请求 DML EP）、node_modules 内 982 个 sourcemap 21MB、`@cantoo/pdf-lib` 的 TS 源与降级声明 4MB。
+  - zip 只降 279MB 而文件夹降 1060MB：删掉的主要是 gettext 翻译、XML 语言包、字典这类**高度可压缩**的文本，在 zip 里本来就占很小空间。用户实际感知的是文件夹体积（解压后占用、拷贝、备份）。
+  - **只删产物，`app/addons` 与 `node_modules` 源树一律不动**——开发树保留完整依赖便于排查，出问题重打即可，不必重装加装包。每条规则是 `PRUNE_RULES` 里的独立一项，删掉一行即回滚该项。规则按**前缀/模式**匹配而非硬编码版本号（如 `python-core-3.12.14`），避免上游升级后目录名一变、裁剪静默失效而体积悄悄涨回去；命中 0 字节会打警告，总收益低于下限也会打警告。
+  - **踩到并修掉的坑**：LibreOffice 两处多语言目录命名规则**不一致**——`program/resource/` 下是**下划线**目录名（`zh_CN`/`en_GB`，且没有 `en_US`，英文原文编进了二进制），`share/registry/res/` 下是**连字符**文件名（`registry_zh-CN.xcd`）。用连字符白名单去匹配 `resource/` 会**一个都匹配不上、把中文翻译一起删光**。是靠「只计数不删除」的干跑校验发现的，故两处各用对应白名单，并加**硬断言**：裁完必须仍存在 `zh_CN` 目录、`registry_zh-CN.xcd`、`fcfg_langpack_zh-CN.xcd`、`soffice.exe` 与 `locales/zh-CN.pak`，缺任一项**直接构建失败**——绝不产出「能跑但中文丢了」的静默劣化产物。
+  - 保留项已复核：`share/registry` 顶层的功能性 xcd（`main`/`writer`/`calc`/`impress`/`draw`/`pdfimport`/`xsltfilter`/`lingucomponent`/`cjk_zh-CN`/`ctl_*`）一个没动；语言数据（数字/日期/货币格式）在 `program/localedata_*.dll`，与裁剪的两处无关，故不影响转换结果。`@cantoo/pdf-lib` 的 `cjs/` 与 `es/` 是 `package.json` 里 `exports` 的真实解析目标，**保留**。
+- **修掉一个产物上的真实功能缺陷：中文字体读不到**（`src/tools/pdf-edit/core/ops.js`）。`CJK_FONT_URL` 用 `new URL('../../../../addons/ocr/fonts/NotoSansSC-VF.ttf', import.meta.url)` 定位字体，这个相对深度**只在开发态成立**：产物上本文件在 `resources/app/src/tools/pdf-edit/core/`，上溯四级只到 `resources/app/`，而 `addons/` 在产物根目录（还要再上两级）。后果是产物上「PDF 编辑整理」的字体提示恒为「中文字体缺失（NotoSansSC-VF.ttf）：水印/页码只能用英文与数字，中文可能显示为空白」，**中文水印与中文页码静默降级成 Helvetica**——而字体其实就在包里。改为优先走主进程已有的 `ocr:font` 通道（路径由 `PORTABLE_DIR` 解析，两种布局都对），这也正是「文字识别」工具一直在用、且在产物上验证正常的那条路；`loadCjkFontBytes(readFile, ocrFont)` 新增第二参数，失败仍回退原相对路径，故 ctx 没有 `ocrFont` 时行为与改动前完全一致。
+- **两处测试假绿/跑不起来**（同一个根因：相对 `__dirname` 上溯固定层数）：
+  - `tests/pdf-edit-test.js` 的 `cjkFont` 步骤用同一个坏路径探测字体，产物上 `fontBytes=null` → `watermarkCjk` 与 `pageNumbersSkipFirstCjk` 两个中文用例走「已按降级路径跳过」，而整体仍报 `ok:true`。**也就是说产物上这两个中文能力等于从未验过，上面那个缺陷才一直没被发现。** 改为与工具同一条路，并在结果里记 `via` 字段便于日后判断走了哪条。
+  - `tests/ocr-poc.js` 硬写 `path.join(__dirname,'..','addons','ocr')`，产物上解析成 `resources/app/addons/ocr`（不存在）→ 这个 **P0 闸门在产物上必然报「OCR 加装包缺失」而 `ok:false`**，等于产物上从来没真正验过 OCR（这也解释了为何产物复检清单里一直没有它）。改为与其余 18 个带加装包的自检同一惯用法 `app.isPackaged ? path.dirname(process.execPath) : path.join(__dirname,'..')`。
+- **「添加图片」不再为一张 42px 缩略图把整图摊开两次**（`src/shared/imageio.js` 新增 `makeThumbnailFromBytes`）。图片压缩 / 九宫格切图 / 长图拼接 / PDF 转格式四个工具的添加路径原本是同一个模式：`decodeImageFromBytes()` 把整图解成一块 `w*h*4` 的 RGBA 缓冲，再交给 `makeThumbnail()`——而后者会用这块像素**重建一个整尺寸 OffscreenCanvas** 才缩到 42px。同一张图被摊开两次，而添加阶段只用到 `width`/`height`/`thumbUrl`，像素拿到就丢（真正处理时会重新解码文件）。4000 万像素的图瞬时约 320MB，拖入一个文件夹时逐张串行执行，**界面会冻结数秒**。新函数 `createImageBitmap` 后直接缩放绘制到目标小画布并立刻 `close()`，全程不产生整图 RGBA 缓冲。两处错误文案与 `MAX_PIXELS` 上限判断逐字照搬，不设 `imageSmoothingQuality`，缩略图观感与提示均不变。
+  - **刻意未改**：加水印的 `loadSource()` 需要一张可绘制的画布（不只是缩略图），涉及 `source.bitmap` 的类型契约；图片混淆需长期持有整图像素做往返，其双份像素常驻是另一个问题；**HEIC/HEIF/HIF 不能走新路径**——Chromium 内核不解码 HEIC，那类输入靠主进程 libheif 引擎返回裸像素，只能用 `makeThumbnail(pixels,…)`。`makeThumbnail` 保留导出。
+- **测试**：开发树 `npm test`（262 项）、`--smoke-test`（21/21）、`--self-test`、`--ui-test`、`--imgbatch-test`、`--media-test`、`--media-ui-test`、`--pdf-test`、`--pdf-ui-test`、`--pdf-ocr-test`、`--ocr-poc` 全绿。**产物上跑了 23 项自检**，其中两条最强证据：`--pdf-test` 的 LibreOffice 三条转换路径产物**逐字节相同**于裁剪前（`docxToPdf` 30346 / `pdfToDocx` 6272 / `pdfToWordText` 5102）；`--pdf-ocr-test` 里 OCR **真跑了推理**（`识别_图片A` recall=1、多页可搜索 PDF 核心词全命中、`可搜索PDF_图片` embedded=17/missing=0），证明删 DirectML 与裁 `@cantoo` 均安全，且中文字体修复后 `watermarkCjk` 断言 `p1HasCjkWatermark:true`。
+- **注意（既有行为，非本版引入）**：`--ui-test` 的 `navSort.resetHiddenInitially` 断言要求**干净的默认档案**——若 `userdata/settings.json` 里已有自定义 `navOrder`，「恢复默认排序」按钮本就该显示，该断言会为 false 而使 `pass:false`。在产物上跑它之前请先清空 `userdata/settings.json`。另：重复打包**同一版本号**时步骤 8c 找不到旧版可迁移设置（旧目录已被步骤 1 删掉），需在 pack 前备份、pack 后放回 `userdata/`。
+
 ## v2.11.0（2026-09-24）导航排序改为「长按拖动」：去掉排序模式，主项目/子项目直接拖
 
 > 用户要求：把排序功能改成「长按项目拖动就可以排序主项目和子项目」——不再需要先点「⇅ 排序」进入排序模式，平时按住左侧条目约 400ms 就能拖。
