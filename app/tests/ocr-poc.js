@@ -18,11 +18,20 @@
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
+const { app } = require('electron');
 
 /** 结果文件（固定路径，便于验收脚本读取） */
 const RESULT_FILE = path.join(os.tmpdir(), 'tomato-ocr-poc.json');
+/**
+ * 加装包基准目录（开发树 = app/；打包产物 = exe 所在目录）
+ * 与其余 18 个带加装包的自检同一惯用法（见 asr-test.js / media-test.js / uninstall-test.js）。
+ * 原先这里硬写 path.join(__dirname, '..')：开发树上 tests/.. = app/ 恰好对，打包产物上
+ * __dirname 是 resources/app/tests，于是解析成 resources/app/addons/ocr（不存在）→
+ * 本闸门在产物上必然报「OCR 加装包缺失」而 ok:false，等于产物上从来没有真正验过 OCR。
+ */
+const ADDON_BASE = app.isPackaged ? path.dirname(process.execPath) : path.join(__dirname, '..');
 /** OCR 加装包目录（不进 git，随包分发） */
-const ADDON_DIR = path.join(__dirname, '..', 'addons', 'ocr');
+const ADDON_DIR = path.join(ADDON_BASE, 'addons', 'ocr');
 /** 加装包内的模型文件名 */
 const MODEL_FILES = {
   detection: 'det.onnx',

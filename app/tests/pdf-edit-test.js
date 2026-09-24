@@ -143,13 +143,28 @@ const RENDERER_SCRIPT = `
     // —— 中文字体（缺失时明确降级） ——
     let fontBytes = null;
     await step('cjkFont', async () => {
+      // 与工具走同一条路：先试主进程 ocr:font（路径由主进程按 PORTABLE_DIR 解析，开发态与
+      // 打包产物都正确），再回退到 ops.cjkFontPath() 的相对路径。
+      // 回退路径在产物上必然失败：本测试文件在 resources/app/tests/，而 addons 在产物根目录，
+      // 相对深度对不上。曾经这里只试相对路径 → 产物上 fontBytes=null → 下面 watermarkCjk 与
+      // pageNumbersSkipFirstCjk 两个中文用例被静默跳过，而整体仍报 ok:true（假绿）。
       const p = ops.cjkFontPath();
-      try {
-        fontBytes = await window.desktop.readFile(p);
-      } catch (err) {
-        fontBytes = null;
+      let via = 'none';
+      if (typeof window.desktop.ocrFont === 'function') {
+        try {
+          const f = await window.desktop.ocrFont();
+          if (f && f.ok && f.bytes && f.bytes.length) { fontBytes = f.bytes; via = 'ocr:font'; }
+        } catch { /* 落到下面的相对路径回退 */ }
       }
-      return { path: p, found: !!(fontBytes && fontBytes.length), bytes: fontBytes ? fontBytes.length : 0 };
+      if (!fontBytes) {
+        try {
+          fontBytes = await window.desktop.readFile(p);
+          if (fontBytes && fontBytes.length) via = 'readFile(相对路径)';
+        } catch (err) {
+          fontBytes = null;
+        }
+      }
+      return { path: p, via, found: !!(fontBytes && fontBytes.length), bytes: fontBytes ? fontBytes.length : 0 };
     });
 
     // —— 纯逻辑：页码范围 / 页序解析 / 参数校验 ——

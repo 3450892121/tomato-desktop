@@ -80,11 +80,17 @@ export const POSITIONS = [
 ];
 
 // —— 中文字体 ——
-// 设计说明：字体文件在 app/addons/ocr/fonts/ 下（随包加装包）。不能硬编码 addon 路径——
-//           打包后软件目录结构与开发态不同，所以用 import.meta.url 相对解析成 file:// URL，
-//           再由主进程的 ctx.readFile 读取（界面进程在沙箱里，读盘统一走主进程）。
-//           字体缺失时明确降级：改用 pdf-lib 内置 Helvetica（只能画拉丁字符），
-//           界面会提示「中文字体缺失，中文可能显示为空白」。
+// 设计说明：字体文件在**软件目录**的 addons/ocr/fonts/ 下（随包加装包）。
+//           取字体有两条路，优先第一条：
+//           ① 主进程的 `ocr:font` IPC（ctx.ocrFont）——路径由主进程按 PORTABLE_DIR 解析
+//              （打包态 = exe 所在目录，开发态 = app/），**两种布局都对**，且与「文字识别」
+//              工具共用同一个通道、同一份真相；
+//           ② 回退：用 import.meta.url 相对解析出 file:// 路径再交给 ctx.readFile 读盘。
+//           为什么必须有 ①：下面的相对深度 `../../../../` 只在**开发态**成立。打包后本文件位于
+//           resources/app/src/tools/pdf-edit/core/，同样上溯四级只到 resources/app/，而 addons
+//           在产物根目录（还要再上两级）——于是 ② 在产物上必然读不到字体，界面会误报
+//           「中文字体缺失」，中文水印与中文页码静默降级成 Helvetica（中文显示为空白）。
+//           字体确实缺失时仍然明确降级，界面提示不变。
 const CJK_FONT_URL = new URL('../../../../addons/ocr/fonts/NotoSansSC-VF.ttf', import.meta.url);
 
 /** 中文字体的本地绝对路径（开发态 = app/addons/ocr/fonts/NotoSansSC-VF.ttf） */
@@ -95,10 +101,19 @@ export function cjkFontPath() {
 
 /**
  * 读取中文字体字节
- * @param {(p: string) => Promise<Uint8Array>} readFile 一般是 ctx.readFile
+ * @param {(p: string) => Promise<Uint8Array>} readFile 一般是 ctx.readFile（回退路径用）
+ * @param {() => Promise<{ok?: boolean, bytes?: Uint8Array}>} [ocrFont] 一般是 ctx.ocrFont（首选路径）
  * @returns {Promise<Uint8Array|null>} 读不到（未打包加装包/被删）返回 null，由调用方降级
  */
-export async function loadCjkFontBytes(readFile) {
+export async function loadCjkFontBytes(readFile, ocrFont) {
+  if (typeof ocrFont === 'function') {
+    try {
+      const font = await ocrFont();
+      if (font && font.ok && font.bytes && font.bytes.length) return font.bytes;
+    } catch {
+      // 主进程通道不可用时落到下面的相对路径回退
+    }
+  }
   if (typeof readFile !== 'function') return null;
   try {
     const bytes = await readFile(cjkFontPath());

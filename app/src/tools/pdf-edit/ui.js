@@ -347,7 +347,9 @@ function readParams() {
 async function ensureFont() {
   if (state.fontBytes !== undefined) return state.fontBytes;
   if (!state.fontPromise) {
-    state.fontPromise = loadCjkFontBytes(state.ctx.readFile)
+    // 第二个参数走主进程 ocr:font 通道：字体路径由主进程按 PORTABLE_DIR 解析，
+    // 开发态与打包产物都正确（只用 readFile + 相对路径的话，产物上会读不到字体）
+    state.fontPromise = loadCjkFontBytes(state.ctx.readFile, state.ctx.ocrFont)
       .then((b) => {
         state.fontBytes = b || null;
         refreshFontNote();
