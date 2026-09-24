@@ -371,6 +371,212 @@ if (fs.existsSync(path.join(hibitAddon, 'HiBitUninstaller-Portable.exe'))) {
   log('警告：未发现 app/addons/hibit/HiBitUninstaller-Portable.exe —— 产物中「软件卸载」将提示需加装');
 }
 
+// —— 5i) 产物瘦身：删掉随上游整包带进来、但本软件运行期用不到的东西 ——
+// 原则（改动前请读完）：
+//   · **只删产物（outDir）**，绝不动 app/addons 与 node_modules 源树——开发树上保留完整依赖便于排查，
+//     也保证「裁剪只影响交付物」，出问题重新 pack 即可，不必重装加装包。
+//   · 每条规则是 PRUNE_RULES 里的独立一项，**删掉一行即回滚该项**，互不牵连。
+//   · 规则按「前缀 / 模式」匹配，不硬编码版本号（如 python-core-3.12.14）——否则上游升级后目录名一变，
+//     裁剪会静默失效、体积悄悄涨回去。为此每条规则命中 0 字节都会打警告，提示上游布局可能已变。
+//   · 判据来源（勿凭印象改）：
+//       - 拼写字典：share/extensions/dict-* 共 57 种语言且**不含中文**；本项目只跑
+//         `soffice --headless --convert-to`（见 main.js 的 libreofficeConvert），全程不触发拼写检查。
+//       - DirectML：ppu-paddle-ocr/constants.js 的 DEFAULT_SESSION_OPTIONS 为 executionProviders:['cpu']，
+//         main.js 创建 PaddleOcrService 时也没覆盖，故 DML EP 永不被请求。
+//       - @cantoo/pdf-lib：源码与测试全部走显式路径 dist/pdf-lib.esm.js（searchable.js / ops.js /
+//         pdf-edit-test.js 另有 dist/pdf-lib.js 的 Node 分支），src/ 是 TS 源、ts3.4/ 是给老版本
+//         TypeScript 的降级声明，均无人引用。**cjs/ 与 es/ 是 package.json 里 exports 的真实解析目标，
+//         保留**（pack.js 步骤4b-2 的注释记着「只复制 ESM 导致产物 Cannot find module」这个坑）。
+//       - locales：Windows 原生文件对话框由系统提供、不受 Chromium 语言包影响；删多余的 .pak 只会让
+//         非中英文系统下 Chromium 自带字符串（输入框右键菜单等）退回英文，故保留 en-US 兜底。
+log('步骤5i：产物瘦身（多语言资源 / 拼写字典 / sourcemap / 未用的原生 DLL）');
+
+const LO_ROOT = path.join(outDir, 'addons', 'libreoffice');
+const NM_OUT = path.join(outDir, 'resources', 'app', 'node_modules');
+// 命名陷阱（实测踩过，勿凭印象改）：LibreOffice 两处多语言目录的命名规则**不一样**——
+//   · program/resource/ 下是**下划线**目录名：zh_CN / zh_TW / en_GB / en_ZA（且**没有 en_US**，
+//     因为英文原文是编进二进制的，不需要 .mo）；
+//   · share/registry/res/ 下是**连字符**文件名：registry_zh-CN.xcd / fcfg_langpack_en-US.xcd。
+// 用连字符白名单去匹配 resource/ 会一个都匹配不上，把中文翻译一起删光（干跑校验时抓到过）。
+const LO_KEEP_RESOURCE_DIRS = new Set(['zh_CN', 'zh_TW', 'en_GB', 'en_ZA']);
+const LO_KEEP_TAGS = ['zh-CN', 'zh-TW', 'en-US', 'en-GB', 'en-ZA'];
+const PAK_KEEP = new Set(['zh-CN.pak', 'en-US.pak', 'en-GB.pak']);
+const ORT_BIN = path.join(NM_OUT, 'onnxruntime-node', 'bin', 'napi-v6', 'win32', 'x64');
+// 注意：步骤7 里的 mb 是 const 箭头函数，不会提升到本步骤之前，故这里自带一个（不改动原有定义）
+const mb0 = (bytes) => `${(bytes / 1024 / 1024).toFixed(1)} MB`;
+
+/** 文件名（去 .xcd 后）是否属于要保留的语言。用后缀匹配兼容 registry_ / fcfg_langpack_ / Langpack- 三种前缀 */
+const keepsLocale = (name) => {
+  const base = name.replace(/\.xcd$/i, '');
+  return LO_KEEP_TAGS.some((tag) => base === tag || base.endsWith(`-${tag}`) || base.endsWith(`_${tag}`));
+};
+
+/** 目录（或文件）占用字节数 */
+function bytesOf(target) {
+  const st = fs.statSync(target);
+  if (!st.isDirectory()) return st.size;
+  let total = 0;
+  for (const e of fs.readdirSync(target, { withFileTypes: true })) {
+    if (e.isSymbolicLink()) continue;
+    total += bytesOf(path.join(target, e.name));
+  }
+  return total;
+}
+
+/** 删除单个目标，返回省下的字节；不存在返回 0 */
+function removeTarget(target) {
+  if (!fs.existsSync(target)) return 0;
+  const freed = bytesOf(target);
+  fs.rmSync(target, { recursive: true, force: true });
+  return freed;
+}
+
+/**
+ * 删除 dir 下的子项，返回省下字节；dir 本身不存在返回 -1（表示「本规则不适用」）。
+ * @param {Set<string>} [keep]  白名单：不在其中的都删
+ * @param {(name:string)=>boolean} [pick]  只删名字命中的（与 keep 二选一）
+ */
+function pruneChildren(dir, keep, pick) {
+  if (!fs.existsSync(dir)) return -1;
+  let freed = 0;
+  for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
+    if (keep ? keep.has(e.name) : (pick && !pick(e.name))) continue;
+    freed += removeTarget(path.join(dir, e.name));
+  }
+  return freed;
+}
+
+/** 递归删除目录下所有 *.map（sourcemap 运行期不需要） */
+function removeSourceMaps(dir) {
+  if (!fs.existsSync(dir)) return -1;
+  let freed = 0;
+  for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
+    const full = path.join(dir, e.name);
+    if (e.isSymbolicLink()) continue;
+    if (e.isDirectory()) {
+      const sub = removeSourceMaps(full);
+      if (sub > 0) freed += sub;
+    } else if (e.name.endsWith('.map')) {
+      freed += removeTarget(full);
+    }
+  }
+  return freed;
+}
+
+const hasLo = fs.existsSync(LO_ROOT);
+const loRel = (...segs) => path.join(LO_ROOT, ...segs);
+
+const PRUNE_RULES = [
+  {
+    name: 'LibreOffice 拼写字典 dict-*（57 种语言、不含中文；headless 转换不做拼写检查）',
+    needsLo: true,
+    run: () => pruneChildren(loRel('share', 'extensions'), null, (n) => n.startsWith('dict-'))
+  },
+  {
+    name: 'LibreOffice 界面翻译 .mo（保留 zh_CN / zh_TW / en_GB / en_ZA；下划线命名）',
+    needsLo: true,
+    run: () => pruneChildren(loRel('program', 'resource'), LO_KEEP_RESOURCE_DIRS)
+  },
+  {
+    // res/ 里只有 registry_<lang>.xcd 与 fcfg_langpack_<lang>.xcd 两个纯语言包家族（实测 247 个文件）。
+    // 只删这两个家族里非保留语言的；任何其它命名的文件一律不动，避免误删功能性配置。
+    // 语言数据（数字/日期/货币格式）在 program/localedata_*.dll，与此处无关，故不影响转换结果。
+    name: 'LibreOffice 语言包 registry_*/fcfg_langpack_*（保留 zh-CN / zh-TW / en-US / en-GB / en-ZA）',
+    needsLo: true,
+    run: () => pruneChildren(loRel('share', 'registry', 'res'), null,
+      (n) => /^(registry|fcfg_langpack)_.+\.xcd$/i.test(n) && !keepsLocale(n))
+  },
+  {
+    // 与上一条配套：顶层 Langpack-<lang>.xcd 是这些语言包的注册项，一并清掉保持 registry 自洽
+    // （否则注册项指向已删除的语言包）。功能性 xcd（writer / pdfimport / xsltfilter / ctl* / cjk* 等）不匹配此前缀，保留。
+    name: 'LibreOffice 顶层 Langpack-*.xcd 注册项（与 res/ 语言包保持一致）',
+    needsLo: true,
+    run: () => pruneChildren(loRel('share', 'registry'), null,
+      (n) => /^Langpack-.+\.xcd$/i.test(n) && !keepsLocale(n))
+  },
+  {
+    name: 'LibreOffice Python 脚本 provider（转换不跑宏；按 python*/pyuno* 前缀匹配，免版本号硬编码）',
+    needsLo: true,
+    run: () => pruneChildren(loRel('program'), null, (n) => n.startsWith('python') || n.startsWith('pyuno'))
+  },
+  {
+    name: 'LibreOffice 帮助 / 图库 / 模板 / 自动图文集 / 向导 / 自述',
+    needsLo: true,
+    run: () => ['help', 'readmes', 'share/gallery', 'share/template', 'share/autotext', 'share/wizards']
+      .reduce((sum, rel) => sum + removeTarget(loRel(...rel.split('/'))), 0)
+  },
+  {
+    name: 'LibreOffice 安装器 *.msi（躺在运行目录里的死重）',
+    needsLo: true,
+    run: () => pruneChildren(LO_ROOT, null, (n) => n.toLowerCase().endsWith('.msi'))
+  },
+  {
+    name: 'Electron 语言包 *.pak（保留 zh-CN / en-US / en-GB）',
+    run: () => pruneChildren(path.join(outDir, 'locales'), PAK_KEEP)
+  },
+  {
+    name: 'onnxruntime DirectML 三件套（EP 默认 cpu，从不加载）',
+    run: () => ['DirectML.dll', 'dxcompiler.dll', 'dxil.dll']
+      .reduce((sum, f) => sum + removeTarget(path.join(ORT_BIN, f)), 0)
+  },
+  {
+    name: 'node_modules 内全部 sourcemap *.map',
+    run: () => removeSourceMaps(NM_OUT)
+  },
+  {
+    name: '@cantoo/pdf-lib 的 src/（TS 源）与 ts3.4/（降级声明）',
+    run: () => ['src', 'ts3.4']
+      .reduce((sum, d) => sum + removeTarget(path.join(NM_OUT, '@cantoo', 'pdf-lib', d)), 0)
+  }
+];
+
+let pruneTotal = 0;
+let pruneWarned = 0;
+for (const rule of PRUNE_RULES) {
+  if (rule.needsLo && !hasLo) continue;   // 本次没打包 LibreOffice，相关规则整体不适用
+  const freed = rule.run();
+  if (freed < 0) {
+    log(`  跳过（目标目录不存在）：${rule.name}`);
+    continue;
+  }
+  if (freed === 0) {
+    // 命中 0 字节 = 上游布局可能变了，裁剪静默失效。只警告不失败：体积涨回去要能被发现。
+    log(`  警告：未命中任何文件，请复核上游布局是否已变 → ${rule.name}`);
+    pruneWarned += 1;
+    continue;
+  }
+  log(`  省下 ${mb0(freed)}：${rule.name}`);
+  pruneTotal += freed;
+}
+// 下限自检：LO 在位时应省下约 900MB，不在位时约 100MB。低于下限说明规则大面积失效。
+const pruneFloor = hasLo ? 800 : 80;
+if (pruneTotal < pruneFloor * 1024 * 1024) {
+  log(`警告：本次仅瘦身 ${mb0(pruneTotal)}，低于预期下限 ${pruneFloor} MB —— 裁剪规则可能已失效，请复核`);
+} else {
+  log(`瘦身合计 ${mb0(pruneTotal)}${pruneWarned ? `（${pruneWarned} 条规则未命中）` : ''}`);
+}
+
+// 硬断言：中文与兜底英文必须还在。上游若改了命名规则，白名单会全落空并把中文一起删光——
+// 那是「产物能跑但中文变英文/语言包缺失」的静默劣化，必须让它在这里就炸掉，而不是发到用户手上。
+if (hasLo) {
+  const mustExist = [
+    loRel('program', 'resource', 'zh_CN'),
+    loRel('share', 'registry', 'res', 'registry_zh-CN.xcd'),
+    loRel('share', 'registry', 'res', 'fcfg_langpack_zh-CN.xcd'),
+    loRel('program', 'soffice.exe')
+  ];
+  const missing = mustExist.filter((p) => !fs.existsSync(p));
+  if (missing.length) {
+    throw new Error(
+      `产物瘦身误删了必需文件（上游命名规则可能已变，请复核步骤5i 的白名单）：\n  ${missing.join('\n  ')}`
+    );
+  }
+}
+const pakDir = path.join(outDir, 'locales');
+if (fs.existsSync(pakDir) && !fs.existsSync(path.join(pakDir, 'zh-CN.pak'))) {
+  throw new Error('产物瘦身误删了 locales/zh-CN.pak —— 请复核步骤5i 的 PAK_KEEP 白名单');
+}
+
 // —— 6) 设置 exe 图标与版本信息（需要 build/rcedit.exe，缺失则跳过） ——
 log('步骤6：设置 exe 图标与版本信息');
 const rcedit = path.join(appRoot, 'build', 'rcedit.exe');
