@@ -1,7 +1,7 @@
 // 工具：图片压缩 —— 界面与交互
 // 分层：本文件只做界面与流程编排；缩放/编码/目标大小逼近在 core/compress.js；
 //       图片解码与缩略图复用 shared/imageio.js。
-import { decodeImageFromBytes, makeThumbnail } from '../../shared/imageio.js';
+import { decodeImageFromBytes, makeThumbnailFromBytes } from '../../shared/imageio.js';
 import { autoFormat, compressPixels } from './core/compress.js';
 
 const IMAGE_EXTS = ['.png', '.jpg', '.jpeg', '.webp', '.bmp', '.gif', '.ico', '.avif'];
@@ -199,11 +199,11 @@ async function addFromPaths(paths) {
       return;
     }
     const bytes = await state.ctx.readFile(p);
-    const img = await decodeImageFromBytes(bytes);
-    const thumb = await makeThumbnail(img.pixels, img.width, img.height, 42);
+    // 添加阶段只要尺寸与缩略图，不摊开整图像素（真正压缩时下面会重新解码）
+    const { thumb, width, height } = await makeThumbnailFromBytes(bytes, 42);
     state.files.push({
       path: p, name: info.name, baseName: info.baseName, dir: info.dir, ext,
-      width: img.width, height: img.height, size: bytes.byteLength,
+      width, height, size: bytes.byteLength,
       thumbUrl: thumb.toDataURL('image/png'),
       result: '', error: false
     });

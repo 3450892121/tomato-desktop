@@ -5,7 +5,7 @@
 import { parsePageRange } from './core/pages.js';
 import { openPdf, renderPageToPixels } from './core/pdfjs.js';
 import { imagesToPdf, mergePdfs, splitPdf, extractPages, getPageCount, sniffImageType } from './core/build.js';
-import { decodeImageFromBytes, encodeImageToBytes, makeThumbnail } from '../../shared/imageio.js';
+import { decodeImageFromBytes, encodeImageToBytes, makeThumbnailFromBytes } from '../../shared/imageio.js';
 
 const DIRECTIONS = [
   { id: 'pdf-to-image', label: 'PDF → 图片', hint: '逐页导出图片，输出到「原文件名_图片」文件夹；扫描件同样适用', run: '开始导出' },
@@ -334,12 +334,12 @@ async function addFromPaths(paths) {
       if (d === 'image-to-pdf') {
         if (!IMAGE_EXTS.has(ext)) { failures.push(`${info.name}：不是支持的图片`); continue; }
         const bytes = await state.ctx.readFile(p);
-        const img = await decodeImageFromBytes(bytes);
-        const thumb = await makeThumbnail(img.pixels, img.width, img.height, 40);
+        // 添加阶段只要尺寸与缩略图，不摊开整图像素（真正转 PDF 时会重新解码）
+        const { thumb, width, height } = await makeThumbnailFromBytes(bytes, 40);
         files.push({
           path: p, name: info.name, baseName: info.baseName, dir: info.dir,
-          width: img.width, height: img.height,
-          meta: `${img.width} × ${img.height}`,
+          width, height,
+          meta: `${width} × ${height}`,
           thumbUrl: thumb.toDataURL('image/png')
         });
       } else if (d === 'office-to-pdf') {

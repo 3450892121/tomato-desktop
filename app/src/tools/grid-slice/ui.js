@@ -2,7 +2,7 @@
 // 分层：本文件做界面、预览与批量流程编排；切分计算 / 编号 / 估算在 core/plan.js（纯逻辑，可 node 单测）；
 //       图片解码、缩略图与编码复用 shared/imageio.js。
 // sliceImage 额外导出：与界面用的是同一条裁切/编码链路，自动化测试直接复用它，避免测到「另一套实现」。
-import { decodeImageFromBytes, makeThumbnail } from '../../shared/imageio.js';
+import { decodeImageFromBytes, makeThumbnailFromBytes } from '../../shared/imageio.js';
 import {
   GRID_PRESETS,
   MAX_LINES,
@@ -255,11 +255,11 @@ async function addFromPaths(paths) {
       return;
     }
     const bytes = await state.ctx.readFile(p);
-    const img = await decodeImageFromBytes(bytes);
-    const thumb = await makeThumbnail(img.pixels, img.width, img.height, 42);
+    // 添加阶段只要尺寸与缩略图，不摊开整图像素（真正切图时会重新解码）
+    const { thumb, width, height } = await makeThumbnailFromBytes(bytes, 42);
     state.files.push({
       path: p, name: info.name, baseName: info.baseName || baseNameOf(p), dir: info.dir, ext,
-      width: img.width, height: img.height, size: bytes.byteLength,
+      width, height, size: bytes.byteLength,
       thumbUrl: thumb.toDataURL('image/png'),
       result: '', error: false
     });

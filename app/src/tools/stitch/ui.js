@@ -2,7 +2,7 @@
 // 分层：本文件做界面与流程编排；尺寸归一 / 布局计算在 core/plan.js（纯逻辑，可 node 单测）；
 //       绘制与编码的 composeStitch 也放在本文件（只用 OffscreenCanvas，不碰 DOM，便于自动化测试直接调用）。
 // 图片解码与缩略图复用 shared/imageio.js。
-import { decodeImageFromBytes, makeThumbnail } from '../../shared/imageio.js';
+import { decodeImageFromBytes, makeThumbnailFromBytes } from '../../shared/imageio.js';
 import {
   ALIGN_PRESETS,
   STITCH_DIRECTIONS,
@@ -396,16 +396,16 @@ async function addFromPaths(paths) {
       return;
     }
     const bytes = await state.ctx.readFile(p);
-    const img = await decodeImageFromBytes(bytes);
-    const thumb = await makeThumbnail(img.pixels, img.width, img.height, 42);
+    // 添加阶段只要尺寸与缩略图，不摊开整图像素（真正拼接时会重新解码）
+    const { thumb, width, height } = await makeThumbnailFromBytes(bytes, 42);
     state.files.push({
       path: p,
       name: info.name,
       baseName: info.baseName,
       dir: info.dir,
       ext,
-      width: img.width,
-      height: img.height,
+      width,
+      height,
       size: bytes.byteLength,
       thumbUrl: thumb.toDataURL('image/png')
     });
