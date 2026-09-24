@@ -20,7 +20,8 @@ const els = {
   progressText: document.getElementById('progressText'),
   btnTheme: document.getElementById('btnTheme'),
   themeIcon: document.getElementById('themeIcon'),
-  themeLabel: document.getElementById('themeLabel')
+  themeLabel: document.getElementById('themeLabel'),
+  navReset: document.getElementById('btnSortReset')
 };
 
 /** 当前活动的工具 */
@@ -389,7 +390,7 @@ function createToolButton(tool) {
   btn.dataset.toolId = tool.id;
   btn.innerHTML = `<span class="tool-item-icon">${tool.icon || '🔧'}</span><span>${tool.name}</span>`;
   btn.addEventListener('click', () => {
-    if (navSort.isActive()) return; // 排序模式中点击让位给拖拽
+    // 长按拖动排序（navsort.js）拖完的 click 已在 capture 阶段拦下，这里只管正常切换
     switchTool(tool.id);
   });
   return btn;
@@ -504,7 +505,7 @@ function updateActiveNav(toolId) {
  * 容错：未声明 group（或声明了未知分组）的工具归入末尾「其它」组。
  */
 function renderNav() {
-  navSort.cancelDrag(); // 防御：重建 DOM 前结束任何拖拽（排序模式本身保留，nav 的 is-sorting 类不受影响）
+  navSort.cancelDrag(); // 防御：重建 DOM 前结束任何拖拽，绝不带着拖拽状态重建 DOM
   els.nav.innerHTML = '';
   navGroups.clear();
   const plan = computeNavPlan(GROUPS, TOOLS, settings.getSettings().navOrder);
@@ -530,9 +531,7 @@ function renderNav() {
       + `<span class="tool-group-count">${tools.length}</span>`;
     // 以「眼睛看到的当前状态」为准取反：自动展开过的分组，点一下就是收起
     head.addEventListener('click', () => {
-      // 排序模式中：轻点标题的展开/收起由 navsort 的 pointerup 分支处理（要区分拖动＝整组移动），
-      // 这里直接让位，避免同一次轻点被处理两遍。
-      if (navSort.isActive()) return;
+      // 长按拖动排序（navsort.js）拖完的 click 已在 capture 阶段拦下，这里只管展开/收起
       setGroupCollapsed(group.id, !wrap.classList.contains('is-collapsed'));
     });
     wrap.appendChild(head);
@@ -550,57 +549,32 @@ function renderNav() {
     renderGroup(group, group.tools);
   }
 
-  if (navSort.isActive()) {
-    // 排序模式中重建（如「恢复默认顺序」）：按本次排序的折叠状态瞬时复位，
-    // 别把用户刚展开、正要排内部工具的那一组收回去（会话状态见 sortSessionCollapsed）。
-    applySortSessionView(true);
-  } else {
-    // 重建后当前工具所在的分组必须仍是展开的（瞬时展开，不播动画）
-    ensureGroupExpanded(activeTool && activeTool.group);
-  }
+  // 重建后当前工具所在的分组必须仍是展开的（瞬时展开，不播动画）
+  ensureGroupExpanded(activeTool && activeTool.group);
+  // 「↺ 恢复默认顺序」只在用户排过序（navOrder 非空）时显示（拖放落盘后由 persist 回调再刷一次）
+  syncNavReset();
 }
 
-// —— 导航手动排序（v2.6.0；v2.7.0 起进入排序默认全收起、可在排序中按需展开）——
-// 分组与组内工具各自独立排序；顺序存 settings.navOrder（null = 默认序）。
-// 排序会话的折叠状态只作用于「这一次排序」：进入时全部收起（用户要求：一屏标题、整洁有序），
-// 点标题可展开某一组去排它的内部工具；**不写进用户偏好**，退出排序时按 collapsedGroups 原样恢复。
-let sortSessionCollapsed = new Set();
+// —— 导航手动排序（v2.6.0；v2.11.0 起长按条目即可拖动，不再有排序模式）——
+// 分组（主项目）与组内工具（子项目）各自独立排序；顺序存 settings.navOrder（null = 默认序）。
+// 快速点击不受影响：点工具切换、点分组标题展开/收起（拖完的 click 由 navsort 在 capture 阶段拦下）。
 
-/** 把「排序会话的折叠状态」刷到当前导航（instant=瞬时：用于进入/重渲染后复位，避免一串动画） */
-function applySortSessionView(instant) {
-  for (const groupId of navGroups.keys()) {
-    applyGroupVisual(groupId, sortSessionCollapsed.has(groupId), instant);
-  }
-}
-
-/** 排序模式下点分组标题：展开/收起这一组（只改本次排序的视图，不写设置、不改用户偏好） */
-function toggleGroupInSort(groupId) {
-  if (!groupId || !navGroups.has(groupId)) return;
-  const collapsed = !sortSessionCollapsed.has(groupId);
-  if (collapsed) sortSessionCollapsed.add(groupId);
-  else sortSessionCollapsed.delete(groupId);
-  applyGroupVisual(groupId, collapsed);
+/** 「↺ 恢复默认顺序」按钮：只在用户排过序（settings.navOrder 非空）时显示，没排过序不占地方 */
+function syncNavReset() {
+  if (els.navReset) els.navReset.hidden = !settings.getSettings().navOrder;
 }
 
 const navSort = createNavSort({
   nav: els.nav,
-  persist: (order) => settings.updateSettings({ navOrder: order }).then(() => setStatus('工具顺序已保存')),
+  persist: (order) => settings.updateSettings({ navOrder: order }).then(() => {
+    syncNavReset();
+    setStatus('工具顺序已保存');
+  }),
   resetOrder: async () => {
     await settings.updateSettings({ navOrder: null });
-    renderNav(); // 排序模式保持开启，列表回默认顺序可继续拖（会话折叠状态由 renderNav 复位）
+    renderNav(); // 顺带把恢复按钮藏回去（navOrder 已为 null）
     setStatus('已恢复默认顺序');
   },
-  enterView: () => {
-    // 进入排序：全部收起（一屏标题、整洁），要排某组内部工具时点标题展开
-    sortSessionCollapsed = new Set(navGroups.keys());
-    applySortSessionView(false); // 带动画收起，切换柔和
-  },
-  exitView: () => {
-    // 退出排序：丢掉会话状态，恢复用户自己的展开/折叠偏好
-    sortSessionCollapsed.clear();
-    for (const groupId of navGroups.keys()) applyGroupVisual(groupId, collapsedGroups.has(groupId));
-  },
-  onGroupHeadTap: toggleGroupInSort,
   onStatus: setStatus
 });
 

@@ -257,8 +257,9 @@ async function runUiTest(win) {
     return JSON.stringify({ ok: info.overflowY === 'auto' && overlap < 2 && items.length >= 17 && reachable, ...info });
   })()`));
 
-  // 2.8) 导航手动排序（v2.6.0；v2.7.0 起进入排序默认全收起、可点标题按需展开）：
-  //      进入排序 → 轻点标题展开某组 → 合成指针拖工具（组内）→ 拖分组（整组）→ 恢复默认 → 退出。
+  // 2.8) 导航手动排序（v2.11.0 起长按条目拖动，无排序模式）：
+  //      点标题展开某组（快速点击照常）→ 长按拖工具（组内）→ 拖后 click 被拦 → 长按拖分组（整组）
+  //      → 按压未满长按就移动＝放弃 → 「恢复默认顺序」按钮显隐与清空。
   //      断言只看静态 DOM 序、折叠类与内存 navOrder/collapsedGroups，不看过渡中间态（防时序 flaky）。
   //      拖拽用合成 PointerEvent：untrusted 事件自家监听器照收；setPointerCapture 在 navsort.js 里
   //      是 try/catch 增强（合成指针会抛 NotFoundError），正确性不依赖它。分多段执行，中间截图。
@@ -281,45 +282,27 @@ async function runUiTest(win) {
     S.toolIds = (gid) => [...nav.querySelectorAll('.tool-group[data-group-id="' + gid + '"] .tool-item')].map((b) => b.dataset.toolId);
     S.activeId = () => (document.querySelector('.tool-item.is-active') || { dataset: {} }).dataset.toolId || '';
     const out = S.out = {};
+    S.prefBefore = JSON.stringify(S.getSettings().collapsedGroups);
+    S.activeBefore = S.activeId();
+    out.resetHiddenInitially = document.getElementById('btnSortReset').hidden; // 没排过序 → 藏着
 
-    // —— 进入排序模式：分组一律先收起（一屏标题、整洁有序），footer 切换 ——
-    document.getElementById('btnSort').click();
-    await wait(520);
-    out.enter = {
-      sorting: nav.classList.contains('is-sorting'),
-      doneShown: !document.getElementById('btnSortDone').hidden,
-      hintShown: !document.getElementById('sortHint').hidden,
-      settingsHidden: document.getElementById('btnSettings').hidden,
-      allCollapsed: S.groupWraps().every((g) => g.classList.contains('is-collapsed'))
-    };
-    return JSON.stringify(out);
-  `));
-  await shot('02d-排序模式-全收起');
-  result.checks.navSort = Object.assign(result.checks.navSort, JSON.parse(await sortStage(`
-    const out = S.out;
-    // —— 轻点分组标题：展开这一组（要排组内工具就得先点开），且**不写用户偏好** ——
-    const prefBefore = JSON.stringify(S.getSettings().collapsedGroups);
+    // —— 快速点分组标题：照常展开这一组（并写偏好）——长按拖动不该影响原有点击
     const imgHead = S.wrapOf('image').querySelector('.tool-group-head');
     const hr = imgHead.getBoundingClientRect();
     S.fire(imgHead, 'pointerdown', hr.left + 10, hr.top + hr.height / 2);
     S.fire(imgHead, 'pointerup', hr.left + 10, hr.top + hr.height / 2);
+    imgHead.click(); // 真实浏览器在 pointerup 后会派发 click；合成事件要手动补一发
     await wait(520);
     out.headTap = {
       imageExpanded: !S.isCollapsed('image'),
-      othersCollapsed: S.groupWraps().filter((g) => g.dataset.groupId !== 'image').every((g) => g.classList.contains('is-collapsed')),
-      notPersisted: JSON.stringify(S.getSettings().collapsedGroups) === prefBefore
+      persisted: JSON.stringify(S.getSettings().collapsedGroups) !== S.prefBefore
     };
-
-    // —— 排序模式中：点工具条目不切换工具（切换让位给拖拽）——
-    const activeBefore = S.activeId();
-    S.nav.querySelector('.tool-item').click();
-    await wait(150);
-    out.clickGuarded = S.activeId() === activeBefore;
-    return JSON.stringify({ headTap: out.headTap, clickGuarded: out.clickGuarded });
-  `)));
-  await shot('02e-排序-展开一组');
+    return JSON.stringify(out);
+  `));
+  await shot('02d-排序-展开一组');
   result.checks.navSort = Object.assign(result.checks.navSort, JSON.parse(await sortStage(`
-    // —— 组内拖工具：把图片组第 1 个工具拖到第 3 位（k=2）——
+    const out = S.out;
+    // —— 长按组内工具拖动：把图片组第 1 个工具拖到第 3 位（k=2）——
     const imageBefore = S.toolIds('image');
     const dragEl = S.nav.querySelector('.tool-item[data-tool-id="' + imageBefore[0] + '"]');
     const r0 = dragEl.getBoundingClientRect();
@@ -328,14 +311,11 @@ async function runUiTest(win) {
     const c2 = items[2].getBoundingClientRect();
     const c3 = items[3].getBoundingClientRect();
     const targetY = (c2.top + c2.height / 2 + c3.top + c3.height / 2) / 2;
-    const steps = 7;
     S.fire(dragEl, 'pointerdown', r0.left + 12, r0.top + r0.height / 2);
-    await wait(30);
-    S.fire(dragEl, 'pointermove', r0.left + 12, r0.top + r0.height / 2 + 6); // 越过 4px 阈值，开始拖
-    await wait(80);
-    const out = S.out;
-    out.draggingClass = dragEl.classList.contains('is-dragging');
+    await wait(500); // 越过长按阈值 400ms：到时即拿起
+    out.liftOnLongPress = dragEl.classList.contains('is-dragging');
     out.dragActiveClass = S.nav.classList.contains('is-drag-active'); // 拖拽中放开组容器裁剪
+    const steps = 7;
     for (let i = 1; i <= steps; i++) {
       S.fire(dragEl, 'pointermove', r0.left + 12, r0.top + r0.height / 2 + (targetY - r0.top - r0.height / 2) * i / steps);
       await wait(40);
@@ -347,20 +327,29 @@ async function runUiTest(win) {
     out.toolDragOk = imageBefore.length >= 4 && JSON.stringify(after) === JSON.stringify(expected);
     out.toolOrderSaved = !!S.getSettings().navOrder
       && JSON.stringify(S.getSettings().navOrder.tools.image) === JSON.stringify(after);
-    return JSON.stringify({ draggingClass: out.draggingClass, dragActiveClass: out.dragActiveClass, toolDragOk: out.toolDragOk, toolOrderSaved: out.toolOrderSaved });
+    out.dragEnded = !dragEl.classList.contains('is-dragging');
+    out.resetShownAfterDrag = !document.getElementById('btnSortReset').hidden; // 排过序 → 按钮出现
+    // 拖完 500ms 内的 click 必须被拦下：不切走工具（真实指针拖完浏览器会派发 click，这里手动补一发）
+    S.nav.querySelector('.tool-item[data-tool-id="' + imageBefore[1] + '"]').click();
+    await wait(150);
+    out.clickAfterDragSuppressed = S.activeId() === S.activeBefore;
+    return JSON.stringify({ liftOnLongPress: out.liftOnLongPress, dragActiveClass: out.dragActiveClass,
+      toolDragOk: out.toolDragOk, toolOrderSaved: out.toolOrderSaved, dragEnded: out.dragEnded,
+      resetShownAfterDrag: out.resetShownAfterDrag, clickAfterDragSuppressed: out.clickAfterDragSuppressed });
   `)));
-  await shot('02f-排序-拖工具后');
+  await shot('02e-排序-长按拖工具后');
   result.checks.navSort = Object.assign(result.checks.navSort, JSON.parse(await sortStage(`
-    // —— 拖分组头：把「视频」组整组拖到「图片」组前面（k=0）——
+    const out = S.out;
+    // —— 长按分组头拖动：把「视频」组整组拖到「图片」组前面（k=0）——
+    // 图片组此刻是展开的（兄弟高度不齐）：顺带验证让位对高度不齐的兄弟也正确
     const groupsBefore = S.groupWraps().map((g) => g.dataset.groupId);
     const videoHead = S.wrapOf('video').querySelector('.tool-group-head');
     const rw = S.wrapOf('video').getBoundingClientRect();
     const rv = videoHead.getBoundingClientRect();
     const ri = S.wrapOf('image').getBoundingClientRect();
     S.fire(videoHead, 'pointerdown', rv.left + 10, rv.top + rv.height / 2);
-    await wait(30);
-    S.fire(videoHead, 'pointermove', rv.left + 10, rv.top + rv.height / 2 + 6);
-    await wait(80);
+    await wait(500); // 越过长按阈值
+    out.groupLifted = S.wrapOf('video').classList.contains('is-dragging');
     // 整组块很高：拖到图片组上方足够远处，保证「视频块中心」越过「图片块中心」
     const gTargetY = ri.top - Math.round(rw.height / 2) - 30;
     const steps = 7;
@@ -371,50 +360,67 @@ async function runUiTest(win) {
     S.fire(videoHead, 'pointerup', rv.left + 10, gTargetY);
     await wait(400);
     const after = S.groupWraps().map((g) => g.dataset.groupId);
-    const out = S.out;
     const firstIdx = groupsBefore.indexOf('video');
     const expected = ['video', ...groupsBefore.slice(0, firstIdx), ...groupsBefore.slice(firstIdx + 1)];
     out.groupDragOk = JSON.stringify(after) === JSON.stringify(expected);
     out.groupOrderSaved = !!S.getSettings().navOrder
       && JSON.stringify(S.getSettings().navOrder.groups) === JSON.stringify(after.filter((id) => id !== 'other'));
+    return JSON.stringify({ groupLifted: out.groupLifted, groupDragOk: out.groupDragOk, groupOrderSaved: out.groupOrderSaved });
+  `)));
+  await shot('02f-排序-拖分组后');
+  result.checks.navSort = Object.assign(result.checks.navSort, JSON.parse(await sortStage(`
+    const out = S.out;
+    // —— 按压未满长按时间就移动（≥4px）：放弃按压，不进入拖拽，click 照常可用 ——
+    const toolsBefore = S.toolIds('image');
+    const groupsBefore = S.groupWraps().map((g) => g.dataset.groupId);
+    const tapEl = S.nav.querySelector('.tool-item[data-tool-id="compress"]');
+    const rt = tapEl.getBoundingClientRect();
+    S.fire(tapEl, 'pointerdown', rt.left + 12, rt.top + rt.height / 2);
+    await wait(80); // 远小于 400ms
+    S.fire(tapEl, 'pointermove', rt.left + 12, rt.top + rt.height / 2 + 14);
+    await wait(60);
+    out.noDragOnEarlyMove = !tapEl.classList.contains('is-dragging');
+    S.fire(tapEl, 'pointerup', rt.left + 12, rt.top + rt.height / 2 + 14);
+    await wait(300);
+    out.orderUntouched = JSON.stringify(S.toolIds('image')) === JSON.stringify(toolsBefore)
+      && JSON.stringify(S.groupWraps().map((g) => g.dataset.groupId)) === JSON.stringify(groupsBefore);
+    // 时间窗外（距拖拽结束已远）点击照常切换工具；随后切回原工具
+    tapEl.click();
+    await wait(500);
+    out.clickWorksAgain = (document.querySelector('.tool-page.is-active') || { dataset: {} }).dataset.toolId === 'compress';
+    const back = [...document.querySelectorAll('#toolNav .tool-item')].find((b) => b.dataset.toolId === S.activeBefore);
+    back.click();
+    await wait(500);
 
-    // —— 恢复默认顺序：navOrder 清 null、DOM 回默认序，且**会话里展开的组保持展开**（不被收回去）——
+    // —— 「↺ 恢复默认顺序」：navOrder 清 null、DOM 回默认序、按钮重新藏起来 ——
     document.getElementById('btnSortReset').click();
     await wait(400);
     out.reset = {
       navOrderNull: S.getSettings().navOrder === null,
       firstGroupIsImage: S.groupWraps()[0].dataset.groupId === 'image',
-      stillSorting: S.nav.classList.contains('is-sorting'),
-      sessionKept: !S.isCollapsed('image')
+      resetHiddenAgain: document.getElementById('btnSortReset').hidden
     };
-
-    // —— 退出排序模式：footer 复原、折叠状态回到用户偏好、工具点击恢复可用 ——
-    document.getElementById('btnSortDone').click();
-    await wait(520);
-    const prefArr = S.getSettings().collapsedGroups;
-    const prefCollapsed = (id) => (Array.isArray(prefArr) ? prefArr.includes(id) : true); // null = 默认全收起
-    out.exit = {
-      notSorting: !S.nav.classList.contains('is-sorting'),
-      footerBack: !document.getElementById('btnSettings').hidden && document.getElementById('btnSortDone').hidden,
-      collapsedRestored: S.groupWraps().every((g) => g.classList.contains('is-collapsed') === prefCollapsed(g.dataset.groupId))
-    };
-    // 点工具恢复正常切换（此操作会临时展开所在分组，放在折叠断言之后）
-    const nav2 = (id) => [...document.querySelectorAll('#toolNav .tool-item')].find((b) => b.dataset.toolId === id);
-    nav2('compress').click();
-    await wait(500);
-    out.exit.toolClickableAgain = (document.querySelector('.tool-page.is-active') || { dataset: {} }).dataset.toolId === 'compress';
-    nav2('obfuscate').click();
-    await wait(500);
-
-    // 兜底：不留排序痕迹给后续步骤（正常路径恢复默认已清 null）
-    if (S.getSettings().navOrder !== null) {
-      const { updateSettings } = await import('../shared/settings.js');
-      await updateSettings({ navOrder: null });
-    }
-    delete window.__navsortTest;
-    return JSON.stringify({ groupDragOk: out.groupDragOk, groupOrderSaved: out.groupOrderSaved, reset: out.reset, exit: out.exit });
+    return JSON.stringify({ noDragOnEarlyMove: out.noDragOnEarlyMove, orderUntouched: out.orderUntouched,
+      clickWorksAgain: out.clickWorksAgain, reset: out.reset });
   `)));
-  await shot('02g-排序-退出后');
+  await shot('02g-排序-恢复默认后');
+
+  // 收尾：不留排序痕迹给后续步骤——把「图片」组点回收起、折叠偏好与 navOrder 复原
+  await sortStage(`
+    const imgHead = S.wrapOf('image').querySelector('.tool-group-head');
+    const hr = imgHead.getBoundingClientRect();
+    S.fire(imgHead, 'pointerdown', hr.left + 10, hr.top + hr.height / 2);
+    S.fire(imgHead, 'pointerup', hr.left + 10, hr.top + hr.height / 2);
+    imgHead.click(); // 真实浏览器在 pointerup 后会派发 click；合成事件要手动补一发
+    await wait(520);
+    const { updateSettings } = await import('../shared/settings.js');
+    if (JSON.stringify(S.getSettings().collapsedGroups) !== S.prefBefore) {
+      await updateSettings({ collapsedGroups: JSON.parse(S.prefBefore) });
+    }
+    if (S.getSettings().navOrder !== null) await updateSettings({ navOrder: null });
+    delete window.__navsortTest;
+    return JSON.stringify({ collapsedAgain: S.isCollapsed('image'), navOrderNull: S.getSettings().navOrder === null });
+  `);
 
   await evalJs(`(() => {
     const sel = document.getElementById('modeSelect');
@@ -680,29 +686,25 @@ async function runUiTest(win) {
     c.stateKeep.ok === true &&
     c.navStable.ok === true &&
     c.navScrollable.ok === true &&
-    c.navSort.enter.sorting === true &&
-    c.navSort.enter.doneShown === true &&
-    c.navSort.enter.hintShown === true &&
-    c.navSort.enter.settingsHidden === true &&
-    c.navSort.enter.allCollapsed === true &&
+    c.navSort.resetHiddenInitially === true &&
     c.navSort.headTap.imageExpanded === true &&
-    c.navSort.headTap.othersCollapsed === true &&
-    c.navSort.headTap.notPersisted === true &&
-    c.navSort.clickGuarded === true &&
-    c.navSort.draggingClass === true &&
+    c.navSort.headTap.persisted === true &&
+    c.navSort.liftOnLongPress === true &&
     c.navSort.dragActiveClass === true &&
     c.navSort.toolDragOk === true &&
     c.navSort.toolOrderSaved === true &&
+    c.navSort.dragEnded === true &&
+    c.navSort.resetShownAfterDrag === true &&
+    c.navSort.clickAfterDragSuppressed === true &&
+    c.navSort.groupLifted === true &&
     c.navSort.groupDragOk === true &&
     c.navSort.groupOrderSaved === true &&
+    c.navSort.noDragOnEarlyMove === true &&
+    c.navSort.orderUntouched === true &&
+    c.navSort.clickWorksAgain === true &&
     c.navSort.reset.navOrderNull === true &&
     c.navSort.reset.firstGroupIsImage === true &&
-    c.navSort.reset.stillSorting === true &&
-    c.navSort.reset.sessionKept === true &&
-    c.navSort.exit.notSorting === true &&
-    c.navSort.exit.footerBack === true &&
-    c.navSort.exit.collapsedRestored === true &&
-    c.navSort.exit.toolClickableAgain === true &&
+    c.navSort.reset.resetHiddenAgain === true &&
     c.obfuscatedDiffers === true &&
     c.revertEqualsOriginal === true &&
     result.steps.filesAfterSave.length >= 1 &&
