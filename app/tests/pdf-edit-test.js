@@ -406,9 +406,29 @@ async function runPdfEditTest(win) {
     };
     for (const [k, v] of Object.entries(checks)) if (!v) failures.push(`关键结果不达标：${k}`);
 
+    // —— 假绿防线：缺资源时的「跳过」必须算失败，不能让 ok:true 混过去 ——
+    // 有些步骤在缺资源时会返回 { skipped: … } 并跳过断言。v2.11.1 之前产物上字体路径解析
+    // 错误，watermarkCjk / pageNumbersSkipFirstCjk 就是这样被静默跳过、整体仍报 ok:true，
+    // 「产物上中文水印是坏的」这个真实缺陷因此一直没被发现。
+    // 为什么算失败而不是像 --imghide-test 那样用 ok/verified 两字段区分：imghide 的裁判是
+    // **刻意不随包分发**的第三方参照，缺它情有可原；而中文字体是加装包里的普通资产，
+    // 与本测试硬性要求的 OCR 引擎同一来源——缺它的环境里，中文水印/页码功能本身就坏了，
+    // 测试理应报失败而不是「跑过的都过」。
+    // verified 作为描述性字段保留：= ok 且无跳过且字体就位（全绿时应与 ok 相等）。
+    const skipped = Object.entries(steps)
+      .filter(([, v]) => v && typeof v === 'object' && typeof v.skipped === 'string')
+      .map(([k, v]) => ({ step: k, reason: v.skipped }));
+    const cjkFontFound = !!(steps.cjkFont && steps.cjkFont.found === true);
+    if (skipped.length) {
+      failures.push(`verified 未达标：${skipped.length} 项被跳过（${skipped.map((s) => s.step).join(', ')}）——缺资源的降级路径不应算通过`);
+    } else if (!cjkFontFound) {
+      failures.push('verified 未达标：中文字体未就位（cjkFont.found=false）');
+    }
+
     const ok = failures.length === 0;
-    writeResult(RESULT_FILE, { ok, at: new Date().toISOString(), cleanBefore, cleanAfter, checks, failures, steps, consoleLines });
-    return { ok, steps, failures, checks };
+    const verified = ok && skipped.length === 0 && cjkFontFound;
+    writeResult(RESULT_FILE, { ok, verified, at: new Date().toISOString(), cleanBefore, cleanAfter, checks, skipped, failures, steps, consoleLines });
+    return { ok, verified, skipped, steps, failures, checks };
   } catch (err) {
     const message = `自检异常：${err && err.message ? err.message : String(err)}`;
     writeResult(RESULT_FILE, {
