@@ -29,7 +29,7 @@
 2. **中文字子集化必须配 `@cantoo/fontkit`**（不是 `@pdf-lib/fontkit`）：后者与本分支 API 不匹配，实测报 `Cannot read properties of undefined (reading 'pos')`（它只提供 v1 的 `encodeStream()`，而分支优先调 v2 的 `encode()`）。
 3. **fontkit 在界面进程要走 UMD**：它的 ESM 产物里是裸模块名（`restructure` / `brotli` / `dfa` / `fflate`），本项目没有打包器，浏览器直接 import 会 `Failed to resolve module specifier`。故渲染进程用 `<script>` 加载 `fontkit.umd.min.js`（CSP `script-src 'self'` 允许同源脚本），Node 侧走 `import`。
 4. **解密必须「搬家」而不是原地保存**：实测直接 `load(带密码) → save()` 会把 `/Encrypt` 原样写回，**输出仍打不开、等于没解密**。正确做法是把页面复制进一个**全新的 PDFDocument** 再保存（自检里加了 `/Encrypt` 字节检查作回归防线）。
-5. 中文字体取自 `addons/ocr/fonts/NotoSansSC-VF.ttf`（与 OCR 工具共用一份，避免重复 17MB）；路径用 `new URL(..., import.meta.url)` 解析，不硬编码目录结构。
+5. 中文字体取自 `addons/ocr/fonts/NotoSansSC-VF.ttf`（与 OCR 工具共用一份，避免重复 17MB）；**取字走主进程 `ocr:font` IPC**——路径由主进程按 `PORTABLE_DIR` 解析，开发态与打包产物都正确；`import.meta.url` 相对路径仅作回退。相对深度只在开发态成立（产物上本文件在 `resources/app/src/...`，`addons/` 在产物根目录）——v2.11.1 之前只走相对路径，产物上字体读不到、中文水印/页码静默降级，见 CHANGELOG v2.11.1。
 
 ## 非目标
 - 不做版面编辑（改文字、挪图片、加批注）——PDF 本身不存版面结构，这类需求不在本期。
