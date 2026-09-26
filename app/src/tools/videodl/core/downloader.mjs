@@ -13,9 +13,13 @@ import * as bilibili from './bilibili.mjs';
 import browserDiscovery from './browser-resolver.cjs';
 import douyinResolver from './douyin-resolver.cjs';
 import { runChildJson, killProcessTree } from './childutil.mjs';
-import { safeFileName, formatSpeed, formatEta, parseYtdlpLine, isYouTubeUrl, isXiaohongshuUrl, extractDouyinVideoId } from './pure.mjs';
+import {
+  safeFileName, formatSpeed, formatEta, parseYtdlpLine, isYouTubeUrl, isXiaohongshuUrl, extractDouyinVideoId,
+  cookiePairsFromSetCookie, parseDouyinRouterData, findDouyinItem,
+} from './pure.mjs';
 
 const DOUYIN_MOBILE_UA = 'Mozilla/5.0 (Linux; Android 14; Pixel 8 Pro) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/145.0.0.0 Mobile Safari/537.36';
+const DOUYIN_DESKTOP_UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/145.0.0.0 Safari/537.36';
 
 function assertNotCancelled(job) {
   if (job.cancelRequested) { const error = new Error('已取消'); error.cancelled = true; throw error; }
@@ -76,17 +80,28 @@ export async function finishVideoJob(ctx, job) {
 }
 
 // ── 抖音：游客通道 + 匿名会话兜底 ──
-async function fetchText(url, timeoutMs = 30000) {
+// 抖音游客页只认「带 ttwid 的游客」：不带这个 Cookie 去请求，页面里永远只有空壳、没有 play_addr，
+// 于是只能退到临时浏览器兜底（慢约 30 秒，机器上开着代理时基本必败）——v2.12.1 实测，
+// 此前抖音下载全灭就是缺了它。ttwid 优先向字节官方接口换一个（分享页自己发不发全看它心情）。
+async function fetchText(url, { timeoutMs = 30000, cookie = '' } = {}) {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {
     const response = await fetch(url, {
       redirect: 'follow',
       signal: controller.signal,
-      headers: { 'User-Agent': DOUYIN_MOBILE_UA, 'Accept-Language': 'zh-CN,zh;q=0.9' },
+      headers: {
+        'User-Agent': DOUYIN_MOBILE_UA,
+        'Accept-Language': 'zh-CN,zh;q=0.9',
+        ...(cookie ? { Cookie: cookie } : {}),
+      },
     });
     if (!response.ok) throw new Error(`页面请求失败（HTTP ${response.status}）`);
-    return { url: response.url, text: await response.text() };
+    return {
+      url: response.url,
+      text: await response.text(),
+      cookies: cookiePairsFromSetCookie(response.headers.getSetCookie()),
+    };
   } finally { clearTimeout(timer); }
 }
 
@@ -95,38 +110,63 @@ export async function resolveXiaohongshuUrl(value) {
   let host = '';
   try { host = new URL(value).hostname.toLowerCase(); } catch { return value; }
   if (host !== 'xhslink.com' && !host.endsWith('.xhslink.com')) return value;
-  const resolved = await fetchText(value, 20000);
+  const resolved = await fetchText(value, { timeoutMs: 20000 });
   return isXiaohongshuUrl(resolved.url) ? resolved.url : value;
 }
 
-function findDouyinItem(value, id) {
-  if (!value || typeof value !== 'object') return null;
-  if (String(value.aweme_id || '') === String(id) && value.video) return value;
-  for (const child of Object.values(value)) {
-    const found = findDouyinItem(child, id);
-    if (found) return found;
-  }
-  return null;
+const DOUYIN_PAGE_PROBLEMS = {
+  missing: '抖音游客页面没有返回视频数据',
+  'bad-json': '抖音游客页面数据解析失败',
+};
+
+// 字节官方的游客标识发放接口：不要账号、不读用户浏览器资料，只换一个匿名 ttwid。
+// 分享页自己发不发 ttwid 看它心情（实测同一天两条链接，一条发一条不发），所以主动去换一个最稳。
+const TTWID_REGISTER_URL = 'https://ttwid.bytedance.com/ttwid/union/register/';
+
+async function registerDouyinTtwid() {
+  try {
+    const response = await fetch(TTWID_REGISTER_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'User-Agent': DOUYIN_DESKTOP_UA },
+      body: JSON.stringify({
+        region: 'cn', aid: 1768, needFid: false, service: 'www.douyin.com',
+        migrate_info: { ticket: '', source: 'node' }, cbUrlProtocol: 'https', union: true,
+      }),
+    });
+    if (!response.ok) return '';
+    return cookiePairsFromSetCookie(response.headers.getSetCookie()).find((pair) => /^ttwid=/i.test(pair)) || '';
+  } catch { return ''; } // 换不到就走下面「用页面自己发的 Cookie」那条退路，最终由页面级错误说话
 }
 
-async function getDouyinVideoInfo(originalUrl) {
+// 取不到条目时只回原因、不抛错：好让「带 Cookie 再来一趟」还有机会。
+function douyinItemFromPage(html, id) {
+  const parsed = parseDouyinRouterData(html);
+  if (!parsed.ok) return { item: null, problem: DOUYIN_PAGE_PROBLEMS[parsed.reason] };
+  const item = findDouyinItem(parsed.data, id);
+  if (!item?.video?.play_addr?.uri) return { item: null, problem: '抖音游客页面暂未提供这个视频的播放地址' };
+  return { item, problem: '' };
+}
+
+export async function getDouyinVideoInfo(originalUrl, { fetchPage = fetchText, getTtwid = registerDouyinTtwid } = {}) {
   let id = extractDouyinVideoId(originalUrl);
   if (!id) {
-    const resolved = await fetchText(originalUrl);
+    const resolved = await fetchPage(originalUrl);
     id = extractDouyinVideoId(resolved.url)
       || resolved.text.match(/"(?:aweme_id|itemId)"\s*:\s*"(\d{15,25})"/i)?.[1]
       || '';
   }
   if (!id) throw new Error('没有从抖音链接中识别出视频编号');
   try {
-    const share = await fetchText(`https://www.iesdouyin.com/share/video/${id}/`);
-    const routerJson = share.text.match(/window\._ROUTER_DATA\s*=\s*(\{[\s\S]*?\})\s*<\/script>/)?.[1];
-    if (!routerJson) throw new Error('抖音游客页面没有返回视频数据');
-    let data;
-    try { data = JSON.parse(routerJson); } catch { throw new Error('抖音游客页面数据解析失败'); }
-    const item = findDouyinItem(data, id);
-    const videoId = item?.video?.play_addr?.uri;
-    if (!item || !videoId) throw new Error('抖音游客页面暂未提供这个视频的播放地址');
+    const shareUrl = `https://www.iesdouyin.com/share/video/${id}/`;
+    const ttwid = await getTtwid();
+    let share = await fetchPage(shareUrl, ttwid ? { cookie: ttwid } : {});
+    let { item, problem } = douyinItemFromPage(share.text, id);
+    if (!item && !ttwid && share.cookies.length) {
+      share = await fetchPage(shareUrl, { cookie: share.cookies.join('; ') });
+      ({ item, problem } = douyinItemFromPage(share.text, id));
+    }
+    if (!item) throw new Error(problem);
+    const videoId = item.video.play_addr.uri;
     return {
       id,
       title: safeFileName(item.desc),
@@ -141,9 +181,10 @@ async function getDouyinVideoInfo(originalUrl) {
 }
 
 async function getDouyinAnonymousVideoInfo(ctx, job, id) {
-  const proxy = ctx.proxy();
+  // 抖音是国内站，不给临时浏览器传代理（B站同理，见 runYtdlpJob 里对 isBili 的处理）：
+  // 探测到的 Clash 端口一旦内核没在跑，整场会空转三十秒后报「没有取得播放地址」。
   const data = await runChildJson(job, {
-    script: ctx.resolverDouyin, args: [String(id), ...(proxy ? [proxy] : [])], timeoutMs: 45000, tag: '匿名临时会话',
+    script: ctx.resolverDouyin, args: [String(id)], timeoutMs: 45000, tag: '匿名临时会话',
   });
   if (String(data.id) !== String(id) || !douyinResolver.isAllowedMediaUrl(data.url)) throw new Error('返回的视频信息不匹配');
   return {

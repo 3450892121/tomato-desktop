@@ -1,6 +1,6 @@
 // 视频下载的纯逻辑小件（无 Electron / 无网络调用，便于 Node 直接单测：tests/videodl.test.mjs）。
 // 行为对齐上游 leetools/video-downloader server.js（MIT，见 ../UPSTREAM-LICENSE.txt）：
-// URL 提取、文件名净化、速度/剩余时间格式、yt-dlp 输出行解析。
+// URL 提取、文件名净化、速度/剩余时间格式、yt-dlp 输出行解析、抖音游客页数据解析。
 import path from 'node:path';
 
 /** 从随意粘贴的文本里抠出第一个 http(s) 链接（去掉中文标点尾巴） */
@@ -63,6 +63,34 @@ export function extractDouyinVideoId(value) {
     }
   } catch {}
   return '';
+}
+
+/** 把响应头里的 Set-Cookie 列表转成可以原样带回去的 "name=value" 数组（去掉 Path/Expires 等属性） */
+export function cookiePairsFromSetCookie(setCookieHeaders) {
+  return (Array.isArray(setCookieHeaders) ? setCookieHeaders : [])
+    .map((line) => String(line || '').split(';')[0].trim())
+    .filter((pair) => pair.includes('='));
+}
+
+/**
+ * 取抖音分享页的 SSR 数据块 window._ROUTER_DATA。
+ * 返回 { ok:true, data } 或 { ok:false, reason:'missing'|'bad-json' }——两种失败要报不同的话，所以不直接抛。
+ */
+export function parseDouyinRouterData(html) {
+  const json = String(html || '').match(/window\._ROUTER_DATA\s*=\s*(\{[\s\S]*?\})\s*<\/script>/)?.[1];
+  if (!json) return { ok: false, reason: 'missing' };
+  try { return { ok: true, data: JSON.parse(json) }; } catch { return { ok: false, reason: 'bad-json' } }
+}
+
+/** 在任意嵌套结构里找 aweme_id 对得上、且带 video 的那条数据（抖音的字段位置随页面版本变，只能递归找） */
+export function findDouyinItem(value, id) {
+  if (!value || typeof value !== 'object') return null;
+  if (String(value.aweme_id || '') === String(id) && value.video) return value;
+  for (const child of Object.values(value)) {
+    const found = findDouyinItem(child, id);
+    if (found) return found;
+  }
+  return null;
 }
 
 /**

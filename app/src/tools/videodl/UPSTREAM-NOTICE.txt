@@ -10,7 +10,7 @@
   core/errors.mjs             ← scripts/download-errors.js（ESM 化）
   core/yangshipin.mjs         ← scripts/yangshipin.js（ESM 化 + 取消信号）
   core/bilibili.mjs           ← scripts/bilibili-download.js（插件目录改入参）
-  core/douyin-resolver.cjs    ← scripts/douyin-anonymous-resolver.js（未改逻辑）
+  core/douyin-resolver.cjs    ← scripts/douyin-anonymous-resolver.js（取数逻辑未改；v2.12.1 起浏览器没起来时把退出码/信号/浏览器自己的输出写进报错）
   core/browser-resolver.cjs   ← scripts/browser-resolver.js（仅改 require 指向）
   plugins/leetools/           ← scripts/yt-dlp-plugins/leetools/（B站备用线路插件，原样）
   core/downloader.mjs         ← server.js 引擎段（yt-dlp 任务/抖音/央视频/网页兜底/音画校验/防覆盖）
@@ -27,5 +27,11 @@
   - 下载历史落盘（userdata/videodl-history.json；上游只在内存，重启即丢）
   - 引擎自更新（查官方 nightly → 下载 → SHA-256 校验 → 落 userdata；失败自动退回随包版）
   - 每周自动检查（可关）、更新进度显示、缺包降级提示
+  - 抖音游客通道带 ttwid Cookie（v2.12.1）：上游直接请求分享页，抖音改版后那样只能拿到没有
+    video 字段的空壳页；现改为先向字节官方发放接口换一份匿名 ttwid（不要账号、不读用户浏览器
+    资料、不落盘），换不到才退回用分享页自己发的 Cookie。同时抖音不再走探测到的代理——它是国内站，
+    代理端口没人听时会让整场空转到超时（B站通道本来就这么处理，这次对齐）。
+  - 抖音相关纯函数（_ROUTER_DATA 解析 / 递归找视频条目 / Set-Cookie 转 Cookie 串）拆进 core/pure.mjs，
+    getDouyinVideoInfo 支持注入假 fetch，于是这条链路有了不联网的单测（上游无测试）。
 
 维护约定：上游更新适配修复时，对照本清单搬运对应文件，并更新上面的「锁定提交」。

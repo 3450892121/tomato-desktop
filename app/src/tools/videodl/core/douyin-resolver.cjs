@@ -126,17 +126,23 @@ class CdpClient {
   close() { try { this.socket.close(); } catch {} }
 }
 
-async function waitForDevTools(profileDir, child) {
+// 报错里带上退出码与浏览器自己的输出：只说「已退出」根本查不出原因（v2.12.1 排查抖音下载时吃过这个亏）。
+function withDetail(message, detail) {
+  const text = typeof detail === 'function' ? detail() : detail;
+  return text ? `${message}（${text}）` : message;
+}
+
+async function waitForDevTools(profileDir, child, detail = () => '') {
   const marker = path.join(profileDir, 'DevToolsActivePort');
   for (let attempt = 0; attempt < 120; attempt++) {
-    if (child && (child.killed || child.exitCode !== null)) throw new Error('临时浏览器已退出');
+    if (child && (child.killed || child.exitCode !== null)) throw new Error(withDetail('临时浏览器已退出', detail));
     if (fs.existsSync(marker)) {
       const port = fs.readFileSync(marker, 'utf8').split(/\r?\n/)[0];
       if (/^\d+$/.test(port)) return port;
     }
     await sleep(100);
   }
-  throw new Error('匿名浏览器启动超时');
+  throw new Error(withDetail('匿名浏览器启动超时', detail));
 }
 
 async function findPageTarget(port) {
@@ -182,12 +188,24 @@ async function resolveAnonymous(videoId, proxy = '') {
     '--remote-debugging-port=0', `--user-data-dir=${profileDir}`, 'about:blank',
   ];
   if (proxy) args.splice(args.length - 1, 0, `--proxy-server=${proxy}`);
-  const child = spawn(browser, args, { windowsHide: true, stdio: 'ignore' });
-  child.on('error', () => {});
+  // stderr 要接出来（原来是 'ignore'）：浏览器启动失败时，唯一的线索就在它自己的输出里。
+  const child = spawn(browser, args, { windowsHide: true, stdio: ['ignore', 'ignore', 'pipe'] });
+  let spawnError = null;
+  let browserStderr = '';
+  child.stderr.setEncoding('utf8');
+  child.stderr.on('data', (chunk) => { browserStderr = (browserStderr + chunk).slice(-600); });
+  child.on('error', (error) => { spawnError = error; });
+  const browserDetail = () => [
+    spawnError ? `启动失败 ${spawnError.code || spawnError.message}` : '',
+    child.exitCode === null || child.exitCode === undefined ? '' : `退出码 ${child.exitCode}`,
+    child.signalCode ? `信号 ${child.signalCode}` : '',
+    child.killed ? '已被本工具终止' : '',
+    browserStderr.trim() ? `浏览器输出 ${browserStderr.trim().slice(-200)}` : '',
+  ].filter(Boolean).join('；');
   const releaseOwnerWatch = watchBrowserOwner(child, 40000);
   let cdp;
   try {
-    const port = await waitForDevTools(profileDir, child);
+    const port = await waitForDevTools(profileDir, child, browserDetail);
     const target = await findPageTarget(port);
     cdp = new CdpClient(target.webSocketDebuggerUrl);
     await cdp.open();

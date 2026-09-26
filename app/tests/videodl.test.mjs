@@ -1,6 +1,7 @@
 // 视频下载 · 纯逻辑单测（Node 直接跑，无需 Electron / 无需联网；挂 npm test）
 // 覆盖：URL 提取与站点识别、文件名净化、速度/剩余时间格式、yt-dlp 行解析、错误分类、
-//       B站参数、央视频解析、引擎安装/读取与「校验不过必须拒绝」。
+//       B站参数、央视频解析、引擎安装/读取与「校验不过必须拒绝」、
+//       抖音游客通道（假 fetch 喂罐装页面，钉住「必须带 ttwid Cookie 才有视频数据」）。
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -9,8 +10,10 @@ import { spawnSync } from 'node:child_process';
 import {
   extractUrl, safeFileName, formatSpeed, formatEta, isDouyinUrl, isYouTubeUrl,
   isXiaohongshuUrl, extractDouyinVideoId, parseYtdlpLine,
+  cookiePairsFromSetCookie, parseDouyinRouterData, findDouyinItem,
 } from '../src/tools/videodl/core/pure.mjs';
 import { describeDownloadError } from '../src/tools/videodl/core/errors.mjs';
+import { getDouyinVideoInfo } from '../src/tools/videodl/core/downloader.mjs';
 import { isBilibiliUrl, attemptArgs, isConnectionFailure } from '../src/tools/videodl/core/bilibili.mjs';
 import { isYangshipinUrl, normalizeUrl, makeCKey, parsePage, parsePlayback } from '../src/tools/videodl/core/yangshipin.mjs';
 import { checkLatestEngine, downloadEngine, installEngine, readInstalledEngine, sha256File } from '../src/tools/videodl/core/engine-update.mjs';
@@ -58,6 +61,94 @@ await test('extractDouyinVideoId：路径 / modal_id / 无', () => {
   assert.equal(extractDouyinVideoId('https://www.douyin.com/video/7412345678901234567'), '7412345678901234567');
   assert.equal(extractDouyinVideoId('https://www.douyin.com/?modal_id=7412345678901234567'), '7412345678901234567');
   assert.equal(extractDouyinVideoId('https://v.douyin.com/abc/'), '');
+});
+
+// —— 1b) 抖音游客通道（v2.12.1 修：不带 ttwid Cookie 就永远只有空壳页，抖音下载全灭）——
+const DY_ID = '7689801276976308730';
+const DY_SHORT = 'https://v.douyin.com/abc123/';
+const DY_SHARE = `https://www.iesdouyin.com/share/video/${DY_ID}/`;
+// 空壳页：只有页面配置，itemId 对得上但没有 video（就是修之前每次都拿到的东西）
+const dyShellPage = `<script>window._ROUTER_DATA = ${JSON.stringify({
+  loaderData: { 'video_(id)/page': { itemId: DY_ID, commonContext: { ua: 'x' } } },
+})}</script>`;
+// 有数据的页：aweme_id 对得上且带 video.play_addr.uri
+const dyDataPage = (uri, desc = '测试视频') => `<script>window._ROUTER_DATA = ${JSON.stringify({
+  loaderData: { 'video_(id)/page': { awemeDetail: { aweme_id: DY_ID, desc, video: { play_addr: { uri, url_list: [] } } } } },
+})}</script>`;
+const dyPage = (text, cookies = []) => ({ url: DY_SHARE, text, cookies });
+
+await test('cookiePairsFromSetCookie：只留 name=value，属性与空行都丢掉', () => {
+  assert.deepEqual(
+    cookiePairsFromSetCookie(['ttwid=abc; Path=/; HttpOnly; Secure', ' s_v_web_id=x; Max-Age=1 ', '', '没有等号的行']),
+    ['ttwid=abc', 's_v_web_id=x'],
+  );
+  assert.deepEqual(cookiePairsFromSetCookie(null), []);
+});
+await test('parseDouyinRouterData：数据块 / 坏 JSON / 根本没有，三种情况分得清', () => {
+  assert.deepEqual(parseDouyinRouterData('<script>window._ROUTER_DATA = {"a":1}</script>'), { ok: true, data: { a: 1 } });
+  assert.deepEqual(parseDouyinRouterData('<script>window._ROUTER_DATA = {"a":}</script>'), { ok: false, reason: 'bad-json' });
+  assert.deepEqual(parseDouyinRouterData('<html>空壳</html>'), { ok: false, reason: 'missing' });
+});
+await test('findDouyinItem：递归找编号对得上且带 video 的那条', () => {
+  const wanted = { aweme_id: DY_ID, video: { play_addr: { uri: 'u' } } };
+  assert.equal(findDouyinItem({ loaderData: { page: { awemeDetail: wanted } } }, DY_ID), wanted);
+  // 只有编号、没有 video 的是页面配置，不能当成视频数据（修之前就是被它骗了）
+  assert.equal(findDouyinItem({ loaderData: { page: { itemId: DY_ID } } }, DY_ID), null);
+  assert.equal(findDouyinItem(null, DY_ID), null);
+});
+await test('抖音游客通道：换到 ttwid 就带着它取分享页，一趟拿到播放地址', async () => {
+  const cookiesSeen = [];
+  const fetchPage = async (url, options = {}) => {
+    cookiesSeen.push(options.cookie || '');
+    if (url === DY_SHORT) return { url: `${DY_SHARE}?region=CN`, text: `"itemId":"${DY_ID}"`, cookies: [] };
+    return dyPage(options.cookie ? dyDataPage('v1e00fgiTEST') : dyShellPage);
+  };
+  const info = await getDouyinVideoInfo(DY_SHORT, { fetchPage, getTtwid: async () => 'ttwid=TESTVALUE' });
+  assert.equal(info.id, DY_ID);
+  assert.equal(info.title, '测试视频');
+  assert.equal(info.url, 'https://aweme.snssdk.com/aweme/v1/play/?video_id=v1e00fgiTEST&ratio=1080p&line=0');
+  assert.equal(info.referer, 'https://www.iesdouyin.com/');
+  // 短链解析那趟不带 Cookie；分享页那趟必须带上 ttwid（不能白跑一趟空的）
+  assert.deepEqual(cookiesSeen, ['', 'ttwid=TESTVALUE']);
+});
+await test('抖音游客通道：换不到 ttwid 时，用分享页自己发的 Cookie 兜底', async () => {
+  const cookiesSeen = [];
+  const fetchPage = async (url, options = {}) => {
+    cookiesSeen.push(options.cookie || '');
+    return dyPage(options.cookie ? dyDataPage('uriFROMPAGE') : dyShellPage, ['ttwid=FROMPAGE', 'other=1']);
+  };
+  const info = await getDouyinVideoInfo(`https://www.douyin.com/video/${DY_ID}`, { fetchPage, getTtwid: async () => '' });
+  assert.equal(info.url.includes('video_id=uriFROMPAGE'), true);
+  assert.deepEqual(cookiesSeen, ['', 'ttwid=FROMPAGE; other=1']);
+});
+await test('抖音游客通道：两趟都拿不到数据时报页面级错误，并带上视频编号供兜底', async () => {
+  const fetchPage = async () => dyPage(dyShellPage);
+  await assert.rejects(
+    getDouyinVideoInfo(`https://www.douyin.com/video/${DY_ID}`, { fetchPage, getTtwid: async () => 'ttwid=X' }),
+    (err) => {
+      assert.equal(err.message, '抖音游客页面暂未提供这个视频的播放地址');
+      assert.equal(err.douyinVideoId, DY_ID); // runDouyinJob 靠它决定是否转匿名会话兜底
+      return true;
+    },
+  );
+});
+await test('抖音游客通道：页面没有数据块 / 数据块坏掉，报的是各自那句话', async () => {
+  const withPage = (text) => async () => dyPage(text);
+  await assert.rejects(
+    getDouyinVideoInfo(`https://www.douyin.com/video/${DY_ID}`, { fetchPage: withPage('<html>空壳</html>'), getTtwid: async () => '' }),
+    /抖音游客页面没有返回视频数据/,
+  );
+  await assert.rejects(
+    getDouyinVideoInfo(`https://www.douyin.com/video/${DY_ID}`, { fetchPage: withPage('<script>window._ROUTER_DATA = {"a":}</script>'), getTtwid: async () => '' }),
+    /抖音游客页面数据解析失败/,
+  );
+});
+await test('抖音：链接里认不出视频编号就明确报错，不去瞎猜', async () => {
+  const fetchPage = async (url) => ({ url: 'https://www.douyin.com/', text: '什么都没有', cookies: [] });
+  await assert.rejects(
+    getDouyinVideoInfo(DY_SHORT, { fetchPage, getTtwid: async () => 'ttwid=X' }),
+    /没有从抖音链接中识别出视频编号/,
+  );
 });
 
 // —— 2) 文件名净化 / 速度 / 剩余时间 ——
