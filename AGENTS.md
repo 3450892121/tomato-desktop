@@ -107,3 +107,28 @@
 - 严禁敏感信息进 git（token、cookie、密码、密钥、凭据等），一律加入 .gitignore。
 - 提交前自查：*.pem、*.key、id_rsa*、*.p12、*.pfx、credentials*、token*、*.secret、*.env 等文件名；私钥块、AKIA…、ghp_、github_pat_、sk- 开头长串等内容特征。
 - 发现敏感文件已被 git 跟踪：立即停手并警告用户——仅加 .gitignore 不够，需 git rm --cached 或 git filter-repo 清理历史。
+
+## 全局记忆（优先读）
+动手前先读，这里是用户的固定偏好与禁忌：
+- C:\Users\chen3\Documents\agent\记忆\PREFERENCES.md   # 用户偏好与红线
+- C:\Users\chen3\Documents\agent\记忆\ENV.md           # 本机环境事实与坑
+- C:\Users\chen3\Documents\agent\记忆\PITFALLS.md      # 跨项目通用坑
+与项目内约束冲突时，停下问用户，不要自行取舍。
+读不到就报错，不要当成「不存在」默默跳过。
+
+## 记忆文件（docs/ 文件夹）
+- spec/ 记「打算怎么做」（事前）；docs/ 记「实际发生了什么」（事后）。
+- docs/PITFALLS.md — 踩过的坑：症状 → 根因 → 解法。只追加，不重写。
+- docs/DECISIONS.md — 做过的技术决策，含被否决的方案与原因。只追加。
+- docs/PROGRESS.md — 当前进度、阻塞、下一步。每次更新覆盖本节。
+- 动手前先读这三个文件，尤其是踩坑记录，避免重踩同一个坑。
+
+## 收尾清单（每次任务结束前必须执行，逐条对照）
+1. 本次踩到新坑、走了弯路 → 追加到 docs/PITFALLS.md（症状 → 根因 → 解法）。
+2. 本次做了技术选型、或推翻了某个方案 → 追加到 docs/DECISIONS.md（含被否决的原因）。
+3. 进度有变化 → 更新 docs/PROGRESS.md（当前目标 / 已完成 / 进行中 / 下一步 / 阻塞）。
+4. 以上都没有 → 在回复里明确写「本次无新增记录」，不要默不作声。
+
+## 记忆提升规则
+- 同一个坑在第二个项目又出现 → 建议提升到 C:\Users\chen3\Documents\agent\记忆\PITFALLS.md，**需用户同意后才写**。
+- 全局记忆只收「换个项目照样成立」的内容；离开本项目就看不懂的，留在项目层。
