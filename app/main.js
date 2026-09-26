@@ -96,14 +96,18 @@ const imgHideUiTest = process.argv.includes('--imghide-ui-test');
 // 软件卸载自检：`electron . --uninstall-test`（加装包与版本、提权命令构造、界面走查与截图；见 spec/modules/uninstall.md）
 const uninstallTest = process.argv.includes('--uninstall-test');
 
+// 视频下载：自检 / 界面自动测试（见 spec/modules/videodl.md）
+const videodlTest = process.argv.includes('--videodl-test');
+const videodlUiTest = process.argv.includes('--videodl-ui-test');
+
 // 测试模式下关闭硬件加速：保证截图（capturePage）在任何机器上都能稳定拿到画面
-if (uiTest || pdfUiTest || mediaUiTest || audioUiTest || asrUiTest || themeTest || avTest || imgbatchTest || settingsIoTest || pdfOcrTest || queueUiTest || archiveUiTest || playerUiTest || imgHideUiTest || uninstallTest) {
+if (uiTest || pdfUiTest || mediaUiTest || audioUiTest || asrUiTest || themeTest || avTest || imgbatchTest || settingsIoTest || pdfOcrTest || queueUiTest || archiveUiTest || playerUiTest || imgHideUiTest || uninstallTest || videodlUiTest) {
   app.disableHardwareAcceleration();
 }
 
 /** 是否处于任一自动测试模式：此时系统对话框一律换成本地测试文件（避免测试卡在弹窗上），
  *  卸载工具的提权启动也会空跑（免得弹 UAC 卡住测试） */
-const testMode = () => uiTest || pdfUiTest || mediaTest || mediaUiTest || audioTest || audioUiTest || asrTest || asrUiTest || ocrPoc || themeTest || avTest || imgbatchTest || settingsIoTest || pdfOcrTest || queueUiTest || archiveTest || archiveUiTest || playerTest || playerUiTest || imgHideTest || imgHideUiTest || uninstallTest;
+const testMode = () => uiTest || pdfUiTest || mediaTest || mediaUiTest || audioTest || audioUiTest || asrTest || asrUiTest || ocrPoc || themeTest || avTest || imgbatchTest || settingsIoTest || pdfOcrTest || queueUiTest || archiveTest || archiveUiTest || playerTest || playerUiTest || imgHideTest || imgHideUiTest || uninstallTest || videodlTest || videodlUiTest;
 
 /** 自动测试模式下：从测试目录取指定扩展名的文件（对话框桩用；扩展名带不带点都能匹配） */
 async function testDirFiles(exts, { startWith, exact } = {}) {
@@ -301,7 +305,9 @@ const AUTO_TESTS = [
   { flag: uninstallTest, tag: 'UNINSTALL_TEST', file: './tests/uninstall-test.js', runner: 'runUninstallTest', args: (win) => [win, { portableDir: PORTABLE_DIR }], log: (r) => JSON.stringify({ pass: r.pass, failures: r.failures }), write: true },
   { flag: imgHideUiTest, tag: 'IMGHIDE_UI_TEST', file: './tests/imghide-ui-test.js', runner: 'runImgHideUiTest', args: (win) => [win, { portableDir: PORTABLE_DIR }], log: (r) => JSON.stringify({ pass: r.pass, failures: r.failures }), write: true },
   { flag: playerTest, tag: 'PLAYER_TEST', file: './tests/player-test.js', runner: 'runPlayerTest', args: (win) => [win], log: (r) => JSON.stringify({ ok: r.ok, failures: r.failures }) },
-  { flag: playerUiTest, tag: 'PLAYER_UI_TEST', file: './tests/player-ui-test.js', runner: 'runPlayerUiTest', args: (win) => [win], log: (r) => JSON.stringify({ pass: r.pass, failures: r.failures }), write: true }
+  { flag: playerUiTest, tag: 'PLAYER_UI_TEST', file: './tests/player-ui-test.js', runner: 'runPlayerUiTest', args: (win) => [win], log: (r) => JSON.stringify({ pass: r.pass, failures: r.failures }), write: true },
+  { flag: videodlTest, tag: 'VIDEODL_TEST', file: './tests/videodl-test.js', runner: 'runVideodlTest', args: (win) => [win, { portableDir: PORTABLE_DIR }], log: (r) => JSON.stringify({ ok: r.ok, verified: r.verified, skipped: r.skipped }) },
+  { flag: videodlUiTest, tag: 'VIDEODL_UI_TEST', file: './tests/videodl-ui-test.js', runner: 'runVideodlUiTest', args: (win) => [win, { portableDir: PORTABLE_DIR }], log: (r) => JSON.stringify({ pass: r.pass, failures: r.failures }) }
 ];
 
 /** 按表注册自动测试入口（createMainWindow 里调用；一次运行只会命中一个 flag） */
@@ -2496,4 +2502,80 @@ ipcMain.handle('hibit:launch', async () => {
   const script = lib.buildRunAsScript({ exePath: st.path, workingDir: st.dir });
   const r = spawnSync(psExe, ['-NoProfile', '-NonInteractive', '-Command', script], { windowsHide: true, encoding: 'utf8' });
   return lib.interpretLaunchResult({ status: r.status, stdout: r.stdout, stderr: r.stderr });
+});
+
+// ═══ 视频下载（「视频下载」工具；见 spec/modules/videodl.md） ═══
+// 引擎在主进程跑（任务不随工具页回收而中断）；三条通道与加固见 src/tools/videodl/core/。
+// 上游来源 leetools/video-downloader（MIT），许可文本随代码在 src/tools/videodl/UPSTREAM-LICENSE.txt。
+let videodlManagerPromise = null;
+function getVideodlManager() {
+  if (!videodlManagerPromise) {
+    videodlManagerPromise = import('./src/tools/videodl/core/manager.mjs').then(({ createVideoDownloader }) => {
+      const ffmpeg = findFfmpeg();
+      // 自动测试：历史/引擎状态写临时目录（每进程一个，保证「初始为空」），不碰用户的 userdata
+      const userdataDir = testMode() ? path.join(os.tmpdir(), `tomato-videodl-testdata-${process.pid}`) : USER_DATA_DIR;
+      return createVideoDownloader({
+        addonsRoot: path.join(PORTABLE_DIR, 'addons'),
+        toolRoot: path.join(__dirname, 'src', 'tools', 'videodl'),
+        userdataDir,
+        ffmpegPath: ffmpeg.found ? ffmpeg.path : '',
+        onChanged: (list) => {
+          if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send('videodl:changed', list);
+        }
+      });
+    });
+  }
+  return videodlManagerPromise;
+}
+
+ipcMain.handle('videodl:start', async (_event, options = {}) => {
+  try {
+    const manager = await getVideodlManager();
+    const job = await manager.start(String(options.url || ''), String(options.dir || ''));
+    return { ok: true, job };
+  } catch (error) {
+    return { ok: false, message: error.message || '开始下载失败' };
+  }
+});
+ipcMain.handle('videodl:cancel', async (_event, id) => (await getVideodlManager()).cancel(String(id || '')));
+ipcMain.handle('videodl:retry', async (_event, id) => {
+  try {
+    const job = await (await getVideodlManager()).retry(String(id || ''));
+    return job ? { ok: true, job } : { ok: false, message: '这条记录已经不能重试了' };
+  } catch (error) {
+    return { ok: false, message: error.message || '重试失败' };
+  }
+});
+ipcMain.handle('videodl:list', async () => (await getVideodlManager()).list());
+ipcMain.handle('videodl:clear-history', async () => (await getVideodlManager()).clearHistory());
+ipcMain.handle('videodl:reveal', async (_event, filePath) => {
+  // 自动测试模式空跑：避免测试期间真的弹出资源管理器窗口
+  if (typeof filePath === 'string' && filePath && fsSync.existsSync(filePath) && !testMode()) shell.showItemInFolder(filePath);
+  return true;
+});
+
+// 引擎状态：顺带做「每周自动检查一次」（可关；自动测试模式不联网检查）；检查结果通过 videodl:changed 推给界面
+ipcMain.handle('videodl:status', async () => {
+  const manager = await getVideodlManager();
+  const saved = await readSettingsFile();
+  const autoCheck = saved.videodlAutoCheck !== false;
+  if (!testMode()) manager.ensureAutoCheck(autoCheck).catch(() => {});
+  return {
+    ok: true,
+    defaultDir: path.join(os.homedir(), 'Downloads', '视频素材'),
+    autoCheck,
+    ...manager.engineStatus()
+  };
+});
+ipcMain.handle('videodl:engine-check', async () => {
+  const manager = await getVideodlManager();
+  return manager.checkEngine({ force: true });
+});
+ipcMain.handle('videodl:engine-update', async () => {
+  const manager = await getVideodlManager();
+  return manager.updateEngine({
+    onProgress: ({ received, total }) => {
+      if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send('videodl:engine-progress', { received, total });
+    }
+  });
 });

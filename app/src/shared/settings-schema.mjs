@@ -13,7 +13,9 @@ export const KNOWN_SETTINGS_KEYS = [
   'askSavePath',      // 保存前询问路径：布尔
   'collapsedGroups',  // 侧栏被收起的分组：null（没设置过）或字符串数组
   'navOrder',         // 导航手动排序：null（没排过）或对象（结构由 navsort.computeNavPlan 净化）
-  'theme'             // 外观：'system' | 'light' | 'dark'
+  'theme',            // 外观：'system' | 'light' | 'dark'
+  'videodlDir',       // 视频下载保存目录：字符串（空 = 默认 下载\视频素材）
+  'videodlAutoCheck'  // 视频下载：每周自动检查引擎更新：布尔（默认开）
 ];
 
 const isPlainObject = (v) => v !== null && typeof v === 'object' && !Array.isArray(v);
@@ -65,6 +67,12 @@ export function validateSettingValue(key, value) {
       if (value !== 'system' && value !== 'light' && value !== 'dark') {
         return { ok: false, reason: '外观取值只能是 system / light / dark' };
       }
+      return { ok: true, value };
+    case 'videodlDir':
+      if (typeof value !== 'string') return { ok: false, reason: '下载保存目录必须是文本' };
+      return { ok: true, value };
+    case 'videodlAutoCheck':
+      if (typeof value !== 'boolean') return { ok: false, reason: '「自动检查引擎更新」必须是开关值' };
       return { ok: true, value };
     default:
       return { ok: false, reason: '未知设置项' };

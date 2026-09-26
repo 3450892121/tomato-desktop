@@ -141,6 +141,27 @@ contextBridge.exposeInMainWorld('desktop', {
   hibitStatus: () => ipcRenderer.invoke('hibit:status'),
   hibitLaunch: () => ipcRenderer.invoke('hibit:launch'),
 
+  // 视频下载（「视频下载」工具；引擎在主进程，切走工具页任务照跑；见 spec/modules/videodl.md）
+  videodlStart: (options) => ipcRenderer.invoke('videodl:start', options),
+  videodlCancel: (id) => ipcRenderer.invoke('videodl:cancel', id),
+  videodlRetry: (id) => ipcRenderer.invoke('videodl:retry', id),
+  videodlList: () => ipcRenderer.invoke('videodl:list'),
+  videodlClearHistory: () => ipcRenderer.invoke('videodl:clear-history'),
+  videodlReveal: (filePath) => ipcRenderer.invoke('videodl:reveal', filePath),
+  videodlStatus: () => ipcRenderer.invoke('videodl:status'),
+  videodlEngineCheck: () => ipcRenderer.invoke('videodl:engine-check'),
+  videodlEngineUpdate: () => ipcRenderer.invoke('videodl:engine-update'),
+  videodlOnChanged: (callback) => {
+    const handler = (_event, list) => callback(list);
+    ipcRenderer.on('videodl:changed', handler);
+    return () => ipcRenderer.removeListener('videodl:changed', handler);
+  },
+  videodlOnEngineProgress: (callback) => {
+    const handler = (_event, data) => callback(data);
+    ipcRenderer.on('videodl:engine-progress', handler);
+    return () => ipcRenderer.removeListener('videodl:engine-progress', handler);
+  },
+
   // PDF 工具：专用文件对话框与 LibreOffice 加装包
   openPdfs: () => ipcRenderer.invoke('dialog:open-pdfs'),
   openDocuments: () => ipcRenderer.invoke('dialog:open-documents'),

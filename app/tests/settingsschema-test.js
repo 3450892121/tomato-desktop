@@ -102,6 +102,18 @@ export function runSchemaUnitTests() {
     assert.equal(validateSettingValue('theme', 'DARK').ok, false);
     assert.equal(validateSettingValue('theme', 1).ok, false);
   });
+  test('videodlDir 合法：任意字符串（含空串）；非法：非字符串', () => {
+    assert.equal(validateSettingValue('videodlDir', '').ok, true);
+    assert.equal(validateSettingValue('videodlDir', 'D:\\视频素材').ok, true);
+    assert.equal(validateSettingValue('videodlDir', 123).ok, false);
+    assert.equal(validateSettingValue('videodlDir', null).ok, false);
+  });
+  test('videodlAutoCheck 合法：布尔；非法：其它', () => {
+    assert.equal(validateSettingValue('videodlAutoCheck', true).ok, true);
+    assert.equal(validateSettingValue('videodlAutoCheck', false).ok, true);
+    assert.equal(validateSettingValue('videodlAutoCheck', 'on').ok, false);
+    assert.equal(validateSettingValue('videodlAutoCheck', 1).ok, false);
+  });
 
   // —— 3) 导入挑选 ——
   test('pickImportableSettings：合法键进 patch、非法键进 skipped、未知键忽略', () => {

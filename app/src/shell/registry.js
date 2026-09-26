@@ -16,6 +16,7 @@ import imgHide from '../tools/imghide/index.js';
 import player from '../tools/player/index.js';
 import videoConvert from '../tools/video-convert/index.js';
 import videoCompress from '../tools/video-compress/index.js';
+import videodl from '../tools/videodl/index.js';
 import sticker from '../tools/sticker/index.js';
 import audioConvert from '../tools/audio-convert/index.js';
 import audioEdit from '../tools/audio-edit/index.js';
@@ -51,6 +52,7 @@ export const TOOLS = [
   stitch,
   gridSlice,
   imgHide,
+  videodl,
   player,
   videoConvert,
   videoCompress,

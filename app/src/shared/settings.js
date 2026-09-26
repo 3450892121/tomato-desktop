@@ -20,7 +20,12 @@ export const DEFAULT_SETTINGS = {
   // 外观主题（见 spec/modules/theme.md）：
   //   'system' = 跟随系统深浅色（默认，对非技术用户最省心）
   //   'light' / 'dark' = 用户明确指定
-  theme: 'system'
+  theme: 'system',
+  // 视频下载（见 spec/modules/videodl.md）：
+  //   videodlDir = 保存目录（'' = 用默认的 下载\视频素材）
+  //   videodlAutoCheck = 每周自动检查一次引擎更新（默认开，可关）
+  videodlDir: '',
+  videodlAutoCheck: true
 };
 
 let current = { ...DEFAULT_SETTINGS };

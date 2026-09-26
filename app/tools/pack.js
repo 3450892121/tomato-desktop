@@ -124,6 +124,10 @@ fs.copyFileSync(path.join(appRoot, 'tests', 'navorder.test.mjs'), path.join(appT
 //   「打 <TAG>_FAIL + 堆栈后退出」，不再是当年那种「窗口开着、不跑也不退」的静默卡住。
 fs.copyFileSync(path.join(appRoot, 'tests', 'uninstall-test.js'), path.join(appTarget, 'tests', 'uninstall-test.js'));
 fs.copyFileSync(path.join(appRoot, 'tests', 'uninstall.test.mjs'), path.join(appTarget, 'tests', 'uninstall.test.mjs'));
+// v2.12.0 起：视频下载（自检 + 界面自动测试 + 纯逻辑）
+fs.copyFileSync(path.join(appRoot, 'tests', 'videodl-test.js'), path.join(appTarget, 'tests', 'videodl-test.js'));
+fs.copyFileSync(path.join(appRoot, 'tests', 'videodl-ui-test.js'), path.join(appTarget, 'tests', 'videodl-ui-test.js'));
+fs.copyFileSync(path.join(appRoot, 'tests', 'videodl.test.mjs'), path.join(appTarget, 'tests', 'videodl.test.mjs'));
 // 兼容性样本工具（--make-samples / --verify-samples，锁定 variants.js 用；见 AGENTS.md）。
 // main.js 里是独立 if 分支 require 它们、不走 AUTO_TESTS 表，所以白名单容易漏——
 // 漏了产物上这两个命令只会打 MAKE_SAMPLES_FAIL / VERIFY_SAMPLES_FAIL。
@@ -369,6 +373,19 @@ if (fs.existsSync(path.join(hibitAddon, 'HiBitUninstaller-Portable.exe'))) {
   copyTree(hibitAddon, path.join(outDir, 'addons', 'hibit'));
 } else {
   log('警告：未发现 app/addons/hibit/HiBitUninstaller-Portable.exe —— 产物中「软件卸载」将提示需加装');
+}
+
+// —— 5h-2) yt-dlp 加装包（「视频下载」必需，随主包分发；v2.12.0 起） ——
+// 说明：yt-dlp.exe（约 16.6MB，nightly 固定版 + SHA-256 记录在 addons/ytdlp/说明.txt）+
+//      可选 node/node.exe（约 82MB，仅 YouTube 挑战求解用）。放在 app/addons/ytdlp/（不进 git，见 spec/modules/videodl.md）。
+//       缺失时工具页显示「未检测到下载引擎」与放置说明，其余工具不受影响；
+//       引擎可自更新（下载到 userdata/videodl-engine，本加装包始终作为兜底）。
+const ytdlpAddon = path.join(appRoot, 'addons', 'ytdlp');
+if (fs.existsSync(path.join(ytdlpAddon, 'yt-dlp.exe'))) {
+  log('步骤5h-2：复制 yt-dlp 加装包（yt-dlp.exe + 可选 node 运行时）…');
+  copyTree(ytdlpAddon, path.join(outDir, 'addons', 'ytdlp'));
+} else {
+  log('警告：未发现 app/addons/ytdlp/yt-dlp.exe —— 产物中「视频下载」将提示需加装');
 }
 
 // —— 5i) 产物瘦身：删掉随上游整包带进来、但本软件运行期用不到的东西 ——
