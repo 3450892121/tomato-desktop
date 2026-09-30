@@ -154,6 +154,27 @@ app.on('will-quit', () => {
   }
 });
 
+// —— 全局兜底与文件日志 ——
+// 此前主进程只有 console.error：绿色版通常没有控制台，未捕获异常与未处理的 Promise 拒绝等于静默丢失、
+// 崩溃后不留痕。这里各落一条到用户数据目录的 logs/main.log（自带时间戳，不引入新依赖）。
+// 写日志自身再出错也绝不再抛（磁盘满/目录不可写等），且不改变原有退出行为——只记不退。
+function appendMainLog(tag, detail) {
+  try {
+    const line = `[${new Date().toISOString()}] [${tag}] ${detail}\n`;
+    const logDir = path.join(app.getPath('userData'), 'logs');
+    fsSync.mkdirSync(logDir, { recursive: true });
+    fsSync.appendFileSync(path.join(logDir, 'main.log'), line);
+  } catch { /* 落盘失败不得外抛 */ }
+}
+process.on('uncaughtException', (err) => {
+  appendMainLog('uncaughtException', String((err && (err.stack || err.message)) || err || ''));
+  try { console.error('[main] uncaughtException', err); } catch { /* 无控制台时忽略 */ }
+});
+process.on('unhandledRejection', (reason) => {
+  appendMainLog('unhandledRejection', String((reason && (reason.stack || reason.message)) || reason || ''));
+  try { console.error('[main] unhandledRejection', reason); } catch { /* 同上 */ }
+});
+
 const argValue = (flag) => {
   const i = process.argv.indexOf(flag);
   return i >= 0 ? process.argv[i + 1] : null;
