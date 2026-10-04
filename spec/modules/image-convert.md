@@ -2,6 +2,7 @@
 
 > 更新记录：v0.1（2026-09-18）新增模块（用户需求：「图片格式转换」，尽量覆盖主流格式）。
 > v2.10.0（2026-09-23）输入侧新增 HEIC / HEIF / HIF（手机拍照格式 → 通用格式；用户需求）。
+> v2.13.0（2026-10-04）输入侧新增老图片格式 TIFF（.tif/.tiff）/ PCX / TGA / PSD / DDS / JPEG2000（.jp2/.j2k）——Chromium 内核解不了，走随包 ffmpeg 出首帧 PNG 再进 canvas（解码器 tiff/pcx/targa/psd/dds/jpeg2000 已逐一验证在位；用户需求：「老格式放在现在有些设备打不开」）。
 
 ## 目标
 批量把图片在主流格式之间互转，产物要能被系统与其他软件正常打开。
@@ -15,6 +16,10 @@
   引擎 = `heic-decode`（ISC）+ `libheif-js`（LGPL-3.0，官方 libheif 1.23 的 WASM 构建），
   跑在**主进程 worker 线程**（WASM 解码是同步计算，放主线程会卡住整窗 IPC），
   渲染进程经 IPC `heic:decode` 拿 RGBA。不依赖系统 HEIF 编解码器扩展，纯离线开箱即用。
+- 老图片格式（v2.13.0）：TIFF（.tif/.tiff）/ PCX / TGA / PSD / DDS / JPEG2000（.jp2/.j2k）。
+  Chromium 内核解不了，经 `ffmpeg:transform-file` 按路径交给随包 ffmpeg 出首帧 PNG
+  （`-frames:v 1`），再进 canvas——大 PSD 不整份读进界面进程；需 ffmpeg 加装包，
+  未装时对该类文件给出明确提示（其余格式不受影响）。多页 TIFF/分层 PSD 取首帧/合并结果。
 
 ### 输出
 | 格式 | 实现 | 说明 |

@@ -5,6 +5,7 @@ import obfuscate from '../tools/obfuscate/index.js';
 import pdfConvert from '../tools/pdf-convert/index.js';
 import pdfEdit from '../tools/pdf-edit/index.js';
 import ocr from '../tools/ocr/index.js';
+import docConvert from '../tools/doc-convert/index.js';
 import compress from '../tools/compress/index.js';
 import enhance from '../tools/enhance/index.js';
 import imgConvert from '../tools/convert/index.js';
@@ -44,6 +45,7 @@ export const TOOLS = [
   pdfConvert,
   pdfEdit,
   ocr,
+  docConvert,
   compress,
   enhance,
   imgConvert,

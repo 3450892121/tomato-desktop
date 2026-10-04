@@ -16,8 +16,14 @@ export const TARGETS = [
   { value: 'avif', ext: '.avif', label: 'AVIF（体积最小，需 ffmpeg）' }
 ];
 
+/** 老图片格式（v2.13.0）：Chromium 内核解不了，解码走随包 ffmpeg 出首帧 PNG 再进 canvas。
+ *  解码器已逐一用随包 ffmpeg 验证在位：tiff / pcx / targa(tga) / psd / dds / jpeg2000(jp2·j2k) */
+export const FFMPEG_DECODE_EXTS = ['tif', 'tiff', 'pcx', 'tga', 'psd', 'dds', 'jp2', 'j2k'];
 /** 拖入 / 选择时认可的输入扩展名（HEIC/HEIF/HIF 经主进程 libheif 引擎解码，见 shared/heic.js） */
-export const INPUT_EXTS = ['png', 'jpg', 'jpeg', 'webp', 'gif', 'bmp', 'ico', 'avif', 'svg', 'heic', 'heif', 'hif'];
+export const INPUT_EXTS = [
+  'png', 'jpg', 'jpeg', 'webp', 'gif', 'bmp', 'ico', 'avif', 'svg', 'heic', 'heif', 'hif',
+  ...FFMPEG_DECODE_EXTS
+];
 /** 手机拍照格式：解码走主进程 HEIC 引擎（Chromium 内核解不了，见 spec/modules/image-convert.md） */
 export const HEIF_EXTS = ['heic', 'heif', 'hif'];
 /** 解码失败的统一提示 */
@@ -138,6 +144,11 @@ export async function encodeIcon(pixels, width, height) {
     list.push({ width: size, height: size, bytes: await makeIconPng(pixels, width, height, size) });
   }
   return encodeIco(list);
+}
+
+/** 老图片格式解码参数（与 shared/ffmpeg.js 的 transformFileToBytes 搭配：出首帧 PNG） */
+export function ffmpegDecodeArgs() {
+  return ['-frames:v', '1'];
 }
 
 /**

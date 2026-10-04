@@ -201,6 +201,8 @@ const ctx = {
   // PDF 工具用：专用文件对话框与 LibreOffice 加装包
   openPdfs: () => window.desktop.openPdfs(),
   openDocuments: () => window.desktop.openDocuments(),
+  // 文档格式转换用：专用对话框（老格式文档）
+  openDocConvert: () => window.desktop.openDocConvert(),
   libreofficeStatus: () => window.desktop.libreofficeStatus(),
   libreofficeConvert: (options) => window.desktop.libreofficeConvert(options),
   officeToPdf: (options) => window.desktop.officeToPdf(options),

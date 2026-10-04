@@ -9,13 +9,19 @@ import { AUDIO_TARGETS, audioEncodeArgs } from '../../../shared/ffmpeg.js';
 export const AUDIO_EXTS = [
   '.mp3', '.wav', '.flac', '.m4a', '.aac', '.ogg', '.oga', '.opus', '.wma', '.amr',
   '.aiff', '.aif', '.ape', '.dsf', '.mpc', '.tak', '.wv', '.tta', '.ac3', '.eac3',
-  '.mp2', '.spx', '.caf', '.au', '.w64', '.ra', '.rm', '.oma'
+  '.mp2', '.spx', '.caf', '.au', '.w64', '.ra', '.rm', '.oma',
+  // v2.13.0 起补充的老格式（demuxer/decoder 均已用随包 ffmpeg 验证在位）：
+  // shn（Shorten）、voc（创新声卡老格式）、mka（Matroska 纯音频）
+  '.shn', '.voc', '.mka'
 ];
 
 /** 也可以作为输入的视频扩展名：自动提取音轨（-vn） */
 export const VIDEO_INPUT_EXTS = [
   '.mp4', '.mov', '.mkv', '.avi', '.webm', '.flv', '.wmv', '.m4v',
-  '.ts', '.3gp', '.mpg', '.mpeg', '.vob', '.rmvb', '.ogv'
+  '.ts', '.3gp', '.mpg', '.mpeg', '.vob', '.rmvb', '.ogv',
+  // v2.13.0 起补充的老格式/常见封装（demuxer 均已验证在位）：
+  // asf（wmv 同容器）、3g2/f4v（mp4 同容器）、mts/m2ts（AVCHD/蓝光 MPEG-TS）
+  '.asf', '.3g2', '.f4v', '.mts', '.m2ts'
 ];
 
 /** 全部可添加的输入扩展名 */

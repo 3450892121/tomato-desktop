@@ -2,6 +2,18 @@
 
 本项目遵循语义化版本（x.y.z）：修 bug → z+1；加功能 → y+1；重要改动 → x+1。
 
+## v2.13.0（2026-10-04）新增第 23 个工具「文档格式转换」：老文档转新格式（起因：教务系统的「假 .xls」）；图片/音视频老格式输入补齐
+
+> 起因：用户发来一份教务系统导出的 `.xls`（2019 年 WPS 保存），问「能不能把这种转成通用的格式，其他老格式也上网查一下——现在有些设备打不开」。实测该文件扩展名 `.xls` 但内容是 **Excel 2003 XML（SpreadsheetML）**——「假 .xls」，Excel 打开会弹格式警告、手机端按扩展名判断直接打不开。据此立项并调研了常见老格式清单。
+
+- **新工具「文档格式转换」**（`src/tools/doc-convert/`，文档组，spec 见 `spec/modules/doc-convert.md`）：doc / xls / ppt / pps / rtf（含「2003 XML 假扩展名」文件）→ docx / xlsx / pptx / PDF；「智能（推荐）」模式按家族自动选目标（doc/rtf→docx、xls→xlsx、ppt/pps→pptx），已是新格式的文件明确提示无需转换，跨家族强制（如 xls→docx）给可读拒绝原因。引擎 = **随包 LibreOffice**（与「PDF 转格式」共用 `libreoffice:convert`，target 白名单扩至 pdf/docx/xlsx/pptx；`--infilter=writer_pdf_import` 从「target=docx 就加」改成「仅输入是 PDF 才加」，否则 .doc→.docx 会被 PDF 导入过滤器弄坏——rtf→docx 用例钉住这条）。任务队列走 cpu 通道串行（共用 LibreOffice profile，并发会撞锁）；取消语义 = 在跑的转换等它自然结束、丢弃产物，不留 profile 锁。
+- **图片格式转换**（img-convert）输入侧新增老图片格式：**TIFF（.tif/.tiff）/ PCX / TGA / PSD / DDS / JPEG2000（.jp2/.j2k）**——Chromium 内核解不了，走随包 ffmpeg 出首帧 PNG 再进 canvas（`ffmpeg:transform-file` 按路径解码，大 PSD 不整份读进界面进程）；解码器逐一验证在位（tiff/pcx/targa/psd/dds/jpeg2000）。
+- **视频/音频转换输入侧补充**（demuxer/decoder 均已用随包 ffmpeg 验证）：视频加 asf（wmv 同容器）、3g2/f4v（mp4 同容器）、mts/m2ts（AVCHD/蓝光）；音频加 shn（Shorten）、voc（创新声卡）、mka（Matroska 纯音频）。rm/rmvb/flv/wmv/wma/ape/ra 等此前已支持。
+- **调研结论（其余老格式去向）**：音频/视频老格式本就由「音频/视频格式转换 + 视频播放器」覆盖（ffmpeg 通道）；WPS 2000 私有格式（.wps/.et/.dps）无现成离线引擎、明确不支持（新版 WPS 的 .wps 实为 docx 变体，改后缀即可开）；.chm/.hlp 帮助文件、.mdb 数据库不在工具箱范围。
+- **测试**：`tests/docconvert.test.mjs` 11 项纯逻辑挂 `npm test`（合计 286→**297** 项）；`--doc-test`（引擎自检：程序内生成「假 .xls」/ 真 BIFF .xls / RTF / 坏文件夹具，经渲染进程走**真实 IPC** 转 xlsx/docx/pdf，SheetJS·jszip 读回校验内容，坏文件给确定结果）与 `--doc-ui-test`（界面全流程截图 + 产物读回）新增并接入产物测试白名单；`--media-test` 新增 oldimage 段（TGA/TIFF/JPEG2000 夹具经与工具同一条 IPC 解码，密集采样断言像素）。回归全绿：smoke（tools=23）、self、media-ui、theme、audio、pdf、pdf-ui。
+- **实测踩坑（都修了）**：① SheetJS 的 `readFile/writeFile` fs 直读直写分支在本项目环境不可用（须用 `XLSX.read/write` 的 buffer 型）——最初误判成「SheetJS 解析不了 Excel 2003 XML」，重验后确认**能解析**（用户样本 61 行完整读出），但只保数据不保样式，转换引擎仍选 LibreOffice 保真；② 手写 SpreadsheetML 缺 `<Table>` 包装会被 LibreOffice 转成空表（Excel 2003 XML 的行必须包在 Table 里）；③ LibreOffice 对垃圾字节的 .xls 不报错而是「转出空表格」（固有嗅探行为，已列入 spec 已知限制）；④ media-test 稀疏像素采样点恰好全落在 testsrc 黑色区域造成假失败（改密集采样取平均）；⑤ 夹具前缀「测试文档」与 pdf-convert 的测试目录清理范围相撞（其对话框按扩展名全收），换成独占前缀「测试老文档」且测试结束自清——残留的 .xls 曾被 pdf-ui-test 的 office 步骤当输入，把「成功 2 个」污染成「成功 4 个」。
+- 文档同步：README（工具清单 22→23、状态表新行、图片格式转换行）、AGENTS.md（工具列表 / npm test 286→297 / 两条新自检 / tools=23 / 交付清单）、`docs/使用说明.txt`（分组清单 + 新工具说明节）、`docs/新增工具指南.md`、`spec/00-overview.md`（v1.13 + 模块表）、`spec/modules/doc-convert.md`（新建）、`spec/modules/image-convert.md`/`audio-convert.md`/`video-convert.md`（输入侧更新记录）。
+
 ## v2.12.1（2026-09-27）修复：抖音下载全灭——游客通道少了一个 ttwid Cookie
 
 > 起因：用户反馈「抖音链接给他下载不了」。从产物的 `userdata/videodl-history.json` 里读到真实链接与报错（三次连续失败，都在 4.2 秒内报「抖音游客页面暂未提供这个视频的播放地址；临时浏览器已退出」），据此实地复现定位。

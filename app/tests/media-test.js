@@ -1,6 +1,7 @@
 // 媒体工具自检（仅 `electron . --media-test` 时运行）
 // 覆盖：图片压缩（核心逻辑 + 目标大小逼近）、图片变清晰（锐度指标提升）、图片格式转换（BMP/ICO/TIFF/GIF/AVIF 产物校验）、
 //       HEIC/HEIF 手机格式输入（主进程 libheif 引擎：尺寸/旋转方向/坏文件报错/HEIC→PNG 产物可解码）、
+//       老图片格式输入（v2.13.0：TGA/TIFF/JPEG2000 经 ffmpeg 解码 → PNG → canvas，与工具同一条 IPC 路径）、
 //       视频格式转换（MP4→WebM/MKV/AVI 真实转码 + 解码校验）、动图与视频互转（MP4→GIF/WebP/APNG、GIF→MP4）。
 // 说明：通过 window.desktop.* 走真实 IPC 链路（与界面点按钮同一条路），产物用 ffmpeg 完整解码一遍才算通过。
 // 结果写入 %TEMP%/tomato-media-test.json，同时打印 MEDIA_TEST {...}。
@@ -264,6 +265,76 @@ async function runMediaTest(win) {
     result.checks.heic = { ok: false, error: err.message };
   }
 
+  // —— 3c) 图片：老图片格式输入（v2.13.0：ffmpeg 解码 → PNG → canvas，与工具同一条 IPC 路径） ——
+  // 夹具 = PNG 测试图经随包 ffmpeg 直接编出老格式（编码器 targa / tiff / jpeg2000，均已验证在位），
+  // 再经 ffmpeg:transform-file（即工具 decodeViaFfmpeg 用的同一条路）解码，断言 PNG 魔数与 canvas 可解。
+  try {
+    const out = JSON.parse(await evalJs(`(async () => {
+      const out = {};
+      const core = await import('../tools/convert/core/convert.js');
+      out.exts = {
+        tga: core.INPUT_EXTS.includes('tga') && core.FFMPEG_DECODE_EXTS.includes('tga'),
+        tiff: core.INPUT_EXTS.includes('tif') && core.INPUT_EXTS.includes('tiff') && core.FFMPEG_DECODE_EXTS.includes('tiff'),
+        psd: core.INPUT_EXTS.includes('psd') && core.FFMPEG_DECODE_EXTS.includes('psd'),
+        dds: core.INPUT_EXTS.includes('dds') && core.FFMPEG_DECODE_EXTS.includes('dds'),
+        jp2: core.INPUT_EXTS.includes('jp2') && core.INPUT_EXTS.includes('j2k') && core.FFMPEG_DECODE_EXTS.includes('jp2'),
+        decodeArgs: core.ffmpegDecodeArgs().join(' ')
+      };
+      const { encodeImageToBytes, decodeImageFromBytes } = await import('../shared/imageio.js');
+      const w = 160, h = 120;
+      const px = new Uint8ClampedArray(w * h * 4);
+      for (let i = 0; i < w * h; i++) {
+        px[i * 4] = (i * 7) & 255; px[i * 4 + 1] = (i * 13) & 255; px[i * 4 + 2] = (i * 29) & 255; px[i * 4 + 3] = 255;
+      }
+      const png = await encodeImageToBytes(px, w, h, { format: 'png' });
+      // 造三种老格式夹具（编码走 ffmpeg:transform 字节链路）
+      const mk = async (ext, args) => {
+        const r = await window.desktop.ffmpegTransform({ bytes: png, ext, args });
+        return r.ok ? r.bytes : null;
+      };
+      const fixtures = {
+        tga: await mk('.tga', ['-c:v', 'targa']),
+        tif: await mk('.tif', ['-c:v', 'tiff', '-compression_algo', 'lzw']),
+        jp2: await mk('.jp2', ['-c:v', 'jpeg2000'])
+      };
+      out.fixtures = { tga: !!fixtures.tga, tif: !!fixtures.tif, jp2: !!fixtures.jp2 };
+      // 夹具路径逐个用完整字面量（不拼动态片段），写盘与后面的解码都走这三个固定路径
+      const pTga = ${JSON.stringify(path.join(TEST_DIR, 'mt-old.tga'))};
+      const pTif = ${JSON.stringify(path.join(TEST_DIR, 'mt-old.tif'))};
+      const pJp2 = ${JSON.stringify(path.join(TEST_DIR, 'mt-old.jp2'))};
+      if (fixtures.tga) await window.desktop.writeFile(pTga, fixtures.tga);
+      if (fixtures.tif) await window.desktop.writeFile(pTif, fixtures.tif);
+      if (fixtures.jp2) await window.desktop.writeFile(pJp2, fixtures.jp2);
+      const saved = { tga: fixtures.tga ? pTga : null, tif: fixtures.tif ? pTif : null, jp2: fixtures.jp2 ? pJp2 : null };
+      // 逐个解码（ffmpeg:transform-file，工具 decodeViaFfmpeg 用的同一条路）→ PNG 魔数 → canvas 解码。
+      // 像素内容用**密集采样取平均**判定（每隔 7 个像素采一次）：稀疏采样点可能恰好全落在
+      // testsrc 的黑色区域，造成「解码成功却判全黑」的假失败（v2.13.0 当天踩到）。
+      const decodeOne = async (name) => {
+        const p = saved[name];
+        if (!p) return { ok: false, reason: '夹具缺失' };
+        const res = await window.desktop.ffmpegTransformFile({ inputPath: p, ext: '.png', args: core.ffmpegDecodeArgs() });
+        if (!res.ok) return { ok: false, reason: res.message };
+        const pngMagic = res.bytes[0] === 0x89 && res.bytes[1] === 0x50 && res.bytes[2] === 0x4e;
+        const img = await decodeImageFromBytes(res.bytes);
+        let sum = 0, n = 0;
+        for (let i = 0; i < img.pixels.length; i += 4 * 7) { sum += img.pixels[i] + img.pixels[i + 1] + img.pixels[i + 2]; n++; }
+        const avg = sum / (n * 3);
+        return { ok: pngMagic && img.width === 160 && img.height === 120 && avg > 40, pngMagic, width: img.width, height: img.height, avg };
+      };
+      out.decoded = { tga: await decodeOne('tga'), tif: await decodeOne('tif'), jp2: await decodeOne('jp2') };
+      return JSON.stringify(out);
+    })()`));
+    result.checks.oldimage = {
+      ...out,
+      ok: out.exts.tga && out.exts.tiff && out.exts.psd && out.exts.dds && out.exts.jp2
+        && out.exts.decodeArgs === '-frames:v 1'
+        && out.fixtures.tga && out.fixtures.tif && out.fixtures.jp2
+        && out.decoded.tga.ok && out.decoded.tif.ok && out.decoded.jp2.ok
+    };
+  } catch (err) {
+    result.checks.oldimage = { ok: false, error: err.message };
+  }
+
   // —— 4) 视频与动图：ffmpeg 造夹具后走真实 IPC 转码 ——
   result.checks.video = { conversions: [], ok: false };
   result.checks.sticker = { conversions: [], ok: false };
@@ -424,7 +495,7 @@ async function runMediaTest(win) {
   }
 
   // —— 汇总 ——
-  const names = ['compress', 'enhance', 'convert', 'heic', 'video', 'sticker', 'ai'];
+  const names = ['compress', 'enhance', 'convert', 'heic', 'oldimage', 'video', 'sticker', 'ai'];
   result.summary = Object.fromEntries(names.map((n) => [n, !!(result.checks[n] && result.checks[n].ok)]));
   result.ok = names.every((n) => result.summary[n]);
   writeResult({ ok: result.ok, at: new Date().toISOString(), result });

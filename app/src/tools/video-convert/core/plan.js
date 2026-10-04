@@ -7,7 +7,10 @@ import { VIDEO_TARGETS, scaleToHeightArgs, videoEncodeArgs } from '../../../shar
 /** ffmpeg 可解的主流视频扩展名（与主进程文件对话框的筛选保持一致） */
 export const VIDEO_EXTS = [
   '.mp4', '.mov', '.mkv', '.avi', '.webm', '.flv', '.wmv',
-  '.m4v', '.ts', '.3gp', '.mpg', '.mpeg', '.vob', '.rmvb', '.ogv'
+  '.m4v', '.ts', '.3gp', '.mpg', '.mpeg', '.vob', '.rmvb', '.ogv',
+  // v2.13.0 起补充的老格式/常见封装（demuxer 均已用随包 ffmpeg 验证在位）：
+  // asf（wmv 同容器）、3g2/f4v（mp4 同容器）、mts/m2ts（AVCHD/蓝光 MPEG-TS）
+  '.asf', '.3g2', '.f4v', '.mts', '.m2ts'
 ];
 
 /** 输出容器信息；传入未知值时退回列表首项（MP4），避免界面异常 */

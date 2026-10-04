@@ -34,3 +34,7 @@ artifacts
 
 # 编辑器/AI 工具的本地工作目录（计划文档等，不进 git；结论性内容已落到 spec/）
 .trae
+
+# Mimosa 安全扫描工具的本地状态（钩子缓存等，不进 git）
+.mimosa/
+app/.mimosa/

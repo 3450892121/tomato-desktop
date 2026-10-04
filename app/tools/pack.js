@@ -128,6 +128,10 @@ fs.copyFileSync(path.join(appRoot, 'tests', 'uninstall.test.mjs'), path.join(app
 fs.copyFileSync(path.join(appRoot, 'tests', 'videodl-test.js'), path.join(appTarget, 'tests', 'videodl-test.js'));
 fs.copyFileSync(path.join(appRoot, 'tests', 'videodl-ui-test.js'), path.join(appTarget, 'tests', 'videodl-ui-test.js'));
 fs.copyFileSync(path.join(appRoot, 'tests', 'videodl.test.mjs'), path.join(appTarget, 'tests', 'videodl.test.mjs'));
+// v2.13.0 起：文档格式转换（引擎自检 + 界面自动测试 + 纯逻辑）；老图片格式输入在 media-test 的 oldimage 段
+fs.copyFileSync(path.join(appRoot, 'tests', 'doc-test.js'), path.join(appTarget, 'tests', 'doc-test.js'));
+fs.copyFileSync(path.join(appRoot, 'tests', 'doc-ui-test.js'), path.join(appTarget, 'tests', 'doc-ui-test.js'));
+fs.copyFileSync(path.join(appRoot, 'tests', 'docconvert.test.mjs'), path.join(appTarget, 'tests', 'docconvert.test.mjs'));
 // 兼容性样本工具（--make-samples / --verify-samples，锁定 variants.js 用；见 AGENTS.md）。
 // main.js 里是独立 if 分支 require 它们、不走 AUTO_TESTS 表，所以白名单容易漏——
 // 漏了产物上这两个命令只会打 MAKE_SAMPLES_FAIL / VERIFY_SAMPLES_FAIL。

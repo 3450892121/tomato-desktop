@@ -165,6 +165,8 @@ contextBridge.exposeInMainWorld('desktop', {
   // PDF 工具：专用文件对话框与 LibreOffice 加装包
   openPdfs: () => ipcRenderer.invoke('dialog:open-pdfs'),
   openDocuments: () => ipcRenderer.invoke('dialog:open-documents'),
+  // 文档格式转换：专用对话框（老格式文档；与 open-documents 的夹具前缀互不污染）
+  openDocConvert: () => ipcRenderer.invoke('dialog:open-doc-convert'),
   libreofficeStatus: () => ipcRenderer.invoke('libreoffice:status'),
   libreofficeConvert: (options) => ipcRenderer.invoke('libreoffice:convert', options),
   officeToPdf: (options) => ipcRenderer.invoke('office:to-pdf', options),

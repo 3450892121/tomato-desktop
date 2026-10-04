@@ -10,7 +10,8 @@
 > 更新记录：v1.9（2026-09-20）新增「视频播放器」工具的目标规格（见 `modules/player.md`）：软件内直接播放视频（含 Windows 自带播放器不支持的 AVI/MKV/FLV 等），内核播不了的格式自动用随包 ffmpeg 准备可播放副本（优先无损换封装）；转换完就能看，不用换软件。原内容全部保留。
 > 更新记录：v1.10（2026-09-20）新增「文件藏图」工具的目标规格（见 `modules/imghide.md`）：把任意文件藏进一张图片、也能从图里取出来，与网上的「图夹」（tj.qdqqd.com 等）**双向互通**——我们打的图网站/APP 能解，别人用网站/APP 打的图我们也能解（含带密码的）；仅做本地打包/解包，不做联网的图床/直链/图语。原内容全部保留。
 > 更新记录：v1.11（2026-09-21）新增「软件卸载」工具的目标规格（见 `modules/uninstall.md`）：随包内置 HiBit Uninstaller 官方便携版（`addons/hibit/`），工具页一键以**管理员身份**启动（Windows 标准 RunAs + 系统 UAC 确认，不静默提权）；只做启动页，不在本软件内重复实现卸载/残留扫描；左侧新增「系统」分组。原内容全部保留。
-> 更新记录：v1.12（2026-09-26）新增「视频下载」工具的目标规格（见 `modules/videodl.md`）：粘贴链接下载网络视频（抖音/小红书/B站/YouTube/央视频/直链），引擎为随包 yt-dlp（可自更新）；来源为 `github.com/Lyee0011/leetools`（MIT）的引擎移植 + 界面重画。这是本软件**第一个天生需要联网**的工具（用户确认接受），其余工具保持离线可用、不受影响。原内容全部保留。
+> 更新记录：v1.12（2026-09-26）新增「视频下载」工具的目标规格（见 `modules/videodl.md`）：粘贴链接下载网络视频（抖音/小红书/B站/YouTube/央视频/直链），引擎为随包 yt-dlp（可自更新）；来源为 `github.com/Lyee0011/leetools`（MIT）的引擎移植 + 界面重画。这是本软件**第一个天生需要联网**的工具（用户确认接受），其余工具保持离线可用，不受影响。原内容全部保留。
+> 更新记录：v1.13（2026-10-04）新增「文档格式转换」工具的目标规格（见 `modules/doc-convert.md`）：老版办公文档（doc/xls/ppt/pps/rtf，含教务系统导出的 Excel 2003 XML「假 .xls」）→ docx/xlsx/pptx/PDF，引擎为随包 LibreOffice（与「PDF 转格式」共用调用机制）。同批：图片格式转换输入侧新增老图片格式（TIFF/PCX/TGA/PSD/DDS/JPEG2000，经随包 ffmpeg 解码）；视频/音频转换输入侧补充 asf/3g2/f4v/mts/m2ts 与 shn/voc/mka 等已验证封装。原内容全部保留。
 
 ## 项目定位
 把安卓 App「番茄图片混淆」（`番茄图片混淆.apk`）的图片混淆/解混淆能力完整搬到 Windows 电脑上，做成**解压即用的免安装绿色软件**：纯离线、与手机版互相兼容。
@@ -52,6 +53,7 @@
 | 跨工具任务队列 | `modules/task-queue.md` | 任务归属队列（不归属工具页）+ 任务中心；切走工具页任务照跑 |
 | 设置导入导出 | `modules/settings-io.md` | 设置备份成 json，换电脑一键带走（只合并已知键） |
 | PDF 转格式 | `modules/pdf-convert.md` | PDF/图片/Office 互转与页面操作（第二个工具；LibreOffice 为可选加装包） |
+| 文档格式转换 | `modules/doc-convert.md` | 老版办公文档（doc/xls/ppt/pps/rtf，含 Excel 2003 XML「假 .xls」）→ docx/xlsx/pptx/PDF（LibreOffice 随包） |
 | PDF 编辑整理 | `modules/pdf-edit.md` | 压缩瘦身 / 水印 / 页码 / 旋转 / 重排 / 加密解密 |
 | 文字识别 | `modules/ocr.md` | 扫描件 → 可搜索 PDF / 纯文本 / Word；预处理与压缩（ocr 加装包） |
 | 图片压缩 | `modules/image-compress.md` | 批量压缩图片体积（画质/尺寸/目标大小），纯内核能力 |

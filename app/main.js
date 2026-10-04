@@ -100,14 +100,18 @@ const uninstallTest = process.argv.includes('--uninstall-test');
 const videodlTest = process.argv.includes('--videodl-test');
 const videodlUiTest = process.argv.includes('--videodl-ui-test');
 
+// 文档格式转换：自检 / 界面自动测试（见 spec/modules/doc-convert.md）
+const docTest = process.argv.includes('--doc-test');
+const docUiTest = process.argv.includes('--doc-ui-test');
+
 // 测试模式下关闭硬件加速：保证截图（capturePage）在任何机器上都能稳定拿到画面
-if (uiTest || pdfUiTest || mediaUiTest || audioUiTest || asrUiTest || themeTest || avTest || imgbatchTest || settingsIoTest || pdfOcrTest || queueUiTest || archiveUiTest || playerUiTest || imgHideUiTest || uninstallTest || videodlUiTest) {
+if (uiTest || pdfUiTest || mediaUiTest || audioUiTest || asrUiTest || themeTest || avTest || imgbatchTest || settingsIoTest || pdfOcrTest || queueUiTest || archiveUiTest || playerUiTest || imgHideUiTest || uninstallTest || videodlUiTest || docUiTest) {
   app.disableHardwareAcceleration();
 }
 
 /** 是否处于任一自动测试模式：此时系统对话框一律换成本地测试文件（避免测试卡在弹窗上），
  *  卸载工具的提权启动也会空跑（免得弹 UAC 卡住测试） */
-const testMode = () => uiTest || pdfUiTest || mediaTest || mediaUiTest || audioTest || audioUiTest || asrTest || asrUiTest || ocrPoc || themeTest || avTest || imgbatchTest || settingsIoTest || pdfOcrTest || queueUiTest || archiveTest || archiveUiTest || playerTest || playerUiTest || imgHideTest || imgHideUiTest || uninstallTest || videodlTest || videodlUiTest;
+const testMode = () => uiTest || pdfUiTest || mediaTest || mediaUiTest || audioTest || audioUiTest || asrTest || asrUiTest || ocrPoc || themeTest || avTest || imgbatchTest || settingsIoTest || pdfOcrTest || queueUiTest || archiveTest || archiveUiTest || playerTest || playerUiTest || imgHideTest || imgHideUiTest || uninstallTest || videodlTest || videodlUiTest || docTest || docUiTest;
 
 /** 自动测试模式下：从测试目录取指定扩展名的文件（对话框桩用；扩展名带不带点都能匹配） */
 async function testDirFiles(exts, { startWith, exact } = {}) {
@@ -328,7 +332,9 @@ const AUTO_TESTS = [
   { flag: playerTest, tag: 'PLAYER_TEST', file: './tests/player-test.js', runner: 'runPlayerTest', args: (win) => [win], log: (r) => JSON.stringify({ ok: r.ok, failures: r.failures }) },
   { flag: playerUiTest, tag: 'PLAYER_UI_TEST', file: './tests/player-ui-test.js', runner: 'runPlayerUiTest', args: (win) => [win], log: (r) => JSON.stringify({ pass: r.pass, failures: r.failures }), write: true },
   { flag: videodlTest, tag: 'VIDEODL_TEST', file: './tests/videodl-test.js', runner: 'runVideodlTest', args: (win) => [win, { portableDir: PORTABLE_DIR }], log: (r) => JSON.stringify({ ok: r.ok, verified: r.verified, skipped: r.skipped }) },
-  { flag: videodlUiTest, tag: 'VIDEODL_UI_TEST', file: './tests/videodl-ui-test.js', runner: 'runVideodlUiTest', args: (win) => [win, { portableDir: PORTABLE_DIR }], log: (r) => JSON.stringify({ pass: r.pass, failures: r.failures }) }
+  { flag: videodlUiTest, tag: 'VIDEODL_UI_TEST', file: './tests/videodl-ui-test.js', runner: 'runVideodlUiTest', args: (win) => [win, { portableDir: PORTABLE_DIR }], log: (r) => JSON.stringify({ pass: r.pass, failures: r.failures }) },
+  { flag: docTest, tag: 'DOC_TEST', file: './tests/doc-test.js', runner: 'runDocTest', args: (win) => [win, { portableDir: PORTABLE_DIR }], log: (r) => JSON.stringify({ ok: r.ok, failures: r.failures }) },
+  { flag: docUiTest, tag: 'DOC_UI_TEST', file: './tests/doc-ui-test.js', runner: 'runDocUiTest', args: (win) => [win], log: (r) => JSON.stringify({ pass: r.pass, failures: r.failures }), write: true }
 ];
 
 /** 按表注册自动测试入口（createMainWindow 里调用；一次运行只会命中一个 flag） */
@@ -1071,7 +1077,8 @@ function killConvertTree(child) {
 // mode='text'：对 PDF→DOCX 产物做压平后处理（见 core/flatten-docx.cjs），产出 Word 能正常打开的文档
 ipcMain.handle('libreoffice:convert', async (_event, options) => {
   const inputPath = options && options.inputPath;
-  const target = options && options.target === 'docx' ? 'docx' : 'pdf';
+  // target 白名单：pdf（Office→PDF）/ docx（PDF→Word）/ xlsx·pptx（v2.13.0 起，文档格式转换工具的 .doc/.xls/.ppt→新格式）
+  const target = ['pdf', 'docx', 'xlsx', 'pptx'].includes(options && options.target) ? options.target : 'pdf';
   if (!inputPath) return { ok: false, message: '缺少输入文件' };
 
   const lo = findLibreOffice();
@@ -1095,8 +1102,10 @@ ipcMain.handle('libreoffice:convert', async (_event, options) => {
   const timeoutMs = Math.min(30 * 60 * 1000, Math.max(5 * 60 * 1000, Math.round(sizeMb * 60 * 1000)));
 
   const args = ['--headless', '--norestore', '--invisible', `-env:UserInstallation=${pathToFileURL(profileDir).href}`];
-  // 关键：PDF 转 Word 必须显式走 Writer 的 PDF 导入过滤器，否则 LibreOffice 会走 Draw 通道输出散架文本框
-  if (target === 'docx') args.push('--infilter=writer_pdf_import');
+  // 关键：PDF 转 Word 必须显式走 Writer 的 PDF 导入过滤器，否则 LibreOffice 会走 Draw 通道输出散架文本框。
+  // 只对「输入是 PDF」加：v2.13.0 起 docx 目标也用于 .doc→.docx（文档格式转换工具），
+  // 普通 .doc 走默认过滤器，套上 PDF 导入过滤器反而转换失败。
+  if (target === 'docx' && /\.pdf$/i.test(inputPath)) args.push('--infilter=writer_pdf_import');
   args.push('--convert-to', target, '--outdir', workDir, inputPath);
 
   const t0 = Date.now();
@@ -1171,13 +1180,26 @@ const IMAGE_ANY_EXTS = ['png', 'jpg', 'jpeg', 'webp', 'gif', 'bmp', 'ico', 'avif
 // 图片格式转换额外收手机拍照格式（HEIC/HEIF/HIF，解码走主进程 libheif 引擎）；
 // 其它图片工具（加水印/拼接/切图等）还不能解 HEIC，继续用 IMAGE_ANY_EXTS
 const IMAGE_ANY_EXTS_WITH_HEIC = [...IMAGE_ANY_EXTS, 'heic', 'heif', 'hif'];
-const VIDEO_EXTS = ['mp4', 'mov', 'mkv', 'avi', 'webm', 'flv', 'wmv', 'm4v', 'ts', '3gp', 'mpg', 'mpeg', 'vob', 'rmvb', 'ogv'];
+// 图片格式转换（仅此一个工具用）再额外收「老图片格式」：输入经随包 ffmpeg 解码成 PNG（v2.13.0，
+// 解码器已逐一验证在位：tiff/pcx/targa/psd/dds/jpeg2000）；加水印等其它图片工具仍用 IMAGE_ANY_EXTS
+const IMG_CONVERT_EXTRA_EXTS = ['tif', 'tiff', 'pcx', 'tga', 'psd', 'dds', 'jp2', 'j2k'];
+const IMG_CONVERT_DIALOG_EXTS = [...IMAGE_ANY_EXTS_WITH_HEIC, ...IMG_CONVERT_EXTRA_EXTS];
+const VIDEO_EXTS = [
+  'mp4', 'mov', 'mkv', 'avi', 'webm', 'flv', 'wmv', 'm4v', 'ts', '3gp',
+  'mpg', 'mpeg', 'vob', 'rmvb', 'ogv',
+  // v2.13.0 起补充的老格式/常见封装（demuxer 均已用随包 ffmpeg 验证在位）：
+  // asf（wmv 同容器）、3g2/f4v（mp4 同容器）、mts/m2ts（AVCHD/蓝光 MPEG-TS）
+  'asf', '3g2', 'f4v', 'mts', 'm2ts'
+];
 const ANIMATED_EXTS = ['gif', 'webp', 'apng'];
 // 音频格式转换工具：音频扩展名 + 视频（视频会自动提取声音）
 const AUDIO_EXTS = [
   'mp3', 'wav', 'flac', 'm4a', 'aac', 'ogg', 'oga', 'opus', 'wma', 'amr',
   'aiff', 'aif', 'ape', 'dsf', 'mpc', 'tak', 'wv', 'tta', 'ac3', 'eac3',
-  'mp2', 'spx', 'caf', 'au', 'w64', 'ra', 'rm', 'oma'
+  'mp2', 'spx', 'caf', 'au', 'w64', 'ra', 'rm', 'oma',
+  // v2.13.0 起补充的老格式（demuxer/decoder 均已用随包 ffmpeg 验证在位）：
+  // shn（Shorten）、voc（创新声卡老格式）、mka（Matroska 纯音频）
+  'shn', 'voc', 'mka'
 ];
 
 // 文件压缩与解压工具：压缩包扩展名（仅用于「打开」对话框的过滤器；
@@ -1202,9 +1224,14 @@ const OPEN_FILE_DIALOGS = {
   'dialog:open-pdfs': { title: '选择 PDF 文件', name: 'PDF 文件', exts: ['pdf'] },
   'dialog:open-documents': { title: '选择 Word / Excel 文件', name: 'Word / Excel', exts: ['doc', 'docx', 'xls', 'xlsx'] },
   'dialog:open-image-any': {
-    title: '选择图片', name: '图片（含 HEIC/ICO/AVIF/SVG）', exts: IMAGE_ANY_EXTS_WITH_HEIC,
+    title: '选择图片', name: '图片（含 HEIC/ICO/AVIF/TIFF/PSD 等老格式）', exts: IMG_CONVERT_DIALOG_EXTS,
     // 测试模式只返回固定夹具「测试原图C」：避免把历次测试产生的副本/产物一起选进来（曾导致一次载入上千张）
     fixture: { exact: '测试原图C' }
+  },
+  'dialog:open-doc-convert': {
+    title: '选择要转换的文档', name: '文档（Word / Excel / PPT / RTF）',
+    exts: ['doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx', 'pps', 'rtf'],
+    fixture: { startWith: '测试老文档' }
   },
   'dialog:open-videos': { title: '选择视频', name: '视频', exts: VIDEO_EXTS, fixture: { startWith: '测试视频' } },
   'dialog:open-player-videos': {

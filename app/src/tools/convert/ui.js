@@ -3,12 +3,12 @@
 //       图片解码复用 shared/imageio.js，TIFF/GIF/AVIF 经 shared/ffmpeg.js 调主进程 ffmpeg，
 //       HEIC/HEIF/HIF（手机拍照格式）经 shared/heic.js 调主进程 libheif 引擎解码。
 import { decodeImageFromBytes, encodeImageToBytes } from '../../shared/imageio.js';
-import { ffmpegStatus, transformImageBytes } from '../../shared/ffmpeg.js';
+import { ffmpegStatus, transformImageBytes, transformFileToBytes } from '../../shared/ffmpeg.js';
 import { decodeHeicFromBytes } from '../../shared/heic.js';
 import {
-  TARGETS, INPUT_EXTS, HEIF_EXTS, DECODE_FAIL_MESSAGE,
+  TARGETS, INPUT_EXTS, HEIF_EXTS, FFMPEG_DECODE_EXTS, DECODE_FAIL_MESSAGE,
   targetInfo, needsFfmpeg, hasQuality, defaultQuality,
-  fitLongEdge, flattenOnColor, resizePixels, encodeWebp, encodeIcon, encodeBmp, ffmpegArgs, outputBaseName
+  fitLongEdge, flattenOnColor, resizePixels, encodeWebp, encodeIcon, encodeBmp, ffmpegArgs, ffmpegDecodeArgs, outputBaseName
 } from './core/convert.js';
 
 const MARKUP = `
@@ -44,7 +44,7 @@ const MARKUP = `
     <main class="card conv-files" id="convFiles">
       <div class="conv-drop" id="convDrop">
         <button class="btn btn-primary btn-lg" id="convAddBtn" data-add="1">添加图片</button>
-        <div class="conv-hint">也可以把图片或整个文件夹拖进窗口；支持多选（含 HEIC / ICO / AVIF / SVG，手机拍照格式可直接转）</div>
+        <div class="conv-hint">也可以把图片或整个文件夹拖进窗口；支持多选（含 HEIC / ICO / AVIF / SVG / TIFF / PSD / PCX / TGA 等老格式，手机拍照格式可直接转）</div>
       </div>
       <div class="conv-list-wrap" id="convListWrap" hidden>
         <div class="conv-list-head">
@@ -131,10 +131,10 @@ function renderFfmpegNote() {
   if (ff && ff.found) {
     const where = ff.where === 'addon' ? '加装包' : '系统安装';
     note.className = 'conv-note is-ok';
-    note.textContent = `✓ 已检测到 ffmpeg${ff.version ? `（${ff.version}）` : ''}，来源：${where} —— TIFF / GIF / AVIF 输出可用`;
+    note.textContent = `✓ 已检测到 ffmpeg${ff.version ? `（${ff.version}）` : ''}，来源：${where} —— TIFF / GIF / AVIF 输出与老格式图片输入（TIFF/PSD/PCX/TGA/DDS/JPEG2000）可用`;
   } else {
     note.className = 'conv-note is-warn';
-    note.textContent = '未检测到 ffmpeg：TIFF / GIF / AVIF 输出不可用（其余格式不受影响）；需要时把加装包解压到软件目录的 addons/ffmpeg 后重开本工具。';
+    note.textContent = '未检测到 ffmpeg：TIFF / GIF / AVIF 输出与老格式图片输入（TIFF/PSD/PCX/TGA/DDS/JPEG2000）不可用（其余格式不受影响）；需要时把加装包解压到软件目录的 addons/ffmpeg 后重开本工具。';
   }
 }
 
@@ -247,6 +247,21 @@ async function onDrop(event) {
 
 // —— 批量转换 ——
 
+/** 老图片格式（TIFF/PCX/TGA/PSD/DDS/JPEG2000）经随包 ffmpeg 解码：出首帧 PNG 再进 canvas */
+async function decodeViaFfmpeg(filePath, bare) {
+  if (!(state.ff && state.ff.found)) {
+    throw new Error(`解码 .${bare} 需要 ffmpeg 加装包（把 addons/ffmpeg 放进软件目录后重开本工具）`);
+  }
+  // transformFileToBytes：主进程按路径把文件直接交给 ffmpeg（PSD/TIFF 可能很大，别整份读进界面进程）
+  const res = await transformFileToBytes(filePath, '.png', ffmpegDecodeArgs());
+  if (!res || !res.ok) throw new Error((res && res.message) || 'ffmpeg 解码失败');
+  try {
+    return await decodeImageFromBytes(res.bytes);
+  } catch {
+    throw new Error(`解码失败：.${bare} 内容不受支持或文件已损坏`);
+  }
+}
+
 /** 把一张图编码成目标格式（失败时抛出带原因的 Error） */
 async function encodeTo(params, pixels, width, height) {
   const { format, quality } = params;
@@ -307,6 +322,9 @@ async function run() {
         if (HEIF_EXTS.includes(bare)) {
           // 手机拍照格式：走主进程 libheif 引擎（引擎报错自带可读原因，直接透传）
           img = await decodeHeicFromBytes(bytes);
+        } else if (FFMPEG_DECODE_EXTS.includes(bare)) {
+          // 老图片格式：内核解不了，走随包 ffmpeg 出首帧 PNG 再解（v2.13.0）
+          img = await decodeViaFfmpeg(f.path, bare);
         } else {
           try {
             img = await decodeImageFromBytes(bytes);
