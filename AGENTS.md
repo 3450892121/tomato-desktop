@@ -8,7 +8,7 @@
 - `README.md`：项目说明、快速开始（运行/测试/打包）、目录结构、已知限制。
 - `CHANGELOG.md`：版本与开发里程碑。
 - `spec/`：目标规格（00-overview 全局地图 / modules 各模块 / acceptance 验收标准）。
-- `docs/`：文档（`使用说明.txt` 面向使用者随包分发；`新增工具指南.md`；`兼容性变体说明.md`；`验收报告-v1.0.0.md`）。
+- `docs/`：文档（`使用说明.txt` 面向使用者随包分发；`加装包说明.txt` 随包分发；`新增工具指南.md`；`兼容性变体说明.md`；`压缩格式性能对比.md`——压缩工具的实测依据，被 archive/core 多处引用；旧版本验收报告已清理，里程碑看 CHANGELOG.md）。
 - `artifacts/`：测试证据（截图等，不进 git）。
 - `app/`：Electron 应用源码：
   - `main.js` / `preload.js`：主进程与安全桥（窗口、文件对话框等系统能力）。
