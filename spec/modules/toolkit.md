@@ -29,7 +29,8 @@
     - 后台任务不受影响：被回收页面里的任务归属队列、照常跑完（见 `task-queue.md` 的硬契约），页面只是退掉自己的 UI 订阅。
       要触发回收得「一边跑长任务、一边连着动过 5 个其它工具」，属于极端操作。
   - 生命周期约定：`mount(container, ctx)`（首次进入一次）→ `activate()` / `deactivate()`（可选，每次切入/切出调用；切走时若该页「没动过」，`deactivate()` 之后紧接着 `unmount()` 释放）→ `unmount()`（页面被销毁 / 被 LRU 回收时调用）。
-  - 工具里挂在 `window` / `document` 上的交互（如快捷键）必须先用 `ctx.isActive()` 判断自己是不是当前页，隐藏时让位；`ctx.setStatus/setInfo` 会记到本页并在切回时恢复，`showProgress/hideProgress` 只有当前页才生效。
+  - 工具里挂在 `window` / `document` 上的交互（如快捷键）必须先用 `ctx.isActive()` 判断自己是不是当前页，隐藏时让位。
+  - **状态与进度按页记账（v2.10.1 起）**：`ctx.setStatus/setInfo` 会记到本页并在切回时恢复；**进度遮罩全局只有一个**——`ctx.showProgress/hideProgress` 始终记到本页、只有当前页才真的动遮罩，`switchTool` 按新页记下的状态恢复或关闭（切走还在跑的工具时遮罩一定会被关掉，切回来又能接上；页面被 LRU 回收后同样由 shell 兜底）。工具侧不必也无法靠自己「回收后补关」，照常用 `ctx.showProgress/hideProgress` 即可。
   - 取舍：保活意味着「动过」页的内存（如已选图片的像素数据）在切换后仍占用，换「切回不丢状态」；没动过的页不驻留、不占内存，超额部分由上面的 LRU 回收兜住。
 - **工具声明约定**：每个工具导出统一结构：
   ```

@@ -58,7 +58,7 @@
 | **动图与视频互转**：GIF/WebP 动图/APNG ↔ 视频 | ✅ 可用（含聊天表情预设与目标大小自动降档） |
 | ffmpeg / Real-ESRGAN / FunASR / OCR / 7-Zip / HiBit 加装包 | ✅ **全部随主包附带**（见 `addons/` 各目录的许可与来源） |
 | 版本号可见（左上角徽章 / 窗口标题 / 帮助「关于」） | ✅ 可用（随包显示当前版本） |
-| 免安装打包（含图标 / 版本信息 / 压缩包） | ✅ 已产出（最新 v2.11.1：文件夹 1487.5 MB + zip 771.2 MB，打包含产物瘦身约 1005MB；v2.0.0 首版为 2468 MB / 1042 MB） |
+| 免安装打包（含图标 / 版本信息 / 压缩包） | ✅ 已产出（最新 v2.13.0：文件夹约 1.6 GB + zip 约 819 MB；打包含产物瘦身约 1005MB） |
 | 与手机版互相兼容（真机样本实测） | ⏳ **待用手机样本锁定**（工具已就绪，见 `docs/兼容性变体说明.md`） |
 
 ---
@@ -67,7 +67,7 @@
 
 ### 直接使用（给使用者）
 双击免安装文件夹里的 `番茄图片混淆桌面版.exe` 即可，无需安装。详见 `docs/使用说明.txt`。
-**完整版已内含 LibreOffice、ffmpeg 与 Real-ESRGAN 加装包——解压后所有功能（含 PDF→Word、高保真 Word/Excel→PDF、视频格式转换、动图与视频互转、AI 放大）立即可用，无需任何额外安装。**
+**随包已内含全部加装包（LibreOffice、ffmpeg、Real-ESRGAN、FunASR、OCR、7-Zip、HiBit、yt-dlp）——解压后全部功能（含 PDF→Word、视频格式转换、AI 放大、语音转文字、文字识别、压缩解压、视频下载）立即可用，无需任何额外安装。**
 
 ### 开发调试（给维护者）
 ```powershell
@@ -86,7 +86,7 @@ npm start
 ### 测试与自检（交付前必须全绿）
 ```powershell
 cd app
-npm test                                                    # 纯逻辑单测共 278 项（算法 55 + 任务队列 13 + 压缩与解压 71 + 文件藏图 41 + 导航排序 33 + 软件卸载 19 + 设置校验与转义 21 + 输出文件名分配 11 + 视频下载 14）
+npm test                                                    # 纯逻辑单测共 297 项（算法 55 + 任务队列 13 + 压缩与解压 71 + 文件藏图 41 + 导航排序 33 + 软件卸载 19 + 设置校验与转义 21 + 输出文件名分配 11 + 视频下载 22 + 文档格式转换 11）
 .\node_modules\electron\dist\electron.exe . --smoke-test     # 冒烟自检（元素/按钮）
 .\node_modules\electron\dist\electron.exe . --self-test      # 端到端（编解码 + 算法 + 性能）
 .\node_modules\electron\dist\electron.exe . --ui-test        # 图片混淆 界面自动测试（含截图与像素级校验）
@@ -114,6 +114,8 @@ npm test                                                    # 纯逻辑单测共
 .\node_modules\electron\dist\electron.exe . --uninstall-test   # 软件卸载自检（加装包哈希/清单权限 + 提权命令构造 + 界面走查 + 空跑无进程 + 缺失降级）
 .\node_modules\electron\dist\electron.exe . --videodl-test     # 视频下载自检（引擎指纹/解析 + 本地真实下载 + 成品校验 + 取消清理 + 历史落盘 + 缺包降级 + 联网检查）
 .\node_modules\electron\dist\electron.exe . --videodl-ui-test  # 视频下载界面自动测试（改目录→贴链接→下载→完成→取消→清空 + 引擎卡片走查 + 截图）
+.\node_modules\electron\dist\electron.exe . --doc-test         # 文档格式转换自检（四类夹具经真实 IPC 转换 + SheetJS/jszip 内容读回）
+.\node_modules\electron\dist\electron.exe . --doc-ui-test      # 文档格式转换界面自动测试（添加→智能转换→产物读回→清空 + 截图）
 ```
 > 界面类测试结果同时写入 `%TEMP%\tomato-*.json`（如 `tomato-pdf-test.json`、`tomato-av-test.json`、`tomato-pdf-ocr-test.json`、`tomato-queue-ui-test.json`、`tomato-archive-test.json` 等），截图在 `%TEMP%\tomato-uitest`。
 > 媒体类自检需要 `app/addons/ffmpeg/ffmpeg.exe`；「文字识别」需要 `app/addons/ocr/`（模型 + 中文字体）；「压缩与解压」需要 `app/addons/7zip/`（引擎，约 2.4MB）；「软件卸载」需要 `app/addons/hibit/`（官方便携版，约 15MB）；「视频下载」需要 `app/addons/ytdlp/yt-dlp.exe`（约 16.6MB，`node/node.exe` 可选、仅 YouTube 用）。仓库内均已有、不进 git；缺失时相关检查会如实标注失败，其余功能不受影响（压缩工具的 ZSTANDARD/BROTLI 走 Node 内置引擎，无加装包也可用）。
@@ -146,15 +148,14 @@ electron . --verify-samples <目录> --key <密钥>
 ├─ CHANGELOG.md              版本与里程碑
 ├─ spec/                     目标规格（地图 / 各模块 / 验收标准）
 │  ├─ 00-overview.md         全局地图
-│  ├─ modules/               每个工具与框架模块一个文件（26 个：toolkit / engine / imageio / archive / ocr / player / uninstall 等）
+│  ├─ modules/               每个工具与框架模块一个文件（28 个：toolkit / engine / imageio / archive / ocr / player / uninstall 等）
 │  └─ acceptance.md          验收标准（A1 起逐条，含实测证据）
 ├─ docs/                     文档
 │  ├─ 使用说明.txt           面向使用者的说明（随安装包分发）
 │  ├─ 加装包说明.txt         各加装包的用途 / 安装 / 许可（随安装包分发）
 │  ├─ 新增工具指南.md         如何给工具箱加一个新工具
 │  ├─ 兼容性变体说明.md       三处兼容性开关的背景与锁定方法
-│  ├─ 压缩格式性能对比.md     压缩工具的技术实现与各格式实测性能对比
-│  └─ 验收报告-*.md           验收标准逐条对照与证据
+│  └─ 压缩格式性能对比.md     压缩工具的技术实现与各格式实测性能对比
 ├─ app/                      Electron 应用源码
 │  ├─ main.js / preload.js   主进程与安全桥
 │  ├─ src/shell/             工具箱框架（导航、注册表、工具页容器、theme.css 设计令牌、components.css 组件库）
@@ -162,7 +163,7 @@ electron . --verify-samples <目录> --key <密钥>
 │  ├─ src/tools/pdf-convert/ PDF 转格式工具（core 核心 / preview 内置降级渲染页）
 │  ├─ src/tools/_template/   新工具模板
 │  ├─ src/shared/            跨工具复用（图片读写、ffmpeg 封装、HEIC 解码、任务队列、设置、转义等）
-│  ├─ tests/                 自动测试（262 项纯逻辑单测 + 各工具自检与界面测试 / 样本工具）
+│  ├─ tests/                 自动测试（297 项纯逻辑单测 + 各工具自检与界面测试 / 样本工具）
 │  └─ tools/                 构建脚本（图标生成、打包）
 ├─ artifacts/                测试证据（截图等，不进 git）
 └─ 番茄图片混淆.apk           参考实现样本（只读）

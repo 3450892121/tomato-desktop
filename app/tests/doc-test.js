@@ -25,7 +25,7 @@ const XLSX = require('../vendor/xlsx/xlsx.full.min.js');
 // 带进产物，`require('jszip')`（按 package.json 解析）在打包产物上会失败（v2.13.0 踩到）
 const JSZip = require('../node_modules/jszip/dist/jszip.min.js');
 
-/** 教务系统同款「假 .xls」：Excel 2003 XML（SpreadsheetML）+ mso-application progid（WPS 保存的实测样本同构） */
+/** 教务系统同款「假 .xls」：Excel 2003 XML（SpreadsheetML）+ mso-application progid（WPS 保存的实测样本同构）；<Row> 必须整段包在 <Table> 里，否则 LibreOffice 转出空表（实测踩过，别去掉这层包裹） */
 function makeFakeXmlXls(rows, sheetName) {
   const esc = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
   const cell = (v) => `<Cell><Data ss:Type="String">${esc(v)}</Data></Cell>`;
