@@ -21,7 +21,9 @@ const fs = require('fs/promises');
 
 // 字面量相对路径 require（Node 按本文件位置解析到 app/vendor；不用动态路径拼 require）
 const XLSX = require('../vendor/xlsx/xlsx.full.min.js');
-const JSZip = require('jszip');
+// jszip 与 flatten-docx.cjs 同一惯用法：走 dist 的 UMD 产物——pack.js 4b 只把这一个文件
+// 带进产物，`require('jszip')`（按 package.json 解析）在打包产物上会失败（v2.13.0 踩到）
+const JSZip = require('../node_modules/jszip/dist/jszip.min.js');
 
 /** 教务系统同款「假 .xls」：Excel 2003 XML（SpreadsheetML）+ mso-application progid（WPS 保存的实测样本同构） */
 function makeFakeXmlXls(rows, sheetName) {
