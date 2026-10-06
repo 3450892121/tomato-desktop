@@ -41,3 +41,7 @@ app/.mimosa/
 
 # 本地私人笔记目录：不入库（AGENTS.md「隐私防漏」）
 /notes/
+
+开源发布/
+*.7z
+*.zip
