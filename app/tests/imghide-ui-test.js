@@ -309,7 +309,7 @@ async function runImgHideUiTest(win, options = {}) {
   if (!sameFile(path.join(dir2, ITEM_A), path.join(TEST_DIR, ITEM_A))) fail('带密码解出来的文件内容不一致');
   await shot('08-正确密码解开');
 
-  // —— 7) 体积提示（用户实测教训：太大的图网站/手机端打不开） ——
+  // —— 7) 体积提示：太大的图在网站 / 手机端打不开 ——
   await fs.writeFile(path.join(TEST_DIR, ITEM_BIG), Buffer.alloc(4 * 1024 * 1024, 7));
   await fs.writeFile(path.join(TEST_DIR, ITEM_HUGE), Buffer.alloc(51 * 1024 * 1024, 9));
   result.checks.bigFixtures = [ITEM_BIG, ITEM_HUGE].map((name) => {

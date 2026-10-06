@@ -71,7 +71,7 @@ async function runAudioUiTest(win) {
   await fs.mkdir(TEST_DIR, { recursive: true });
 
   // —— 清理上次夹具与产物（本测试只认「测试音频*」，清理范围也仅限它，避免影响其它界面测试的夹具） ——
-  //    诊断口径：清理前/后各记一次匹配文件，防止「产物混进列表」类问题再次悄悄发生（参考 v1.5.0 教训）
+  //    诊断口径：清理前/后各记一次匹配文件，防止「产物混进列表」类问题再次悄悄发生
   const cleanBefore = (await fs.readdir(TEST_DIR)).filter((f) => /^测试音频/.test(f));
   for (const f of await fs.readdir(TEST_DIR)) {
     if (/^测试音频/.test(f)) {

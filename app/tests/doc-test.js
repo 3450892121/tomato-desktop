@@ -120,7 +120,7 @@ async function runDocTest(win) {
       return docXml.replace(/<[^>]+>/g, '');
     };
 
-    // ① 教务系统「假 .xls」→ xlsx（本工具立项的原始场景）
+    // ① 教务系统「假 .xls」→ xlsx（典型场景）
     const outFake = path.join(dir, '名单-假xls.xlsx');
     const r1 = await convert('假xls转xlsx', fakeXls, 'xlsx', outFake);
     if (r1.ok) {

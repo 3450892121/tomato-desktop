@@ -1,7 +1,7 @@
 // 工具：视频播放器 —— 播放计划与文案（纯逻辑，可单测；界面只负责照做）
 // 职责：判断「这个视频能不能直接播」，不能就直接给出「怎么准备一份可播放副本」的 ffmpeg 参数。
 // 依据：Electron 内核（Chromium）实际支持的容器/编码 + ffmpeg 探测出的编码名（见 shared/ffmpeg.js 的 probeMedia）。
-//      目标、取舍与实测回填见 spec/modules/player.md。
+//      目标与取舍见 spec/modules/player.md。
 
 /**
  * 播放方式档位，从轻到重排列：播放失败时按这个顺序往上升级（见 nextMode）。

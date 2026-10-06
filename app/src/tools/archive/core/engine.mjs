@@ -724,7 +724,7 @@ function countFilesSince(dir, before) {
 
 /**
  * 计数用的 Transform（进度上报）。
- * ⚠️ 教训：**不能**直接给源流挂 `on('data')` 来数字节——那会把流切到 flowing 模式，
+ * **不能**直接给源流挂 `on('data')` 来数字节——那会把流切到 flowing 模式，
  * 在 `pipeline()` 接上消费者之前就已经吐掉数据（小文件直接丢光，压出来只剩 zstd 帧头 9 字节、
  * 解压得到空文件）。放进管道里当一环才是安全的。
  */

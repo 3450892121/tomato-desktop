@@ -5,7 +5,7 @@
 //     长按条目约 400ms 即拿起（被拖条目升起玻璃卡跟随指针），同级兄弟用 transform 平滑让位，
 //     松手按视觉序重排 DOM 后落盘。不需要任何「排序模式」，点击（切工具 / 展开收起分组）不受影响。
 //
-// 拖拽的关键约定（踩坑记录）：
+// 拖拽的关键约定：
 //  - 正确性绝不依赖 setPointerCapture（合成事件没有真实指针，capture 会抛 NotFoundError）；
 //    pointermove/up/cancel 挂 window，capture 只在 try/catch 里当增强。
 //  - 坐标全部用「内容坐标」（clientY + nav.scrollTop）：拖拽中容器自动滚动、列表本身滚动都不影响计算。

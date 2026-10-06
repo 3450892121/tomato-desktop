@@ -178,7 +178,7 @@
 .progress-text { font-size: var(--font-size-sm); color: var(--color-text-secondary); }
 
 /* —— 组件库动效（页面切换 / 弹窗 / 选中）——
-   v2.1.0：幅度与时长的都调强了一档（用户反馈「看不出来发生了什么」）。 */
+   幅度与时长取「一眼看得出发生了变化」的量级。 */
 @keyframes overlay-in { from { opacity: 0; } to { opacity: 1; } }
 @keyframes overlay-out { from { opacity: 1; } to { opacity: 0; } }
 @keyframes modal-in {

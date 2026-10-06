@@ -410,7 +410,7 @@ export function uniqueEntryName(usedNames, name) {
 
 // —— 动态混淆（极速）容器：原版「动态混淆」用的另一套格式 ——
 //
-// 实测教训（用户反馈「网站的工具说要密码」）：原版有两套容器 ——
+// 互通要点：原版有两套容器，走「极速」打法时对方会要求密码 ——
 //   ① 动态混淆（极速）：载荷是**明文分隔符格式**，直接追加在图片尾部，靠全文件字节扫描定位；
 //      不解压、不需密码、多大文件都能开（原版 `handleLegacyDecrypt` 就是全文件里找 `DYNAMIC_V2_`）。
 //   ② 图夹 PRO（防查）：就是上面的 V6（含 16 字节指纹 + 可选密码）；原版客户端一看到指纹就弹密码框。
@@ -580,7 +580,7 @@ export function appendDynamicPayload(imageBytes, payload) {
   return concatBytes([imageBytes, payload]);
 }
 
-// —— 体积提示（用户实测教训：788MB 的图夹在网站/手机端根本打不开） ——
+// —— 体积提示：超大图夹在网站 / 手机端打不开 ——
 
 /** 贴吧等平台的建议上限（原版口径：表图控制在 3MB 以内更好发） */
 export const PLATFORM_HINT_BYTES = 3 * 1024 * 1024;
