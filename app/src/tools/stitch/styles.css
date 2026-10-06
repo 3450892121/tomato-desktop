@@ -1,0 +1,173 @@
+/* 工具：长图拼接 —— 专属样式
+   约定：颜色 / 字号 / 间距一律引用 shell/theme.css 的变量，类名统一 st- 前缀 */
+.st-tool {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  height: 100%;
+  min-height: 0;
+}
+
+.st-controls {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  flex: none;
+  padding: var(--space-3) var(--space-4);
+}
+
+.st-w-num { flex: none; width: 92px; }
+.st-w-mode { flex: none; width: 152px; }
+.st-gap { margin-left: var(--space-3); }
+
+.st-files {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.st-drop {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-3);
+  flex: none;
+  padding: var(--space-6);
+}
+.st-drop-hint { font-size: var(--font-size-sm); color: var(--color-text-secondary); }
+
+.st-list-wrap { display: flex; flex-direction: column; flex: 1 1 auto; min-height: 0; }
+.st-list-head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex: none;
+  padding: var(--space-3) var(--space-4);
+  border-bottom: 1px solid var(--color-border);
+  font-size: var(--font-size-sm);
+  color: var(--color-text-secondary);
+}
+.st-spacer { flex: 1 1 auto; }
+
+.st-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  flex: 1 1 auto;
+  min-height: 0;
+  margin: 0;
+  padding: var(--space-2);
+  overflow-y: auto;
+  list-style: none;
+}
+
+.st-item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-sm);
+}
+.st-item:hover { background: var(--color-surface-soft); }
+
+.st-item-order {
+  flex: none;
+  width: 22px;
+  text-align: center;
+  font-size: var(--font-size-xs);
+  color: var(--color-text-secondary);
+}
+
+.st-item-thumb {
+  flex: none;
+  width: 42px;
+  height: 42px;
+  object-fit: contain;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface-soft);
+}
+
+.st-item-main { flex: 1 1 auto; min-width: 0; }
+.st-item-name {
+  font-size: var(--font-size-md);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.st-item-meta { font-size: var(--font-size-xs); color: var(--color-text-secondary); }
+
+.st-item-actions { flex: none; display: flex; align-items: center; gap: var(--space-1); }
+.st-icon-btn {
+  width: 28px;
+  height: 28px;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-md);
+  cursor: pointer;
+}
+.st-icon-btn:hover { background: var(--color-neutral); color: var(--color-text); }
+.st-icon-btn:disabled { opacity: 0.4; cursor: default; }
+.st-icon-btn:disabled:hover { background: transparent; color: var(--color-text-secondary); }
+
+/* —— 排布预览 —— */
+.st-preview-wrap {
+  display: flex;
+  flex-direction: column;
+  flex: none;
+  height: 190px;
+  border-top: 1px solid var(--color-border);
+}
+.st-preview-head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex: none;
+  padding: var(--space-2) var(--space-4);
+  font-size: var(--font-size-sm);
+  color: var(--color-text-secondary);
+}
+.st-preview {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: 1 1 auto;
+  min-height: 0;
+  padding: 0 var(--space-4) var(--space-3);
+}
+.st-preview-canvas {
+  position: relative;
+  border: 1px solid var(--color-border);
+  background: var(--color-surface-soft);
+}
+.st-preview-box {
+  position: absolute;
+  box-sizing: border-box;
+  border: 1px solid var(--color-border-strong);
+  background-color: var(--color-surface);
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: cover;
+}
+.st-limit {
+  flex: none;
+  padding: 0 var(--space-4) var(--space-2);
+  line-height: 1.5;
+}
+.st-limit.is-danger { color: var(--color-danger); }
+
+.st-actions { display: flex; align-items: center; gap: var(--space-3); flex: none; }
+.st-result {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-size: var(--font-size-xs);
+  color: var(--color-text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}

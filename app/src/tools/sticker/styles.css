@@ -1,0 +1,153 @@
+/* ============================================================
+   工具「动图与视频互转」的专属样式
+   只使用 shell/theme.css 的令牌；通用组件（按钮/卡片/输入）来自 shell.css
+   ============================================================ */
+
+.st-tool {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  height: 100%;
+  min-height: 0;
+}
+
+/* 顶部：参数与 ffmpeg 状态 */
+.st-controls {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  flex: none;
+  padding: var(--space-3) var(--space-4);
+}
+.st-block {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding-top: var(--space-2);
+  border-top: 1px dashed var(--color-border);
+}
+.st-params {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) var(--space-4);
+}
+.st-param { display: flex; align-items: center; gap: var(--space-2); }
+.st-param .select { min-height: 32px; }
+.st-w-num { max-width: 88px; }
+.st-w-sel { min-width: 130px; }
+.st-presets .btn { min-height: 28px; padding: 0 var(--space-3); font-size: var(--font-size-xs); }
+.st-note { font-size: var(--font-size-xs); color: var(--color-text-secondary); }
+.st-note.is-ok { color: var(--color-success); }
+.st-note.is-warn { color: var(--color-warning); }
+
+/* 中部：文件区 */
+.st-files {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 180px;
+  padding: var(--space-3);
+  overflow: hidden;
+  background: var(--color-surface-soft);
+}
+.st-drop {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  flex: 1 1 auto;
+}
+.st-drop-hint { font-size: var(--font-size-xs); color: var(--color-text-secondary); }
+
+.st-list-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  flex: 1 1 auto;
+  min-height: 0;
+}
+.st-list-head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex: none;
+  font-size: var(--font-size-xs);
+  color: var(--color-text-secondary);
+}
+.st-list-head .btn { min-height: 28px; padding: 0 var(--space-3); font-size: var(--font-size-xs); }
+.st-spacer { flex: 1 1 auto; }
+
+.st-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  overflow-y: auto;
+}
+.st-item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-1) var(--space-2);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+}
+.st-tag {
+  flex: none;
+  padding: 0 var(--space-2);
+  border-radius: var(--radius-sm);
+  font-size: var(--font-size-xs);
+  line-height: 20px;
+}
+.st-tag.is-anim { background: var(--color-sidebar-active-bg); color: var(--color-sidebar-active-text); }
+.st-tag.is-video { background: var(--color-neutral); color: var(--color-neutral-text); }
+.st-item-main { flex: 1 1 auto; min-width: 0; }
+.st-item-name {
+  font-size: var(--font-size-sm);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.st-item-meta { font-size: var(--font-size-xs); color: var(--color-text-secondary); }
+.st-item-result {
+  font-size: var(--font-size-xs);
+  color: var(--color-text-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.st-item-result.is-ok { color: var(--color-success); }
+.st-item-result.is-fail { color: var(--color-danger); }
+.st-item-actions { display: flex; gap: var(--space-1); flex: none; }
+.st-icon-btn {
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-xs);
+  cursor: pointer;
+}
+.st-icon-btn:hover { background: var(--color-surface-soft); }
+.st-icon-btn:disabled { opacity: 0.4; cursor: default; }
+
+/* 底部：操作与结果 */
+.st-actions { display: flex; align-items: center; gap: var(--space-2); flex: none; }
+.st-actions .st-run { min-width: 140px; }
+.st-result {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-size: var(--font-size-xs);
+  color: var(--color-text-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

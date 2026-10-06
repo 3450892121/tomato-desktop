@@ -1,0 +1,561 @@
+/* ============================================================
+   框架样式：左侧导航 + 工具页容器（左右布局、分组折叠、页面切换）
+   - 通用组件（按钮/卡片/输入/弹窗/进度）在 components.css
+   - 只使用 theme.css 的令牌；工具自带样式放各自 tools/<id>/styles.css
+   ============================================================ */
+
+* { box-sizing: border-box; }
+
+/* 关键：本文件多处把元素设为 display:flex，会覆盖浏览器默认的 [hidden] 规则，
+   导致 hidden 属性失效（遮罩一直显示、按钮藏不掉）。这里统一兜底。 */
+[hidden] { display: none !important; }
+
+html, body {
+  margin: 0;
+  height: 100%;
+  background-color: var(--color-bg); /* 窗口底色：必须与 main.js 的 windowBackgroundColor 一致，否则启动闪白 */
+  color: var(--color-text);
+  font-family: var(--font-family);
+  font-size: var(--font-size-md);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* 背景光晕（v2.1.0）：磨砂玻璃要有东西可「糊」才看得出效果。
+   强度控制在 ≤0.35（见 theme.css 的 --bg-aurora-*），不影响看图配色与文字对比度；
+   深浅色各一套色值。 */
+body {
+  background-image:
+    var(--bg-grain), /* 最底层细颗粒：玻璃后面被糊掉的正是它，磨砂感的关键 */
+    /* 光斑刻意做得「紧」一点：太大会摊平成一层浅色，玻璃的模糊就看不出差别了 */
+    radial-gradient(58% 40% at 14% -6%, var(--bg-aurora-warm), transparent 68%),
+    radial-gradient(52% 38% at 86% -10%, var(--bg-aurora-cool), transparent 66%),
+    radial-gradient(46% 40% at 30% 112%, var(--bg-aurora-violet), transparent 68%),
+    radial-gradient(40% 34% at 96% 104%, var(--bg-aurora-cool), transparent 70%);
+}
+
+.shell { display: flex; height: 100%; }
+
+/* —— 左侧工具列表 —— */
+.sidebar {
+  display: flex;
+  flex-direction: column;
+  flex: none;
+  width: var(--sidebar-width);
+  /* 磨砂玻璃侧栏：半透明底 + 背景模糊 + 顶部内高光 + 左上斜向高光（玻璃的「厚度」与「反光面」） */
+  background: var(--color-sidebar-bg);
+  background-image: var(--glass-sheen);
+  border-right: 1px solid var(--color-border);
+  box-shadow: var(--glass-inner-highlight), 1px 0 0 var(--glass-border), var(--shadow-float);
+  backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
+}
+.sidebar-brand {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-4) var(--space-4) var(--space-3);
+}
+.sidebar-logo { font-size: var(--font-size-xl); }
+.sidebar-text { display: flex; flex-direction: column; min-width: 0; }
+.sidebar-title { font-size: var(--font-size-md); font-weight: 600; white-space: nowrap; }
+/* 版本号：随时能确认自己打开的是哪个版本（放在标题下方，避免把标题挤换行） */
+.sidebar-version {
+  font-size: var(--font-size-xs);
+  color: var(--color-text-secondary);
+  white-space: nowrap;
+}
+
+/* 工具列表：分组全展开时条目会变多（17 个工具 + 4 个分组标题），
+   必须自己可滚动 —— 否则底部「设置 / 帮助」会压在最后几个工具上（用户反馈「有些地方被挡住了」）。
+   min-height: 0 是关键：flex 子项默认不肯收缩到内容以下，会直接撑破侧栏。 */
+.tool-nav {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  /* 横向彻底禁掉：只写 overflow-y 的话，横向会被算成 auto ——
+     内容一旦越界（例如悬停位移）列表就能左右晃动，还带出一条横向滚动条。 */
+  overflow-x: hidden;
+  padding: var(--space-1) var(--space-2);
+}
+/* 细滚动条：不抢视觉，深浅色都看得见 */
+.tool-nav::-webkit-scrollbar { width: 8px; }
+.tool-nav::-webkit-scrollbar-track { background: transparent; }
+.tool-nav::-webkit-scrollbar-thumb { background: var(--color-border-strong); border-radius: 999px; }
+.tool-nav::-webkit-scrollbar-thumb:hover { background: var(--color-text-secondary); }
+.tool-item {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--color-text);
+  font-family: inherit;
+  font-size: var(--font-size-md);
+  text-align: left;
+  cursor: pointer;
+  transition: background var(--transition-fast), color var(--transition-fast),
+              transform var(--transition-base), box-shadow var(--transition-base);
+}
+.tool-item:hover { background: var(--color-surface-soft); }
+/* 当前工具（v2.2.2）：磨砂玻璃块 —— 半透明白玻璃底 + 背景模糊 + 顶部内高光 + 主色细描边。
+   相比 v2.1.0 的番茄红染色块更清爽高级（用户反馈「染色块颜色不好看，想要玻璃效果」）。
+   关键：背景 / 描边 / 内高光全部 inset 落地，绝不外溢 —— 分组容器 overflow:hidden 会把外投影裁掉，
+   看起来就像选中框右边被切掉一块。悬停位移也去掉了，避免选中块左右晃动。 */
+.tool-item.is-active {
+  background: var(--color-sidebar-active-bg);
+  background-image: var(--glass-sheen); /* 左上斜向高光：玻璃与「半透明色块」的关键区别 */
+  backdrop-filter: blur(var(--glass-blur-strong)) saturate(var(--glass-saturate));
+  color: var(--color-sidebar-active-text);
+  font-weight: 600;
+  box-shadow: var(--shadow-sidebar-select);
+  animation: nav-select-in var(--transition-base);
+}
+/* 选中「亮起来」：导航专用，刻意不回弹 —— 分组容器是 overflow: hidden，
+   回弹曲线会把方块放大到 1 以上，多出来的边会被裁掉（看着又像选中框被切了一角）。 */
+@keyframes nav-select-in {
+  from { transform: scale(0.96); opacity: 0.55; }
+  to { transform: none; opacity: 1; }
+}
+/* 当前工具的左侧标记：切换时从中间「长出来」，比整块背景变化更柔和（加粗加长，一眼能看到） */
+.tool-item::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 50%;
+  width: 4px;
+  height: 64%;
+  border-radius: 999px;
+  background: currentColor;
+  transform: translateY(-50%) scaleY(0);
+  opacity: 0;
+  transition: transform var(--transition-base), opacity var(--transition-base);
+}
+.tool-item.is-active::before { transform: translateY(-50%) scaleY(1); opacity: 1; }
+.tool-item-icon { flex: none; font-size: var(--font-size-lg); transition: transform var(--transition-spring); }
+.tool-item:hover .tool-item-icon { transform: scale(1.12); }
+
+/* 工具分组（图片 / 视频 / 文档）—— 同类工具聚在一起，标题可点：收起 / 展开 */
+.tool-group { display: flex; flex-direction: column; }
+.tool-group-head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  width: 100%;
+  padding: var(--space-2) var(--space-3);
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--color-text-secondary);
+  font-family: inherit;
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-align: left;
+  cursor: pointer;
+  user-select: none;
+  transition: background var(--transition-fast), color var(--transition-fast);
+}
+.tool-group-head:hover { background: var(--color-surface-soft); color: var(--color-text); }
+.tool-group-chevron {
+  flex: none;
+  width: 9px;
+  height: 9px;
+  margin-left: 2px;
+  border-right: 1.5px solid currentColor;
+  border-bottom: 1.5px solid currentColor;
+  transform: rotate(45deg) translate(-1px, -1px); /* 展开：向下箭头 */
+  transition: transform var(--transition-fast);
+}
+.tool-group.is-collapsed .tool-group-chevron { transform: rotate(-45deg) translate(-1px, -1px); } /* 收起：向右箭头 */
+.tool-group-icon { flex: none; font-size: var(--font-size-md); }
+.tool-group-name { flex: 1 1 auto; }
+.tool-group-count {
+  flex: none;
+  padding: 0 var(--space-1);
+  border-radius: 999px;
+  background: var(--color-neutral);
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-xs);
+  font-weight: 400;
+}
+/* 分组内容：收起 / 展开是平滑的高度过渡（max-height 的具体值由 shell.js 量出来写进内联样式，
+   保证任何内容高度都能自然过渡）；收起完成后才隐藏，既不闪烁也不会用键盘 Tab 进隐藏项。 */
+.tool-group-items {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  overflow: hidden;
+  transition: max-height var(--transition-collapse), opacity var(--transition-collapse), visibility 0s 0s;
+}
+.tool-group.is-collapsed .tool-group-items {
+  max-height: 0;
+  opacity: 0;
+  visibility: hidden;
+  transition: max-height var(--transition-collapse), opacity var(--transition-collapse), visibility 0s var(--transition-collapse);
+}
+.tool-group-items .tool-item { padding-left: var(--space-5); } /* 略微缩进，体现层级 */
+
+/* ============================================================
+   导航手动排序（v2.6.0 引入；v2.11.0 起长按条目即可拖动，无排序模式）
+   - 长按条目约 400ms 拿起：被拖条目升起玻璃卡跟随指针，同级兄弟用 transform 平滑让位；
+   - 快速点击不受影响（切工具 / 展开收起分组照常）；松手按视觉序重排 DOM。
+   ============================================================ */
+
+/* 折叠动画靠 overflow:hidden，所以默认不放开；只在「拖拽进行中」放开——
+   否则被拖条目升起的玻璃卡外阴影、以及兄弟让位的位移会被组容器裁掉。
+   （被收起的分组其内容是 visibility:hidden，放开也不会露出来。） */
+.tool-nav.is-drag-active .tool-group-items { overflow: visible; }
+
+/* 可抓取的暗示（常驻）：悬停 grab 光标；触屏长按拖拽不被浏览器接管成滚动 */
+.tool-nav .tool-item,
+.tool-nav .tool-group-head {
+  touch-action: none;
+  user-select: none;
+}
+.tool-nav .tool-item:hover,
+.tool-nav .tool-group-head:hover { cursor: grab; }
+
+/* 抓手（六点）：只在工具条目悬停时浮现，画在 24px 缩进区内（不挤文字、不与 4px 选中标记条重叠）；
+   分组头靠 grab 光标示意（左端是折叠箭头，再画抓手会打架）。颜色随条目文字色。 */
+.tool-nav .tool-item::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 9px;
+  width: 5px;
+  height: 15px;
+  transform: translateY(-50%);
+  background-image: radial-gradient(circle, currentColor 1.3px, transparent 1.5px);
+  background-size: 3px 5px;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--transition-fast);
+}
+.tool-nav .tool-item:hover::after { opacity: 0.55; }
+
+/* 同级兄弟让位：transform 由 navsort.js 内联驱动，这里只负责平滑过渡
+   （.tool-item 的 transform 过渡在基础规则里已有；分组块在这里补上——
+    被拖条目 .is-dragging 例外，跟随指针必须逐帧，见下）。 */
+.tool-nav .tool-group { transition: transform var(--transition-base); }
+
+/* 被拖条目：升起玻璃卡。必须盖过 .tool-item.is-active（含磨砂选中块与 nav-select-in
+   的 transform 关键帧动画——逐帧跟随的 translateY 不能和它打架）。
+   transform 本身由 JS 内联（translateY + scale），CSS 不写 transform。 */
+.tool-nav .tool-item.is-dragging,
+.tool-nav .tool-item.is-dragging.is-active {
+  position: relative;
+  z-index: 20;
+  cursor: grabbing;
+  transition: none;
+  animation: none;
+  background: var(--glass-bg-strong);
+  background-image: var(--glass-sheen);
+  backdrop-filter: blur(var(--glass-blur-strong)) saturate(var(--glass-saturate));
+  color: var(--color-text);
+  font-weight: 400;
+  box-shadow: var(--shadow-card), inset 0 0 0 1px var(--glass-border);
+}
+/* 被拖的分组块：整组升起一张更实的玻璃卡（正常分组是透明的，拖起来得有「实体」感） */
+.tool-nav .tool-group.is-dragging {
+  position: relative;
+  z-index: 20;
+  cursor: grabbing;
+  transition: none;
+  background: var(--glass-bg-strong);
+  background-image: var(--glass-sheen);
+  backdrop-filter: blur(var(--glass-blur-strong)) saturate(var(--glass-saturate));
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-card), inset 0 0 0 1px var(--glass-border);
+}
+/* 拖拽中：其余条目轻微淡出，视线集中在被拖的那一块 */
+.tool-nav.is-drag-active .tool-item:not(.is-dragging),
+.tool-nav.is-drag-active .tool-group:not(.is-dragging) > .tool-group-head { opacity: 0.82; }
+
+.sidebar-footer {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  flex: none;
+  padding: var(--space-2);
+  border-top: 1px solid var(--color-border);
+}
+.side-btn {
+  padding: var(--space-2) var(--space-3);
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--color-text-secondary);
+  font-family: inherit;
+  font-size: var(--font-size-sm);
+  text-align: left;
+  cursor: pointer;
+}
+.side-btn:hover { background: var(--color-surface-soft); }
+
+/* —— 右侧工作区 —— */
+.workspace { display: flex; flex-direction: column; flex: 1 1 auto; min-width: 0; }
+.topbar {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  flex: none;
+  position: relative; /* 外观切换按钮绝对定位到右上角，不挤占中间的状态文字 */
+  min-height: var(--topbar-height);
+  padding: var(--space-2) var(--space-4) 0;
+  text-align: center;
+  /* 玻璃顶栏（v2.1.0）：轻玻璃底 + 背景模糊 + 底部发丝线，与侧栏同为玻璃家族 */
+  background: var(--glass-bg-soft);
+  border-bottom: 1px solid var(--glass-border);
+  backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
+}
+.topbar-status { font-size: var(--font-size-md); }
+.topbar-info { font-size: var(--font-size-xs); color: var(--color-text-secondary); }
+
+/* 外观切换（浅色 / 深色 / 跟随系统）：顶栏右上角的小胶囊按钮 */
+.topbar-theme {
+  position: absolute;
+  right: var(--space-4);
+  top: 50%;
+  transform: translateY(-50%);
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  height: 26px;
+  padding: 0 var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  background: var(--color-surface);
+  color: var(--color-text-secondary);
+  font-family: var(--font-family);
+  font-size: var(--font-size-xs);
+  cursor: pointer;
+  transition: background var(--transition-fast), color var(--transition-fast),
+              border-color var(--transition-fast), transform var(--transition-spring);
+}
+.topbar-theme:hover {
+  background: var(--glass-bg-strong);
+  color: var(--color-text);
+  border-color: var(--color-border-strong);
+  transform: translateY(-50%) scale(1.06); /* 保留居中的 translateY，再轻微放大 */
+}
+
+/* —— 工具页容器 ——
+   每个工具一个 .tool-page：切走时整页从文档里取下（DOM 与工具内部状态留在内存），
+   切回来原样放回，所以列表、当前图、输入内容、滚动位置与顶栏提示都不会重置。
+   页面切换带轻微上浮淡入（page-in 定义在 components.css）。 */
+.tool-host { display: flex; flex-direction: column; flex: 1 1 auto; min-height: 0; padding: var(--space-3) var(--space-4) var(--space-4); }
+.tool-page { display: flex; flex-direction: column; flex: 1 1 auto; min-height: 0; overflow-y: auto; }
+.tool-page.is-active { animation: page-in var(--transition-slow) both; }
+
+/* ============================================================
+   任务中心（顶栏入口 + 右侧抽屉）
+   —— 任务归属队列、不归属工具页：面板开关不影响后台任务继续跑。
+   ============================================================ */
+
+/* 顶栏「任务」按钮：与外观切换同一排（外观按钮固定在右上角，这里排在它左边） */
+.topbar-tasks {
+  position: absolute;
+  right: 148px;
+  top: 50%;
+  transform: translateY(-50%);
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  height: 26px;
+  padding: 0 var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  background: var(--color-surface);
+  color: var(--color-text-secondary);
+  font-family: var(--font-family);
+  font-size: var(--font-size-xs);
+  cursor: pointer;
+  transition: background var(--transition-fast), color var(--transition-fast),
+              border-color var(--transition-fast), transform var(--transition-spring);
+}
+.topbar-tasks:hover {
+  background: var(--glass-bg-strong);
+  color: var(--color-text);
+  border-color: var(--color-border-strong);
+  transform: translateY(-50%) scale(1.06); /* 与外观按钮同款悬停手感 */
+}
+.topbar-tasks.has-active { color: var(--color-text); border-color: var(--color-border-strong); }
+/* 未完成数量徽标（0 个时不显示，由 shell.js 控制 hidden） */
+.topbar-tasks-badge {
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: var(--color-primary);
+  color: var(--color-text-inverse);
+  font-size: 11px;
+  line-height: 18px;
+  text-align: center;
+}
+
+/* 抽屉遮罩（点空白处关闭） */
+.task-center-mask {
+  position: fixed;
+  inset: 0;
+  z-index: 90;
+  background: rgba(24, 28, 36, 0.28);
+  backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate)); /* 拉开抽屉时背景整体虚化 */
+  animation: overlay-in var(--transition-base) both;
+}
+
+/* 右侧抽屉本体 */
+.task-center {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 91;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  width: min(420px, 92vw);
+  padding: var(--space-4);
+  /* 磨砂玻璃抽屉：更实的玻璃 + 更强的模糊，浮在虚化的界面之上 */
+  background: var(--glass-bg-strong);
+  background-image: var(--glass-sheen);
+  border-left: 1px solid var(--glass-border);
+  box-shadow: -12px 0 40px rgba(16, 24, 40, 0.18), var(--glass-inner-highlight);
+  backdrop-filter: blur(var(--glass-blur-strong)) saturate(var(--glass-saturate));
+}
+.task-center.is-open { animation: taskcenter-in var(--transition-slow) var(--ease-spring) both; }
+@keyframes taskcenter-in {
+  from { opacity: 0; transform: translateX(40px) scale(0.99); }
+  to { opacity: 1; transform: none; }
+}
+
+.tc-head { display: flex; align-items: center; justify-content: space-between; }
+.tc-title { font-size: var(--font-size-lg); font-weight: 600; }
+.tc-close {
+  width: 26px;
+  height: 26px;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-lg);
+  line-height: 1;
+  cursor: pointer;
+  transition: background var(--transition-fast), color var(--transition-fast);
+}
+.tc-close:hover { background: var(--color-surface-soft); color: var(--color-text); }
+
+.tc-summary { font-size: var(--font-size-sm); color: var(--color-text-secondary); }
+.tc-overall { display: flex; align-items: center; gap: var(--space-2); }
+.tc-overall-track {
+  flex: 1 1 auto;
+  height: 8px;
+  border-radius: 999px;
+  background: var(--color-neutral);
+  overflow: hidden;
+}
+.tc-overall-fill {
+  width: 0%;
+  height: 100%;
+  border-radius: 999px;
+  background: var(--color-primary);
+  transition: width var(--transition-base);
+}
+.tc-overall-text { flex: none; font-size: var(--font-size-xs); color: var(--color-text-secondary); }
+
+.tc-actions { display: flex; gap: var(--space-2); }
+.tc-body { display: flex; flex-direction: column; gap: var(--space-3); flex: 1 1 auto; min-height: 0; overflow-y: auto; }
+
+.tc-section { display: flex; flex-direction: column; gap: var(--space-2); }
+.tc-section-title { font-size: var(--font-size-sm); font-weight: 600; color: var(--color-text-secondary); }
+.tc-empty-line { font-size: var(--font-size-xs); color: var(--color-text-secondary); }
+
+/* 空态 */
+.tc-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  padding: var(--space-6) var(--space-4);
+  text-align: center;
+}
+.tc-empty-icon { font-size: var(--font-size-xl); }
+.tc-empty-title { font-size: var(--font-size-md); font-weight: 600; }
+.tc-empty-hint { font-size: var(--font-size-xs); color: var(--color-text-secondary); line-height: 1.7; }
+
+/* 单个任务卡片 */
+.tc-task {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-soft);
+}
+.tc-task-head { display: flex; align-items: center; gap: var(--space-2); min-width: 0; }
+.tc-task-tool {
+  flex: none;
+  padding: 0 var(--space-2);
+  border-radius: 999px;
+  background: var(--color-neutral);
+  color: var(--color-neutral-text);
+  font-size: var(--font-size-xs);
+}
+.tc-task-name {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--font-size-sm);
+}
+.tc-task-status { flex: none; font-size: var(--font-size-xs); color: var(--color-text-secondary); }
+.tc-task-status.is-running { color: var(--color-primary); }
+.tc-task-status.is-done { color: var(--color-success); }
+.tc-task-status.is-failed { color: var(--color-danger); }
+.tc-task-status.is-canceled { color: var(--color-text-secondary); }
+
+.tc-bar { height: 6px; border-radius: 999px; background: var(--color-neutral); overflow: hidden; }
+.tc-bar-fill {
+  width: 0%;
+  height: 100%;
+  border-radius: 999px;
+  background: var(--color-primary);
+  transition: width var(--transition-base);
+}
+.tc-task.is-done .tc-bar-fill { background: var(--color-success); }
+.tc-task.is-failed .tc-bar-fill { background: var(--color-danger); }
+.tc-task.is-canceled .tc-bar-fill { background: var(--color-border-strong); }
+
+.tc-task-meta { display: flex; align-items: center; gap: var(--space-2); min-width: 0; }
+.tc-task-note { flex: none; font-size: var(--font-size-xs); color: var(--color-text-secondary); }
+.tc-task-result {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--font-size-xs);
+  color: var(--color-text-secondary);
+}
+.tc-task-result.is-done { color: var(--color-success); }
+.tc-task-result.is-failed { color: var(--color-danger); }
+.tc-task-btn {
+  flex: none;
+  padding: 2px var(--space-2);
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--color-text-secondary);
+  font-family: inherit;
+  font-size: var(--font-size-xs);
+  cursor: pointer;
+  transition: background var(--transition-fast), color var(--transition-fast), border-color var(--transition-fast);
+}
+.tc-task-btn:hover { background: var(--color-surface); color: var(--color-text); border-color: var(--color-text-secondary); }

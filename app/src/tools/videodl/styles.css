@@ -1,0 +1,250 @@
+/* 工具：视频下载 —— 专属样式
+   约定：颜色 / 字号 / 间距一律引用 shell/theme.css 的变量，类名统一 vdl- 前缀 */
+.vdl-tool {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  height: 100%;
+  min-height: 0;
+  overflow-y: auto;
+  padding-right: var(--space-1);
+}
+
+.vdl-subtitle {
+  margin: 0;
+  font-size: var(--font-size-md);
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+/* —— 链接输入卡 —— */
+.vdl-input-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  flex: none;
+}
+
+.vdl-link-row {
+  display: flex;
+  gap: var(--space-2);
+  align-items: stretch;
+}
+
+.vdl-input {
+  flex: 1;
+  min-width: 0;
+  min-height: 40px;
+  padding: 0 var(--space-3);
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-soft);
+  color: var(--color-text);
+  font-size: var(--font-size-sm);
+}
+
+.vdl-input:focus {
+  outline: none;
+  border-color: var(--color-select-border, var(--color-primary));
+  box-shadow: 0 0 0 2px var(--color-select-ring, rgba(255, 90, 78, 0.35));
+}
+
+.vdl-dir-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.vdl-dir-label {
+  flex: none;
+  font-size: var(--font-size-sm);
+  color: var(--color-text-secondary);
+}
+
+.vdl-dir {
+  flex: 1;
+  min-width: 0;
+  font-size: var(--font-size-sm);
+  color: var(--color-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.vdl-hint {
+  margin: 0;
+  font-size: var(--font-size-sm);
+  color: var(--color-text-secondary);
+  min-height: 1.2em;
+}
+
+/* 小号按钮（本工具用；components.css 没有 btn-sm） */
+.vdl-tool .btn.btn-sm {
+  min-height: 28px;
+  padding: 0 var(--space-3);
+  font-size: var(--font-size-sm);
+}
+
+/* —— 下载记录 —— */
+.vdl-list-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-4);
+  flex: none;
+}
+
+.vdl-list-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.vdl-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.vdl-empty {
+  margin: 0;
+  font-size: var(--font-size-sm);
+  color: var(--color-text-secondary);
+}
+
+.vdl-item {
+  display: flex;
+  gap: var(--space-3);
+  align-items: center;
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-soft);
+}
+
+.vdl-item-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.vdl-item-title {
+  font-size: var(--font-size-sm);
+  color: var(--color-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.vdl-item-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--font-size-sm);
+  color: var(--color-text-secondary);
+  line-height: 1.5;
+}
+
+.vdl-state {
+  flex: none;
+  font-weight: 600;
+}
+
+.vdl-state-running { color: var(--color-primary); }
+.vdl-state-done { color: var(--color-success); }
+.vdl-state-error { color: var(--color-danger); }
+.vdl-state-cancelled { color: var(--color-text-secondary); }
+
+.vdl-meta-extra { word-break: break-all; }
+
+.vdl-bar {
+  height: 4px;
+  border-radius: 2px;
+  background: var(--color-neutral, rgba(0, 0, 0, 0.08));
+  overflow: hidden;
+}
+
+.vdl-bar-fill {
+  height: 100%;
+  width: 0;
+  border-radius: 2px;
+  background: var(--color-primary);
+  transition: width 0.3s ease;
+}
+
+.vdl-item.is-done .vdl-bar-fill { background: var(--color-success); }
+.vdl-item.is-error .vdl-bar-fill { background: var(--color-danger); }
+
+.vdl-item-actions {
+  flex: none;
+  display: flex;
+  gap: var(--space-1);
+  align-items: center;
+}
+
+/* —— 引擎卡 —— */
+.vdl-engine-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-4);
+  flex: none;
+}
+
+.vdl-engine-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.vdl-engine-badge {
+  flex: none;
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+  padding: 2px var(--space-2);
+  border-radius: var(--radius-sm, 6px);
+  border: 1px solid var(--color-border-strong);
+  color: var(--color-text-secondary);
+}
+
+.vdl-engine-badge.is-ok { color: var(--color-success); border-color: var(--color-success); }
+.vdl-engine-badge.is-new { color: var(--color-warning); border-color: var(--color-warning); }
+.vdl-engine-badge.is-bad { color: var(--color-danger); border-color: var(--color-danger); }
+
+.vdl-engine-line {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: var(--font-size-sm);
+  color: var(--color-text-secondary);
+  line-height: 1.6;
+  word-break: break-all;
+}
+
+.vdl-engine-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+
+.vdl-auto {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: var(--font-size-sm);
+  color: var(--color-text-secondary);
+  cursor: pointer;
+}
+
+.vdl-engine-hint {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-secondary);
+  min-height: 1.2em;
+}

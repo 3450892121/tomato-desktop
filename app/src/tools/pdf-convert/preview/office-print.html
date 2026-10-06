@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta http-equiv="Content-Security-Policy"
+        content="default-src 'self'; img-src 'self' data: blob:; style-src 'self' 'unsafe-inline'; script-src 'self'" />
+  <title>Office 转换预览（内部页面）</title>
+  <link rel="stylesheet" href="office-print.css" />
+</head>
+<body>
+  <!-- 渲染目标：docx-preview / SheetJS 的内容都进这里 -->
+  <div id="content"></div>
+  <div id="status">准备中…</div>
+
+  <!-- 说明：内置降级页无打包器，直接按相对路径加载各库的 UMD 构建 -->
+  <script src="../../../../node_modules/jszip/dist/jszip.min.js"></script>
+  <script src="../../../../node_modules/docx-preview/dist/docx-preview.js"></script>
+  <!-- SheetJS 走本地内置（vendor/，0.20.3）：npm 版停在 0.18.5 有已知漏洞，见 vendor/xlsx/说明.txt -->
+  <script src="../../../../vendor/xlsx/xlsx.full.min.js"></script>
+  <script type="module" src="office-print.js"></script>
+</body>
+</html>

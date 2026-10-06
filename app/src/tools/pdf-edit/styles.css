@@ -1,0 +1,205 @@
+/* ============================================================
+   工具「PDF 编辑整理」的专属样式
+   只使用 shell/theme.css 的令牌；通用组件（按钮/卡片/输入）来自 components.css
+   ============================================================ */
+
+.ped-tool {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  height: 100%;
+  min-height: 0;
+}
+
+/* —— 顶部：操作类型与参数 —— */
+.ped-controls {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  flex: none;
+  padding: var(--space-3) var(--space-4);
+}
+.ped-params {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) var(--space-4);
+}
+.ped-param { display: flex; align-items: center; gap: var(--space-2); }
+.ped-param-wide { flex: 1 1 100%; }
+.ped-param .input, .ped-param .select { min-height: 32px; }
+.ped-w-sm { max-width: 180px; }
+.ped-w-md { max-width: 260px; }
+.ped-w-lg { max-width: 380px; }
+.ped-w-num { max-width: 90px; }
+.ped-color {
+  flex: none;
+  width: 48px;
+  min-height: 32px;
+  padding: 2px;
+  cursor: pointer;
+}
+.ped-perms { flex-wrap: wrap; gap: var(--space-3); }
+.ped-note { font-size: var(--font-size-xs); color: var(--color-text-secondary); }
+.ped-note.is-ok { color: var(--color-success); }
+.ped-note.is-warn { color: var(--color-warning); }
+
+/* —— 中部：文件区 —— */
+.ped-files {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 200px;
+  padding: var(--space-3);
+  overflow: hidden;
+  background: var(--color-surface-soft);
+}
+.ped-drop {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  flex: 1 1 auto;
+}
+.ped-drop .drop-hint { position: static; }
+
+.ped-list-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  flex: 1 1 auto;
+  min-height: 0;
+}
+.ped-list-head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex: none;
+  font-size: var(--font-size-xs);
+  color: var(--color-text-secondary);
+}
+.ped-list-head .btn { min-height: 28px; padding: 0 var(--space-3); font-size: var(--font-size-xs); }
+.ped-spacer { flex: 1 1 auto; }
+
+.ped-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  overflow-y: auto;
+  flex: 1 1 auto;
+  min-height: 0;
+}
+.ped-item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-1) var(--space-2);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: border-color var(--transition-fast), background var(--transition-fast),
+              box-shadow var(--transition-base);
+}
+.ped-item:hover { border-color: var(--color-border-strong); }
+/* 选中项（v2.1.0 强化）：染色块 + 主色描边 + 外发光环 */
+.ped-item.is-active {
+  border-color: var(--color-select-border);
+  background: var(--color-select-bg);
+  box-shadow: var(--shadow-select);
+}
+.ped-item-main { flex: 1 1 auto; min-width: 0; }
+.ped-item-name {
+  font-size: var(--font-size-sm);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ped-item-meta { font-size: var(--font-size-xs); color: var(--color-text-secondary); }
+.ped-item-result {
+  font-size: var(--font-size-xs);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ped-item-result.is-ok { color: var(--color-success); }
+.ped-item-result.is-bad { color: var(--color-danger); }
+.ped-item-actions { display: flex; gap: var(--space-1); flex: none; }
+.ped-icon-btn {
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-xs);
+  cursor: pointer;
+}
+.ped-icon-btn:hover { background: var(--color-surface-soft); }
+
+/* —— 预览缩略图 —— */
+.ped-preview {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  flex: none;
+  padding: var(--space-2);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+}
+.ped-preview-head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--font-size-xs);
+  color: var(--color-text-secondary);
+}
+.ped-mini { min-height: 26px; padding: 0 var(--space-2); font-size: var(--font-size-xs); }
+.ped-thumbs {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  overflow-x: auto;
+  min-height: 120px;
+}
+.ped-thumb {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-1);
+  flex: none;
+}
+.ped-thumb canvas {
+  max-height: 130px;
+  max-width: 160px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-sm);
+}
+.ped-thumb.is-bad canvas { border-color: var(--color-danger); }
+.ped-thumb-label { font-size: var(--font-size-xs); color: var(--color-text-secondary); }
+.ped-thumb-msg {
+  font-size: var(--font-size-xs);
+  color: var(--color-text-secondary);
+  padding: var(--space-2);
+}
+
+/* —— 底部：操作与结果 —— */
+.ped-actions { display: flex; align-items: center; gap: var(--space-2); flex: none; }
+.ped-actions .btn-run { min-width: 140px; }
+.ped-result {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-size: var(--font-size-xs);
+  color: var(--color-text-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

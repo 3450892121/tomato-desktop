@@ -1,0 +1,37 @@
+移植来源与边界（「视频下载」工具）
+====================================
+
+上游仓库：https://github.com/Lyee0011/leetools（`video-downloader` 子目录）
+锁定提交：920bbbcf4068952df1eabd1c137bb359caf933cb
+上游许可：MIT（自有代码）——完整文本见同目录 UPSTREAM-LICENSE.txt
+同步日期：2026-09-26
+
+移植进本项目的文件（保留上游逻辑，做了少量适配）：
+  core/errors.mjs             ← scripts/download-errors.js（ESM 化）
+  core/yangshipin.mjs         ← scripts/yangshipin.js（ESM 化 + 取消信号）
+  core/bilibili.mjs           ← scripts/bilibili-download.js（插件目录改入参）
+  core/douyin-resolver.cjs    ← scripts/douyin-anonymous-resolver.js（取数逻辑未改；v2.12.1 起浏览器没起来时把退出码/信号/浏览器自己的输出写进报错）
+  core/browser-resolver.cjs   ← scripts/browser-resolver.js（仅改 require 指向）
+  plugins/leetools/           ← scripts/yt-dlp-plugins/leetools/（B站备用线路插件，原样）
+  core/downloader.mjs         ← server.js 引擎段（yt-dlp 任务/抖音/央视频/网页兜底/音画校验/防覆盖）
+  core/manager.mjs            ← server.js 任务管理段（并发上限/重试/历史内存表）
+
+未移植（本项目的取舍，见 spec/modules/videodl.md）：
+  - HTTP 服务层与安全头（会话令牌 / Host / Origin / CSP）——本项目用 Electron IPC，不开端口
+  - 内嵌网页界面（server.js 的 PAGE 段）——界面按工具箱设计系统重画
+  - PowerShell bootstrap（下载 Node/FFmpeg 的脚本）——本项目已有 Node（Electron）与 ffmpeg 加装包
+  - bin/ 哈希清单校验（runtime.js）——改为对 addons/ytdlp 校验固定指纹 + 引擎自更新（engine-update.mjs）
+
+本项目新增（上游没有的能力）：
+  - 用户取消（杀进程树 + 只清自己产生的半成品，绝不动用户已有文件）
+  - 下载历史落盘（userdata/videodl-history.json；上游只在内存，重启即丢）
+  - 引擎自更新（查官方 nightly → 下载 → SHA-256 校验 → 落 userdata；失败自动退回随包版）
+  - 每周自动检查（可关）、更新进度显示、缺包降级提示
+  - 抖音游客通道带 ttwid Cookie（v2.12.1）：上游直接请求分享页，抖音改版后那样只能拿到没有
+    video 字段的空壳页；现改为先向字节官方发放接口换一份匿名 ttwid（不要账号、不读用户浏览器
+    资料、不落盘），换不到才退回用分享页自己发的 Cookie。同时抖音不再走探测到的代理——它是国内站，
+    代理端口没人听时会让整场空转到超时（B站通道本来就这么处理，这次对齐）。
+  - 抖音相关纯函数（_ROUTER_DATA 解析 / 递归找视频条目 / Set-Cookie 转 Cookie 串）拆进 core/pure.mjs，
+    getDouyinVideoInfo 支持注入假 fetch，于是这条链路有了不联网的单测（上游无测试）。
+
+维护约定：上游更新适配修复时，对照本清单搬运对应文件，并更新上面的「锁定提交」。

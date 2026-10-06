@@ -1,0 +1,144 @@
+/* ============================================================
+   工具「视频压缩」的专属样式（类名统一 vcomp- 前缀，避免与其它工具冲突）
+   只使用 shell/theme.css 的令牌；通用组件（按钮/卡片/输入）来自 shell/components.css
+   ============================================================ */
+
+.vcomp-tool {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  height: 100%;
+  min-height: 0;
+}
+
+/* 顶部：压缩方式与参数 */
+.vcomp-controls {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  flex: none;
+  padding: var(--space-3) var(--space-4);
+}
+.vcomp-row { display: flex; align-items: center; gap: var(--space-2); }
+.vcomp-row .select { min-height: 32px; min-width: 260px; }
+.vcomp-params {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) var(--space-4);
+}
+.vcomp-param { display: flex; align-items: center; gap: var(--space-2); }
+.vcomp-param .select { min-height: 32px; min-width: 180px; }
+.vcomp-check {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--font-size-sm);
+  color: var(--color-text-secondary);
+  cursor: pointer;
+}
+.vcomp-note { font-size: var(--font-size-xs); color: var(--color-text-secondary); }
+.vcomp-note.is-ok { color: var(--color-success); }
+.vcomp-note.is-warn { color: var(--color-warning); }
+
+/* 中部：文件区 */
+.vcomp-files {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 180px;
+  padding: var(--space-3);
+  overflow: hidden;
+  background: var(--color-surface-soft);
+}
+.vcomp-drop {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  flex: 1 1 auto;
+}
+.vcomp-drop-hint { font-size: var(--font-size-xs); color: var(--color-text-secondary); }
+
+.vcomp-list-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  flex: 1 1 auto;
+  min-height: 0;
+}
+.vcomp-list-head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex: none;
+  font-size: var(--font-size-xs);
+  color: var(--color-text-secondary);
+}
+.vcomp-list-head .btn { min-height: 28px; padding: 0 var(--space-3); font-size: var(--font-size-xs); }
+.vcomp-spacer { flex: 1 1 auto; }
+
+.vcomp-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  overflow-y: auto;
+}
+.vcomp-item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-1) var(--space-2);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+}
+.vcomp-item-main { flex: 1 1 auto; min-width: 0; }
+.vcomp-item-name {
+  font-size: var(--font-size-sm);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.vcomp-item-meta { font-size: var(--font-size-xs); color: var(--color-text-secondary); }
+.vcomp-item-result {
+  font-size: var(--font-size-xs);
+  color: var(--color-text-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.vcomp-item-result.is-ok { color: var(--color-success); }
+.vcomp-item-result.is-fail { color: var(--color-danger); }
+.vcomp-item-actions { display: flex; gap: var(--space-1); flex: none; }
+.vcomp-icon-btn {
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-xs);
+  cursor: pointer;
+}
+.vcomp-icon-btn:hover { background: var(--color-surface-soft); }
+.vcomp-icon-btn:disabled { opacity: 0.4; cursor: default; }
+
+/* 底部：操作与结果 */
+.vcomp-actions { display: flex; align-items: center; gap: var(--space-2); flex: none; }
+.vcomp-actions .vcomp-run { min-width: 140px; }
+.vcomp-result {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-size: var(--font-size-xs);
+  color: var(--color-text-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

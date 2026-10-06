@@ -1,0 +1,75 @@
+LibreOffice 加装包（可选）—— 番茄图片混淆 桌面版
+==================================================
+
+【用途】
+装上它以后，「PDF 转格式」工具里这两项才能用 / 才更准：
+  1. Word/Excel → PDF：高保真转换（支持旧版 .doc/.xls，PPT 也支持）
+  2. PDF → Word：把 PDF 转成可编辑的 Word 文档
+不装它也不影响其他功能（PDF↔图片、合并/拆分/提取页、.docx/.xlsx → PDF 的内置方式都照常可用）。
+
+【怎么安装】
+把本压缩包里的 addons 文件夹，整个解压到「番茄图片混淆桌面版」的软件目录下
+（就是和「番茄图片混淆桌面版.exe」位于同一层的那个目录）。
+解压后应形成这样的路径：
+    软件目录\addons\libreoffice\program\soffice.com
+然后重新打开软件（或重开「PDF 转格式」工具），
+方向选「Word/Excel → PDF」或「PDF → Word」，看到「✓ 已检测到 LibreOffice」就成了。
+
+【说明】
+- 加装包解压后约 1.5 GB，来自 LibreOffice 26.2.6（开源免费，MPL-2.0 许可），
+  只是把它的文件放在软件目录里，不会安装到系统、不写注册表。
+- 随软件附带的是裁剪版（约 0.6 GB，已去掉与格式转换无关的多语言拼写字典、
+  帮助文档等），转换功能与完整版相同、转换结果逐字节一致；
+  本说明的「解压后约 1.5 GB」指自行获取的完整加装包。
+- 完全离线运行，不联网。
+- 运行时的临时配置放在 软件目录\userdata\libreoffice-profile 下，
+  整个软件文件夹拷走就能一起带走。
+- 不需要了：直接删掉 addons\libreoffice 文件夹即可，不影响其他功能。
+
+【许可】
+本加装包的文件来自 The Document Foundation 的 LibreOffice（MPL-2.0），
+版权归其所有；许可证与版权信息见：
+    addons\libreoffice\LICENSE.html 与 addons\libreoffice\license.txt
+
+==================================================
+ffmpeg 加装包（视频/动图功能必需，已随软件附带）
+==================================================
+
+【用途】
+「视频格式转换」「动图与视频互转」两个工具，以及「图片格式转换」里的
+TIFF / GIF / AVIF 输出，都依赖它。
+文件：软件目录\addons\ffmpeg\ffmpeg.exe（FFmpeg 6.1.1，单文件，约 83 MB）
+不需要安装、不写注册表、完全离线。
+
+【缺失时】
+其它工具（图片混淆、PDF、图片压缩、变清晰、格式转换的 PNG/JPG/WebP/BMP/ICO）
+照常可用；视频类工具会显示「未检测到 ffmpeg」及放置说明。
+把 addons\ffmpeg 文件夹放回软件目录后重开工具即可。
+
+【许可】
+FFmpeg 6.1.1（GPL v3），构建来自 gyan.dev release-essentials（Windows x64 静态版）。
+许可证全文见 addons\ffmpeg\LICENSE.txt，版本/来源/源码地址见 addons\ffmpeg\说明.txt。
+不需要了：直接删掉 addons\ffmpeg 文件夹即可，不影响其它功能。
+
+==================================================
+Real-ESRGAN 加装包（AI 放大 / AI 超分，已随软件附带）
+==================================================
+
+【用途】
+「图片变清晰」工具里的 AI 放大预设（AI 放大 4×（照片）/ 2×（最快）/ 4×（动漫、插画））。
+它按 AI 模型重新绘制放大，细节明显好于普通插值放大。
+
+【文件与位置】
+软件目录\addons\realesrgan\（约 50 MB）
+  · realesrgan-ncnn-vulkan.exe（命令行程序）、models\（AI 模型）、vcomp140.dll（自带运行库）
+
+【硬件要求（重要）】
+需要支持 Vulkan 的显卡（近几年的独立显卡与 Intel/AMD 核显基本都支持）；**纯 CPU 不可用**。
+实测参考（本机 NVIDIA 显卡）：640×420 放大 4 倍约 5.5 秒、720p 放大 4 倍约 10.4 秒，核显会明显更慢。
+显卡不支持或驱动过旧时，界面会明确提示「本机显卡不支持 Vulkan（或驱动过旧），AI 放大用不了」，
+其它功能（普通锐化、清晰放大 2×）不受影响。
+
+【许可】
+Real-ESRGAN v0.2.5.0（BSD 3-Clause，见 addons\realesrgan\LICENSE.txt），
+其中 ncnn 推理库（腾讯，BSD 3-Clause）以静态库形式编在 exe 内。
+不需要了：直接删掉 addons\realesrgan 文件夹即可。

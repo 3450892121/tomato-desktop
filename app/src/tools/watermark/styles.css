@@ -1,0 +1,264 @@
+/* 工具：加水印 —— 专属样式
+   约定：颜色 / 字号 / 间距 / 圆角一律引用 shell/theme.css 的变量，不写死色值；类名统一 wm- 前缀 */
+.wm-tool {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  height: 100%;
+  min-height: 0;
+}
+
+/* —— 顶部参数卡 —— */
+.wm-controls {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  flex: none;
+  padding: var(--space-3) var(--space-4);
+}
+.wm-w-num { flex: none; width: 82px; }
+.wm-gap { margin-left: var(--space-3); }
+.wm-inline { display: inline-flex; align-items: center; gap: var(--space-2); }
+.wm-color {
+  flex: none;
+  width: 52px;
+  min-height: 36px;
+  padding: 2px var(--space-1);
+  cursor: pointer;
+}
+.wm-check {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  flex: none;
+  font-size: var(--font-size-sm);
+  color: var(--color-text-secondary);
+  cursor: pointer;
+}
+
+/* 水印类型：两个互斥按钮 */
+.wm-seg { display: inline-flex; gap: var(--space-1); flex: none; }
+.wm-seg-btn { min-width: 92px; }
+.wm-seg-btn.is-active {
+  background: var(--color-primary);
+  border-color: var(--color-primary);
+  color: var(--color-text-inverse);
+  box-shadow: var(--shadow-btn);
+}
+
+/* 位置：九宫格 3×3 + 右侧「平铺」占满一列 */
+.wm-pos-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 38px);
+  grid-auto-rows: 30px;
+  gap: var(--space-1);
+  flex: none;
+}
+.wm-pos-btn {
+  min-height: 30px;
+  padding: 0;
+  font-size: var(--font-size-xs);
+}
+.wm-pos-btn.is-active {
+  background: var(--color-primary);
+  border-color: var(--color-primary);
+  color: var(--color-text-inverse);
+  box-shadow: var(--shadow-btn);
+}
+.wm-pos-tile {
+  grid-column: 4;
+  grid-row: 1 / span 3;
+  width: 62px;
+}
+
+/* —— 中间：左列表 / 右预览 —— */
+.wm-body {
+  display: flex;
+  gap: var(--space-3);
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+.wm-files {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 46%;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.wm-drop {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-3);
+  padding: var(--space-6);
+}
+.wm-drop-hint { font-size: var(--font-size-sm); color: var(--color-text-secondary); }
+
+.wm-list-wrap { display: flex; flex-direction: column; flex: 1 1 auto; min-height: 0; }
+.wm-list-head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex: none;
+  padding: var(--space-3) var(--space-4);
+  border-bottom: 1px solid var(--color-border);
+  font-size: var(--font-size-sm);
+  color: var(--color-text-secondary);
+}
+.wm-spacer { flex: 1 1 auto; }
+
+.wm-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  flex: 1 1 auto;
+  min-height: 0;
+  margin: 0;
+  padding: var(--space-2);
+  overflow-y: auto;
+  list-style: none;
+}
+
+.wm-item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: background var(--transition-fast), border-color var(--transition-fast),
+              box-shadow var(--transition-base);
+}
+.wm-item:hover { background: var(--color-surface-soft); }
+/* 选中项（v2.1.0 强化）：染色块 + 主色描边 + 外发光环 */
+.wm-item.is-selected {
+  background: var(--color-select-bg);
+  border-color: var(--color-select-border);
+  box-shadow: var(--shadow-select);
+}
+
+.wm-item-thumb {
+  flex: none;
+  width: 42px;
+  height: 42px;
+  object-fit: cover;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface-soft);
+}
+
+.wm-item-main { flex: 1 1 auto; min-width: 0; }
+.wm-item-name {
+  font-size: var(--font-size-md);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.wm-item-meta { font-size: var(--font-size-xs); color: var(--color-text-secondary); }
+.wm-item-result { margin-top: 2px; font-size: var(--font-size-sm); color: var(--color-save); }
+.wm-item-result.is-error { color: var(--color-danger); }
+
+.wm-icon-btn {
+  flex: none;
+  width: 28px;
+  height: 28px;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-lg);
+  cursor: pointer;
+}
+.wm-icon-btn:hover { background: var(--color-neutral); color: var(--color-danger); }
+
+/* —— 预览卡 —— */
+.wm-preview {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  flex: 1 1 54%;
+  min-width: 0;
+  min-height: 0;
+  padding: var(--space-3) var(--space-4);
+}
+.wm-preview-head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex: none;
+  font-size: var(--font-size-sm);
+  color: var(--color-text-secondary);
+}
+.wm-preview-panes {
+  display: flex;
+  gap: var(--space-3);
+  flex: 1 1 auto;
+  min-height: 0;
+}
+.wm-pane {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  flex: 1 1 0;
+  min-width: 0;
+  min-height: 0;
+  margin: 0;
+}
+.wm-pane-wrap {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: hidden;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface-soft);
+}
+.wm-pane-wrap canvas { max-width: 100%; max-height: 100%; }
+.wm-pane figcaption {
+  flex: none;
+  text-align: center;
+  font-size: var(--font-size-xs);
+  color: var(--color-text-secondary);
+}
+.wm-preview-hint {
+  flex: none;
+  min-height: var(--space-4);
+  font-size: var(--font-size-xs);
+  color: var(--color-text-secondary);
+}
+
+.wm-stamp-thumb {
+  flex: none;
+  width: 36px;
+  height: 36px;
+  object-fit: contain;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface-soft);
+}
+
+/* —— 底部操作条 —— */
+.wm-actions { display: flex; align-items: center; gap: var(--space-3); flex: none; }
+.wm-result {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-size: var(--font-size-xs);
+  color: var(--color-text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* 窄窗口下改成上下排布，预览不至于被挤没 */
+@media (max-width: 900px) {
+  .wm-body { flex-direction: column; }
+  .wm-files, .wm-preview { flex: 1 1 auto; }
+}

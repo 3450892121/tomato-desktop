@@ -1,0 +1,135 @@
+/* ============================================================
+   工具「音频格式转换」的专属样式
+   只使用 shell/theme.css 的令牌；通用组件（按钮/卡片/输入）来自 shell.css
+   ============================================================ */
+
+.ac-tool {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  height: 100%;
+  min-height: 0;
+}
+
+/* 顶部：参数与 ffmpeg 状态 */
+.ac-controls {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  flex: none;
+  padding: var(--space-3) var(--space-4);
+}
+.ac-params {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) var(--space-4);
+}
+.ac-param { display: flex; align-items: center; gap: var(--space-2); }
+.ac-param .select { min-height: 32px; min-width: 180px; }
+.ac-note { font-size: var(--font-size-xs); color: var(--color-text-secondary); }
+.ac-note.is-ok { color: var(--color-success); }
+.ac-note.is-warn { color: var(--color-warning); }
+.ac-note-inline { font-size: var(--font-size-xs); color: var(--color-text-secondary); }
+
+/* 中部：文件区 */
+.ac-files {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 180px;
+  padding: var(--space-3);
+  overflow: hidden;
+  background: var(--color-surface-soft);
+}
+.ac-drop {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  flex: 1 1 auto;
+}
+.ac-drop-hint { font-size: var(--font-size-xs); color: var(--color-text-secondary); }
+
+.ac-list-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  flex: 1 1 auto;
+  min-height: 0;
+}
+.ac-list-head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex: none;
+  font-size: var(--font-size-xs);
+  color: var(--color-text-secondary);
+}
+.ac-list-head .btn { min-height: 28px; padding: 0 var(--space-3); font-size: var(--font-size-xs); }
+.ac-spacer { flex: 1 1 auto; }
+
+.ac-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  overflow-y: auto;
+}
+.ac-item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-1) var(--space-2);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+}
+.ac-item-main { flex: 1 1 auto; min-width: 0; }
+.ac-item-name {
+  font-size: var(--font-size-sm);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ac-item-meta { font-size: var(--font-size-xs); color: var(--color-text-secondary); }
+.ac-item-result {
+  font-size: var(--font-size-xs);
+  color: var(--color-text-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ac-item-result.is-ok { color: var(--color-success); }
+.ac-item-result.is-fail { color: var(--color-danger); }
+.ac-item-actions { display: flex; gap: var(--space-1); flex: none; }
+.ac-icon-btn {
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-xs);
+  cursor: pointer;
+}
+.ac-icon-btn:hover { background: var(--color-surface-soft); }
+.ac-icon-btn:disabled { opacity: 0.4; cursor: default; }
+
+/* 底部：操作与结果 */
+.ac-actions { display: flex; align-items: center; gap: var(--space-2); flex: none; }
+.ac-actions .ac-run { min-width: 140px; }
+.ac-result {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-size: var(--font-size-xs);
+  color: var(--color-text-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

@@ -1,0 +1,35 @@
+{
+  "name": "tomato-obfuscator-desktop",
+  "productName": "番茄图片混淆 桌面版",
+  "version": "2.13.0",
+  "description": "把安卓 App「番茄图片混淆」的图片混淆/解混淆能力搬到 Windows：免安装、纯离线、与手机版互相兼容",
+  "main": "main.js",
+  "private": true,
+  "license": "MIT",
+  "scripts": {
+    "start": "electron .",
+    "test": "node tests/engine.test.mjs && node tests/taskqueue.test.mjs && node tests/archive.test.mjs && node tests/imghide.test.mjs && node tests/navorder.test.mjs && node tests/uninstall.test.mjs && node tests/settingsschema.test.mjs && node tests/uniquepath.test.mjs && node tests/videodl.test.mjs && node tests/docconvert.test.mjs",
+    "icon": "node tools/make-icon.js",
+    "pack": "node tools/pack.js"
+  },
+  "devDependencies": {
+    "electron": "^44.4.2"
+  },
+  "dependencies": {
+    "@cantoo/fontkit": "^2.0.12",
+    "@cantoo/pdf-lib": "^2.11.1",
+    "docx-preview": "^0.4.0",
+    "heic-decode": "^2.1.0",
+    "onnxruntime-node": "^1.30.0",
+    "pdf-lib": "^1.17.1",
+    "pdfjs-dist": "^6.3.289",
+    "ppu-paddle-ocr": "^6.6.0"
+  },
+  "author": "tomato-desktop authors",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/3450892121/tomato-desktop.git"
+  },
+  "bugs": "https://github.com/3450892121/tomato-desktop/issues",
+  "homepage": "https://github.com/3450892121/tomato-desktop#readme"
+}

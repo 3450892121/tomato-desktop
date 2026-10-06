@@ -1,0 +1,33 @@
+# 依赖与构建产物
+node_modules
+dist
+build
+out
+app/node_modules
+app/release
+app/dist
+
+# 本机构建工具（Node 便携版等，按需自备）
+.tools
+
+# 打包用外部小工具（rcedit 等二进制，按需下载；图标文件由 npm run icon 生成）
+app/build
+
+# 软件运行期用户数据（绿色版的配置随文件夹走，不入库）
+app/userdata
+
+# 加装包：体积约 1.5 GB，不入库。放置位置见 docs/加装包说明.txt 与 THIRD-PARTY-NOTICES.md
+app/addons
+
+# 测试证据（自检截图与 json）
+artifacts
+
+# 日志、系统文件与本地环境
+*.log
+*.secret
+.DS_Store
+Thumbs.db
+desktop.ini
+.env
+.env.*
+*.local

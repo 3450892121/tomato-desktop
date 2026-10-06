@@ -1,0 +1,197 @@
+/* 工具「批量重命名」专属样式
+   规则：只引用 shell/theme.css 的变量（颜色/字号/间距/圆角/动效），不写死色值；
+   通用组件（card / btn / input / select / field-check）复用 shell/components.css。 */
+
+.bren-tool {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  height: 100%;
+  min-height: 0;
+}
+
+/* —— 规则区 —— */
+.bren-controls {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-4);
+}
+.bren-w-mode { flex: 0 1 240px; }
+.bren-w-num { flex: 0 1 96px; }
+.bren-params { display: flex; flex-direction: column; gap: var(--space-2); }
+.bren-param { display: flex; flex-direction: column; gap: var(--space-2); }
+.bren-param[hidden] { display: none; }
+.bren-check { font-size: var(--font-size-sm); color: var(--color-text-secondary); }
+
+.bren-warn {
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--color-warning);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface-soft);
+  color: var(--color-text);
+  font-size: var(--font-size-sm);
+  line-height: 1.6;
+}
+.bren-warn b { color: var(--color-warning); }
+
+/* —— 文件区 —— */
+.bren-files {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+  padding: var(--space-4);
+}
+.bren-drop {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  flex: 1 1 auto;
+  min-height: 160px;
+  border: 1px dashed var(--color-border-strong);
+  border-radius: var(--radius-md);
+}
+.bren-drop-hint { font-size: var(--font-size-sm); color: var(--color-text-secondary); }
+
+.bren-list-wrap { display: flex; flex-direction: column; min-height: 0; }
+.bren-list-head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding-bottom: var(--space-2);
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-sm);
+}
+.bren-spacer { flex: 1 1 auto; }
+
+.bren-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+.bren-item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface-soft);
+  font-size: var(--font-size-md);
+}
+.bren-item.is-bad { border-color: var(--color-danger); }
+.bren-item.is-skip { border-color: var(--color-warning); }
+.bren-old-name {
+  flex: 1 1 32%;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--color-text-secondary);
+}
+/* 修改日期列：等宽数字，等宽列，方便竖着看 */
+.bren-time {
+  flex: none;
+  width: 106px;
+  font-size: var(--font-size-xs);
+  font-variant-numeric: tabular-nums;
+  color: var(--color-text-secondary);
+  white-space: nowrap;
+}
+.bren-arrow { flex: none; color: var(--color-text-secondary); }
+.bren-new-name {
+  flex: 1 1 32%;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--color-text);
+}
+.bren-item.is-bad .bren-new-name { color: var(--color-danger); }
+.bren-item.is-skip .bren-new-name { color: var(--color-text-secondary); }
+.bren-item-meta { flex: none; font-size: var(--font-size-xs); color: var(--color-text-secondary); }
+.bren-reason { flex: none; font-size: var(--font-size-xs); color: var(--color-danger); }
+.bren-item.is-skip .bren-reason { color: var(--color-warning); }
+/* 「覆盖」「自动编号」小标签 */
+.bren-tag {
+  flex: none;
+  padding: 0 var(--space-1);
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-sm);
+  font-size: var(--font-size-xs);
+  color: var(--color-text-secondary);
+}
+.bren-item-actions { flex: none; }
+.bren-icon-btn {
+  width: 24px;
+  height: 24px;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-lg);
+  line-height: 1;
+  cursor: pointer;
+  transition: background var(--transition-fast), color var(--transition-fast);
+}
+.bren-icon-btn:hover { background: var(--color-neutral); color: var(--color-danger); }
+
+/* —— 底部操作区 —— */
+.bren-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+.bren-result { font-size: var(--font-size-sm); color: var(--color-text-secondary); }
+.bren-notice {
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--color-danger);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface-soft);
+  color: var(--color-danger);
+  font-size: var(--font-size-sm);
+}
+.bren-notice[hidden] { display: none; }
+
+/* —— 执行前的确认弹窗（外壳的 .modal-backdrop / .modal-card 来自 components.css，宽度沿用外壳弹窗） —— */
+.bren-confirm-summary { font-size: var(--font-size-md); color: var(--color-text); }
+.bren-confirm-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  max-height: 240px;
+  overflow-y: auto;
+  padding: var(--space-2);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface-soft);
+  font-size: var(--font-size-sm);
+}
+.bren-confirm-row { display: flex; align-items: center; gap: var(--space-2); }
+.bren-confirm-from {
+  flex: 1 1 50%;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--color-text-secondary);
+}
+.bren-confirm-arrow { flex: none; color: var(--color-text-secondary); }
+.bren-confirm-to {
+  flex: 1 1 50%;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.bren-confirm-to.is-skip { color: var(--color-warning); }
+.bren-confirm-more { font-size: var(--font-size-xs); color: var(--color-text-secondary); }
+.bren-confirm-warn { font-size: var(--font-size-sm); color: var(--color-warning); line-height: 1.6; }

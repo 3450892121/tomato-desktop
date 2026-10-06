@@ -1,0 +1,210 @@
+/* ============================================================
+   工具「图片变清晰」的专属样式
+   只使用 shell/theme.css 的令牌；通用组件（按钮/卡片/输入）来自 shell.css
+   ============================================================ */
+
+.enh-tool {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  height: 100%;
+  min-height: 0;
+}
+
+/* —— 顶部：预设与参数 —— */
+.enh-controls {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  flex: none;
+  padding: var(--space-3) var(--space-4);
+}
+.enh-params {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2) var(--space-4);
+  padding-top: var(--space-1);
+}
+.enh-param { display: flex; align-items: center; gap: var(--space-2); }
+.enh-param .control-label { font-size: var(--font-size-sm); }
+.enh-range { width: 130px; accent-color: var(--color-primary); }
+.enh-val {
+  flex: none;
+  min-width: 44px;
+  font-size: var(--font-size-xs);
+  color: var(--color-text-secondary);
+}
+.enh-note { font-size: var(--font-size-xs); color: var(--color-text-secondary); }
+
+/* AI 放大提示条：加装包状态 + 硬件要求（只在选中 AI 类预设时出现） */
+.enh-note-ai { padding: var(--space-2) var(--space-3); border-radius: var(--radius-sm); background: var(--color-surface-soft); line-height: 1.6; }
+.enh-note-ai.is-ok { color: var(--color-save); }
+.enh-note-ai.is-warn { color: var(--color-warning); }
+
+/* —— 中部：预览 + 文件列表 —— */
+.enh-main {
+  display: flex;
+  align-items: stretch;
+  gap: var(--space-3);
+  flex: 1 1 auto;
+  min-height: 0;
+}
+.enh-preview {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  flex: 1.4 1 380px;
+  min-width: 0;
+  padding: var(--space-3);
+  overflow: hidden;
+}
+.enh-preview-head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex: none;
+  font-size: var(--font-size-xs);
+  color: var(--color-text-secondary);
+}
+.enh-toggle { display: flex; gap: var(--space-1); flex: none; }
+.enh-toggle .btn {
+  min-height: 28px;
+  padding: 0 var(--space-3);
+  font-size: var(--font-size-xs);
+}
+/* 选中的预设（v2.1.0 强化）：染色块 + 描边 + 外发光环 */
+.enh-toggle .btn.is-active {
+  background: var(--color-select-bg);
+  border-color: var(--color-select-border);
+  color: var(--color-sidebar-active-text);
+  box-shadow: var(--shadow-select);
+}
+.enh-preview-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.enh-spacer { flex: 1 1 auto; }
+.enh-preview-size { flex: none; }
+
+.enh-stage {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: 1 1 auto;
+  min-height: 220px;
+  padding: var(--space-2);
+  background: var(--color-surface-soft);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+}
+.enh-canvas {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+  box-shadow: var(--shadow-card);
+}
+.enh-empty { font-size: var(--font-size-xs); color: var(--color-text-secondary); }
+
+.enh-files {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 320px;
+  min-width: 0;
+  min-height: 180px;
+  padding: var(--space-3);
+  overflow: hidden;
+  background: var(--color-surface-soft);
+}
+.enh-drop {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  flex: 1 1 auto;
+}
+.enh-hint { font-size: var(--font-size-xs); color: var(--color-text-secondary); }
+
+.enh-list-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  flex: 1 1 auto;
+  min-height: 0;
+}
+.enh-list-head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex: none;
+  font-size: var(--font-size-xs);
+  color: var(--color-text-secondary);
+}
+.enh-list-head .btn { min-height: 28px; padding: 0 var(--space-3); font-size: var(--font-size-xs); }
+
+.enh-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  overflow-y: auto;
+}
+.enh-item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-1) var(--space-2);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: border-color var(--transition-fast), background var(--transition-fast),
+              box-shadow var(--transition-base);
+}
+.enh-item:hover { border-color: var(--color-border-strong); }
+/* 选中项（v2.1.0 强化）：染色块 + 主色描边 + 外发光环 */
+.enh-item.is-selected {
+  border-color: var(--color-select-border);
+  background: var(--color-select-bg);
+  box-shadow: var(--shadow-select);
+}
+.enh-item-main { flex: 1 1 auto; min-width: 0; }
+.enh-item-name {
+  font-size: var(--font-size-sm);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.enh-item-meta { font-size: var(--font-size-xs); color: var(--color-text-secondary); }
+.enh-item-meta.is-error { color: var(--color-danger); }
+.enh-item-actions { display: flex; gap: var(--space-1); flex: none; }
+.enh-icon-btn {
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-xs);
+  cursor: pointer;
+}
+.enh-icon-btn:hover { background: var(--color-surface-soft); }
+
+/* —— 底部：操作与结果 —— */
+.enh-actions { display: flex; align-items: center; gap: var(--space-2); flex: none; }
+.enh-actions .btn-run { min-width: 140px; }
+.enh-result {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-size: var(--font-size-xs);
+  color: var(--color-text-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

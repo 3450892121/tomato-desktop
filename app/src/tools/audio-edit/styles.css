@@ -1,0 +1,204 @@
+/* ============================================================
+   工具「音频剪辑」的专属样式
+   只使用 shell/theme.css 的令牌；通用组件（按钮/卡片/输入）来自 components.css
+   ============================================================ */
+
+.aedit-tool {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  height: 100%;
+  min-height: 0;
+}
+
+/* 顶部：参数与状态 */
+.aedit-controls {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  flex: none;
+  padding: var(--space-3) var(--space-4);
+}
+.aedit-params {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) var(--space-4);
+}
+.aedit-param { display: flex; align-items: center; gap: var(--space-2); }
+.aedit-param .select { min-height: 32px; min-width: 132px; }
+.aedit-check { font-size: var(--font-size-sm); color: var(--color-text); cursor: pointer; }
+.aedit-note { font-size: var(--font-size-xs); color: var(--color-text-secondary); }
+.aedit-note.is-ok { color: var(--color-success); }
+.aedit-note.is-warn { color: var(--color-warning); }
+.aedit-note-inline { font-size: var(--font-size-xs); color: var(--color-text-secondary); }
+
+/* 中部：文件区 + 波形 */
+.aedit-files {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  flex: 1 1 auto;
+  min-height: 220px;
+  padding: var(--space-3);
+  overflow: hidden;
+  background: var(--color-surface-soft);
+}
+.aedit-drop {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  flex: 1 1 auto;
+}
+.aedit-drop-hint { font-size: var(--font-size-xs); color: var(--color-text-secondary); }
+
+.aedit-list-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  flex: none;
+  max-height: 38%;
+  min-height: 0;
+}
+.aedit-list-head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex: none;
+  font-size: var(--font-size-xs);
+  color: var(--color-text-secondary);
+}
+.aedit-list-head .btn { min-height: 28px; padding: 0 var(--space-3); font-size: var(--font-size-xs); }
+.aedit-spacer { flex: 1 1 auto; }
+
+.aedit-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  overflow-y: auto;
+}
+.aedit-item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-1) var(--space-2);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: border-color var(--transition-fast), background var(--transition-fast),
+              box-shadow var(--transition-base);
+}
+.aedit-item:hover { border-color: var(--color-border-strong); }
+/* 选中项（v2.1.0 强化）：染色块 + 主色描边 + 外发光环 */
+.aedit-item.is-selected {
+  border-color: var(--color-select-border);
+  background: var(--color-select-bg);
+  box-shadow: var(--shadow-select);
+}
+.aedit-item-main { flex: 1 1 auto; min-width: 0; }
+.aedit-item-name {
+  font-size: var(--font-size-sm);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.aedit-item-meta { font-size: var(--font-size-xs); color: var(--color-text-secondary); }
+.aedit-item-result {
+  font-size: var(--font-size-xs);
+  color: var(--color-text-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.aedit-item-result.is-ok { color: var(--color-success); }
+.aedit-item-result.is-fail { color: var(--color-danger); }
+.aedit-item-actions { display: flex; gap: var(--space-1); flex: none; }
+.aedit-icon-btn {
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-xs);
+  cursor: pointer;
+}
+.aedit-icon-btn:hover { background: var(--color-surface-soft); }
+.aedit-icon-btn:disabled { opacity: 0.4; cursor: default; }
+
+/* 波形与选区 */
+.aedit-wave {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  flex: 1 1 auto;
+  min-height: 0;
+}
+.aedit-wave-head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex: none;
+  font-size: var(--font-size-xs);
+  color: var(--color-text-secondary);
+}
+.aedit-wave-name {
+  max-width: 50%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--color-text);
+  font-size: var(--font-size-sm);
+}
+.aedit-wave-tip { flex: none; }
+.aedit-canvas {
+  display: block;
+  width: 100%;
+  height: 96px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface-soft);
+  cursor: crosshair;
+  user-select: none;
+  touch-action: none;
+}
+.aedit-times {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex: none;
+  flex-wrap: wrap;
+}
+.aedit-time { display: flex; align-items: center; gap: var(--space-2); }
+.aedit-time .input {
+  flex: none;
+  width: 104px;
+  min-height: 30px;
+  font-variant-numeric: tabular-nums;
+}
+.aedit-time .control-label { font-size: var(--font-size-xs); }
+.aedit-clip { font-size: var(--font-size-xs); color: var(--color-text-secondary); }
+.aedit-times .btn { min-height: 28px; padding: 0 var(--space-3); font-size: var(--font-size-xs); }
+.aedit-wave-note { flex: none; font-size: var(--font-size-xs); color: var(--color-text-secondary); }
+.aedit-wave-note.is-warn { color: var(--color-warning); }
+
+/* 底部：操作与结果 */
+.aedit-actions { display: flex; align-items: center; gap: var(--space-2); flex: none; }
+.aedit-actions .aedit-run { min-width: 140px; }
+.aedit-result {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-size: var(--font-size-xs);
+  color: var(--color-text-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

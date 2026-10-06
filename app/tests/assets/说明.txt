@@ -1,0 +1,26 @@
+HEIC 测试夹具说明（「图片格式转换」的 HEIC/HEIF 输入自检用）——本仓库不附带夹具文件，需自行准备
+========================================================================================
+
+heic-sample.heic
+  - 来源：nokiatech/heif 仓库 gh-pages 公开测试图 content/images/autumn_1440x960.heic
+    （https://github.com/nokiatech/heif —— HEIF 官方参考实现的公开样例集，生态内广泛用作测试素材）
+  - 规格：1440x960，HEVC 编码，无旋转属性
+  - 下载方式：镜像前缀 + https://raw.githubusercontent.com/nokiatech/heif/gh-pages/content/images/autumn_1440x960.heic
+
+heic-sample-rotated.heic
+  - 来源：对上面的 heic-sample.heic 做二进制「手术」生成（非重新编码）：
+    在 iprp/ipco 末尾注入 irot（rot=1，逆时针 90°）属性、给主图 item 的 ipma 关联表加一条引用、
+    修正 ipco/ipma/iprp/meta 四级 box 尺寸、iloc 的 extent 偏移 +10 字节。
+  - 规格：存储像素不变（HEVC 数据原样），带 irot=1；解码应输出 960x1440 且像素等于
+    原图解码结果逆时针旋转 90°（2026-09-23 本机实测与 Windows WIC 解码逐像素一致，均值差 0.00）
+  - 用途：断言解码引擎正确应用 HEIF 容器的旋转属性（竖拍照片方向正确的关键）
+
+校验（SHA-256，2026-09-23 生成时）：
+  heic-sample.heic          = 按需自行计算，以本文件入库版本为准
+  heic-sample-rotated.heic  = 同上
+
+注意：两个夹具是「图片格式转换」--media-test 的 HEIC 段输入；不要改名（测试按文件名读取）。
+
+为什么不随仓库分发：nokiatech/heif 的素材用 Nokia HEIF License v2.1 授权，其「Licensed Field」限定为非商业的评估/测试/学术研究，
+与本项目源码的 MIT 许可不兼容，故不在本仓库内附带。自行下载那张图放进本目录即可跑 --media-test 的 HEIC 段；
+或者直接用你自己手机拍一张 HEIC 改名为 heic-sample.heic（旋转变体需按上面的容器手术方法自行生成，或用一张真实竖拍 HEIC 代替）。

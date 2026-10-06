@@ -1,0 +1,198 @@
+/* 工具：文件藏图 —— 专属样式（颜色/字号/间距一律引用 shell/theme.css 变量） */
+
+.ih-tool {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  height: 100%;
+  min-height: 0;
+}
+
+/* —— 顶部：打包 / 解包 模式切换 —— */
+.ih-modes {
+  display: flex;
+  gap: var(--space-2);
+  align-items: center;
+}
+.ih-mode-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 38px;
+  padding: 0 var(--space-4);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--glass-bg-soft);
+  color: var(--color-text);
+  font-size: var(--font-size-md);
+  cursor: pointer;
+  transition: background var(--transition-fast), border-color var(--transition-fast), transform var(--transition-fast);
+  -webkit-app-region: no-drag;
+}
+.ih-mode-btn:hover { border-color: var(--color-text-secondary); }
+.ih-mode-btn:active { transform: translateY(1px); }
+.ih-mode-btn.is-active {
+  background: var(--color-select-bg);
+  border-color: var(--color-select-border);
+  box-shadow: var(--shadow-select);
+  font-weight: 600;
+}
+.ih-modes-spacer { flex: 1; }
+.ih-modes-hint {
+  font-size: var(--font-size-xs);
+  color: var(--color-text-secondary);
+  white-space: nowrap;
+}
+
+.ih-pane {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  min-height: 0;
+  flex: 1;
+}
+.ih-pane[hidden] { display: none; }
+
+/* —— 参数卡 —— */
+.ih-card {
+  padding: var(--space-3) var(--space-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+.ih-row { display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap; }
+.ih-row .control-label { min-width: 76px; }
+.ih-note {
+  font-size: var(--font-size-xs);
+  color: var(--color-text-secondary);
+  line-height: 1.6;
+}
+.ih-note.is-warn { color: var(--color-warning); }
+/* 密码/水印输入框宽度（不用内联 style：界面进程有 CSP，内联样式会被拦） */
+.ih-w-md { width: 280px; max-width: 100%; }
+
+/* 加密方式单选（极速 / 防查） */
+.ih-radio {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding: var(--space-1) var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface-soft);
+  font-size: var(--font-size-sm);
+  cursor: pointer;
+}
+.ih-radio input { cursor: pointer; }
+.ih-note.is-error { color: var(--color-danger); }
+
+/* —— 表图/图片预览 —— */
+.ih-cover {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-2) var(--space-3);
+  border: 1px dashed var(--color-border-strong);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-soft);
+}
+.ih-cover.is-set { border-style: solid; }
+.ih-cover-thumb {
+  width: 64px;
+  height: 64px;
+  object-fit: contain;
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  flex: none;
+}
+.ih-cover-thumb[hidden] { display: none; }
+.ih-cover-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  font-size: var(--font-size-sm);
+  color: var(--color-text);
+}
+.ih-cover-meta .ih-sub { color: var(--color-text-secondary); font-size: var(--font-size-xs); }
+.ih-cover-name { font-weight: 600; overflow-wrap: anywhere; }
+
+/* —— 文件列表 —— */
+.ih-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  max-height: 220px;
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+.ih-list:empty { display: none; }
+.ih-item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface-soft);
+  font-size: var(--font-size-sm);
+}
+.ih-item-name { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.ih-item-size { color: var(--color-text-secondary); font-size: var(--font-size-xs); white-space: nowrap; }
+.ih-item-remove {
+  border: none;
+  background: transparent;
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  font-size: var(--font-size-md);
+  line-height: 1;
+  padding: 2px 6px;
+  border-radius: var(--radius-sm);
+}
+.ih-item-remove:hover { color: var(--color-danger); background: var(--color-neutral); }
+
+/* —— 解包结果 —— */
+.ih-result-card { gap: var(--space-2); }
+.ih-result-head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--font-size-sm);
+  color: var(--color-text-secondary);
+}
+.ih-result-dir {
+  flex: 1;
+  min-width: 0;
+  overflow-wrap: anywhere;
+  color: var(--color-text);
+}
+
+/* —— 底部动作条 —— */
+.ih-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding-top: var(--space-1);
+  flex-wrap: wrap;
+}
+.ih-result {
+  flex: 1;
+  min-width: 0;
+  font-size: var(--font-size-sm);
+  color: var(--color-text-secondary);
+  overflow-wrap: anywhere;
+}
+.ih-result.is-ok { color: var(--color-save); }
+.ih-result.is-error { color: var(--color-danger); }
+
+/* —— 拖拽高亮 —— */
+.ih-tool.is-over .ih-card { border-color: var(--color-select-border); }
+.ih-drop-hint {
+  font-size: var(--font-size-xs);
+  color: var(--color-text-secondary);
+}
+.ih-tool.is-over .ih-drop-hint { color: var(--color-primary); }

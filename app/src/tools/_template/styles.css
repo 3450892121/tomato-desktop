@@ -1,0 +1,11 @@
+/* 【新工具模板】专属样式
+   规则：只使用 shell/theme.css 的变量（颜色/字号/间距/圆角），不得写死色值。
+   类名建议加工具前缀（如 .compress-xxx），避免与其他工具冲突。 */
+
+.example-tool {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  height: 100%;
+  min-height: 0;
+}

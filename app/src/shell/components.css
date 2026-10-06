@@ -1,0 +1,215 @@
+/* ============================================================
+   通用组件库（shell/components.css）
+   作用：全软件共用的「按钮 / 输入 / 卡片 / 弹窗 / 进度 / 表单字段」等组件的唯一样式源。
+   约定：
+     - 颜色 / 字号 / 间距 / 圆角 / 阴影 / 动效节奏一律引用 theme.css 的令牌，不写死色值；
+     - 各工具直接复用这里的类名（btn / card / input / select / field …），不要各写一套；
+     - 工具专属样式仍放各自 tools/<id>/styles.css。
+   加载顺序：theme.css → components.css → shell.css（工具样式最后挂载，可覆盖细节）。
+   ============================================================ */
+
+/* —— 卡片（磨砂玻璃面）——
+   组成：半透明玻璃底（--color-surface）+ 背景模糊（--glass-blur）+ 内高光（玻璃的「厚度」）。
+   注意：backdrop-filter 会给元素建一个包含块，卡片内部别再放 position: fixed 的东西。 */
+.card {
+  background: var(--color-surface);
+  background-image: var(--glass-sheen); /* 左上斜向高光：玻璃的「反光面」 */
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-card), var(--glass-inner-highlight);
+  backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
+  transition: box-shadow var(--transition-base), border-color var(--transition-base), transform var(--transition-base);
+}
+
+/* —— 行内控件（标签 + 输入 + 提示） —— */
+.control-row { display: flex; align-items: center; gap: var(--space-2); }
+.control-label { flex: none; color: var(--color-text-secondary); }
+.control-hint { flex: none; font-size: var(--font-size-xs); color: var(--color-text-secondary); }
+
+/* —— 输入框 / 下拉框 —— */
+.select, .input {
+  flex: 1 1 auto;
+  min-height: 36px;
+  padding: 0 var(--space-3);
+  background: var(--color-surface-soft);
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-sm);
+  color: var(--color-text);
+  font-family: inherit;
+  font-size: var(--font-size-md);
+  outline: none;
+  transition: border-color var(--transition-fast), box-shadow var(--transition-fast), background var(--transition-fast);
+}
+.select:hover, .input:hover { border-color: var(--color-text-secondary); }
+.select:focus, .input:focus {
+  border-color: var(--color-primary);
+  background: var(--color-surface);
+  box-shadow: 0 0 0 3px rgba(255, 90, 78, 0.14);
+}
+.input:disabled, .select:disabled { opacity: 0.55; cursor: default; }
+
+/* —— 按钮 ——
+   统一节奏：悬停轻微上浮 + 加深阴影；按下回弹；禁用变淡；
+   纯色按钮（主色 / 蓝 / 绿）才有「上浮」动效，浅灰与描边按钮只变底色，避免整屏乱动。 */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 36px;
+  padding: 0 var(--space-4);
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  background: var(--color-neutral);
+  color: var(--color-neutral-text);
+  font-family: inherit;
+  font-size: var(--font-size-md);
+  cursor: pointer;
+  user-select: none;
+  transition: background var(--transition-fast), border-color var(--transition-fast),
+              color var(--transition-fast), box-shadow var(--transition-fast),
+              transform var(--transition-fast), opacity var(--transition-fast);
+}
+.btn:hover { background: var(--color-neutral-hover); }
+.btn:active { transform: translateY(1px); }
+.btn:disabled { opacity: 0.5; cursor: default; transform: none; box-shadow: none; }
+.btn:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }
+
+.btn-obfuscate { background: var(--color-primary); color: var(--color-text-inverse); box-shadow: var(--shadow-btn); }
+.btn-deobfuscate { background: var(--color-deobfuscate); color: var(--color-text-inverse); box-shadow: var(--shadow-btn); }
+.btn-save { background: var(--color-save); color: var(--color-text-inverse); box-shadow: var(--shadow-btn); }
+.btn-primary { background: var(--color-primary); color: var(--color-text-inverse); box-shadow: var(--shadow-btn); }
+/* 纯色按钮：悬停上浮一点点，按下回到原位（动效节奏统一走令牌） */
+.btn-obfuscate:hover, .btn-deobfuscate:hover, .btn-save:hover, .btn-primary:hover {
+  box-shadow: 0 4px 12px rgba(16, 24, 40, 0.16);
+  transform: translateY(-1px);
+}
+.btn-obfuscate:hover { background: var(--color-primary-hover); }
+.btn-deobfuscate:hover { background: var(--color-deobfuscate-hover); }
+.btn-save:hover { background: var(--color-save-hover); }
+.btn-primary:hover { background: var(--color-primary-hover); }
+.btn-obfuscate:active, .btn-deobfuscate:active, .btn-save:active, .btn-primary:active {
+  box-shadow: var(--shadow-btn);
+  transform: translateY(1px);
+}
+.btn-plain { background: var(--color-neutral); color: var(--color-neutral-text); }
+.btn-ghost {
+  flex: none;
+  background: var(--glass-bg-soft); /* 轻玻璃底：在玻璃卡片上也有「一层玻璃」的层次 */
+  border-color: var(--color-border-strong);
+  color: var(--color-text-secondary);
+}
+.btn-ghost:hover { background: var(--color-surface-soft); border-color: var(--color-text-secondary); color: var(--color-text); }
+.btn-lg { min-height: 46px; padding: 0 var(--space-6); font-size: var(--font-size-lg); }
+
+/* —— 表单字段（设置弹窗等） —— */
+.field { display: flex; flex-direction: column; gap: var(--space-1); }
+.field-label { font-size: var(--font-size-sm); color: var(--color-text-secondary); }
+.field-hint { font-size: var(--font-size-xs); color: var(--color-text-secondary); }
+.field-check { display: flex; align-items: center; gap: var(--space-2); font-size: var(--font-size-md); }
+
+/* —— 帮助内容排版 —— */
+.help-section h4 { margin: 0 0 var(--space-1); font-size: var(--font-size-md); }
+.help-section p, .help-section ul, .help-section ol { margin: 0; padding-left: var(--space-4); color: var(--color-text-secondary); font-size: var(--font-size-sm); line-height: 1.7; }
+.help-section p { padding-left: 0; }
+
+/* —— 弹窗（设置 / 帮助共用） ——
+   打开：背景整体虚化 + 遮罩淡入 + 卡片放大上浮；关闭：快速淡出后移除（动效由 shell.js 控制节奏）。
+   背景整体虚化是「苹果式浮层」的关键：弹窗后面的一切都柔化掉，视线自然落到弹窗上。 */
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(24, 28, 36, 0.28);
+  backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
+  z-index: 100;
+  animation: overlay-in var(--transition-base) both;
+}
+.modal-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  width: min(560px, 92vw);
+  max-height: 86vh;
+  padding: var(--space-5);
+  background: var(--glass-bg-strong);
+  background-image: var(--glass-sheen);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-lg);
+  box-shadow: 0 18px 60px rgba(16, 24, 40, 0.24), var(--glass-inner-highlight);
+  backdrop-filter: blur(var(--glass-blur-strong)) saturate(var(--glass-saturate));
+  animation: modal-in var(--transition-slow) both;
+}
+.modal-backdrop.is-closing { animation: overlay-out var(--transition-fast) both; }
+.modal-backdrop.is-closing .modal-card { animation: modal-out var(--transition-fast) both; }
+.modal-title { font-size: var(--font-size-lg); font-weight: 600; }
+.modal-body { display: flex; flex-direction: column; gap: var(--space-3); overflow-y: auto; }
+.modal-actions { display: flex; justify-content: flex-end; gap: var(--space-2); }
+
+/* —— 框架级进度遮罩（所有工具共用） —— */
+.progress {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-3);
+  background: var(--glass-bg-strong); /* 玻璃遮罩：处理中把界面虚化，视线集中到进度条 */
+  /* 处理中省 GPU：整窗盖满时用浅模糊，别让遮罩把批量任务拖慢（--glass-blur-overlay 的注释同理） */
+  backdrop-filter: blur(var(--glass-blur-overlay));
+  animation: overlay-in var(--transition-base) both;
+}
+.progress-track {
+  width: 320px;
+  height: 8px;
+  border-radius: 999px;
+  background: var(--color-neutral);
+  overflow: hidden;
+}
+.progress-fill {
+  width: 0%;
+  height: 100%;
+  border-radius: 999px;
+  background: var(--color-primary);
+  transition: width var(--transition-base);
+}
+.progress-text { font-size: var(--font-size-sm); color: var(--color-text-secondary); }
+
+/* —— 组件库动效（页面切换 / 弹窗 / 选中）——
+   v2.1.0：幅度与时长的都调强了一档（用户反馈「看不出来发生了什么」）。 */
+@keyframes overlay-in { from { opacity: 0; } to { opacity: 1; } }
+@keyframes overlay-out { from { opacity: 1; } to { opacity: 0; } }
+@keyframes modal-in {
+  from { opacity: 0; transform: translateY(18px) scale(0.94); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes modal-out {
+  from { opacity: 1; transform: none; }
+  to { opacity: 0; transform: translateY(10px) scale(0.96); }
+}
+@keyframes page-in {
+  from { opacity: 0; transform: translateY(14px) scale(0.985); }
+  to { opacity: 1; transform: none; }
+}
+/* 选中「弹一下」：工具 / 外壳的选中项加 .is-selected / .is-active 时引用，
+   配合 --transition-spring 就有回弹手感（关键帧是全局的，工具里直接用即可）。 */
+@keyframes select-pop {
+  from { transform: scale(0.9); }
+  to { transform: scale(1); }
+}
+
+/* —— 选中反馈（全软件统一，令牌在 theme.css）——
+   选中态一律这三行：染色块 + 主色描边环 + 投影，一眼能看出「选中的是哪个」。
+     background: var(--color-select-bg); border-color: var(--color-select-border); box-shadow: var(--shadow-select); */
+
+/* —— 无障碍：系统要求「减少动态效果」时，全部动效降为瞬时 —— */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 1ms !important;
+    animation-delay: 0ms !important;
+    transition-duration: 1ms !important;
+    transition-delay: 0ms !important;
+  }
+}

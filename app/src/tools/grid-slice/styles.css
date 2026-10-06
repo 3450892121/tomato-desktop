@@ -1,0 +1,206 @@
+/* 工具：九宫格切图 —— 专属样式
+   约定：颜色 / 字号 / 间距 / 圆角一律引用 shell/theme.css 的变量，不写死色值；类名统一 gs- 前缀 */
+.gs-tool {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  height: 100%;
+  min-height: 0;
+}
+
+/* —— 顶部参数卡 —— */
+.gs-controls {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  flex: none;
+  padding: var(--space-3) var(--space-4);
+}
+.gs-w-num { flex: none; width: 82px; }
+.gs-w-mode { flex: none; width: 148px; }
+.gs-gap { margin-left: var(--space-3); }
+.gs-inline { display: inline-flex; align-items: center; gap: var(--space-2); flex: none; }
+.gs-color {
+  flex: none;
+  width: 52px;
+  min-height: 36px;
+  padding: 2px var(--space-1);
+  cursor: pointer;
+}
+
+/* —— 中间：左列表 / 右预览 —— */
+.gs-body {
+  display: flex;
+  gap: var(--space-3);
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+.gs-files {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 46%;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.gs-drop {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-3);
+  padding: var(--space-6);
+}
+.gs-drop-hint { font-size: var(--font-size-sm); color: var(--color-text-secondary); }
+
+.gs-list-wrap { display: flex; flex-direction: column; flex: 1 1 auto; min-height: 0; }
+.gs-list-head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex: none;
+  padding: var(--space-3) var(--space-4);
+  border-bottom: 1px solid var(--color-border);
+  font-size: var(--font-size-sm);
+  color: var(--color-text-secondary);
+}
+.gs-spacer { flex: 1 1 auto; }
+
+.gs-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  flex: 1 1 auto;
+  min-height: 0;
+  margin: 0;
+  padding: var(--space-2);
+  overflow-y: auto;
+  list-style: none;
+}
+
+.gs-item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: background var(--transition-fast), border-color var(--transition-fast),
+              box-shadow var(--transition-base);
+}
+.gs-item:hover { background: var(--color-surface-soft); }
+/* 选中项（v2.1.0 强化）：染色块 + 主色描边 + 外发光环 */
+.gs-item.is-selected {
+  background: var(--color-select-bg);
+  border-color: var(--color-select-border);
+  box-shadow: var(--shadow-select);
+}
+
+.gs-item-thumb {
+  flex: none;
+  width: 42px;
+  height: 42px;
+  object-fit: cover;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface-soft);
+}
+
+.gs-item-main { flex: 1 1 auto; min-width: 0; }
+.gs-item-name {
+  font-size: var(--font-size-md);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.gs-item-meta { font-size: var(--font-size-xs); color: var(--color-text-secondary); }
+.gs-item-result { margin-top: 2px; font-size: var(--font-size-sm); color: var(--color-save); }
+.gs-item-result.is-error { color: var(--color-danger); }
+
+.gs-item-actions { flex: none; }
+.gs-icon-btn {
+  width: 28px;
+  height: 28px;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-lg);
+  cursor: pointer;
+}
+.gs-icon-btn:hover { background: var(--color-neutral); color: var(--color-danger); }
+
+/* —— 预览卡 —— */
+.gs-preview {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  flex: 1 1 54%;
+  min-width: 0;
+  min-height: 0;
+  padding: var(--space-3) var(--space-4);
+}
+.gs-preview-head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex: none;
+  font-size: var(--font-size-sm);
+  color: var(--color-text-secondary);
+}
+.gs-preview-head .gs-spacer { flex: 1 1 auto; }
+
+.gs-stage {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: 1 1 auto;
+  min-height: 0;
+  padding: var(--space-2);
+  overflow: hidden;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface-soft);
+}
+.gs-canvas { max-width: 100%; max-height: 100%; }
+.gs-empty {
+  padding: 0 var(--space-4);
+  text-align: center;
+  font-size: var(--font-size-sm);
+  color: var(--color-text-secondary);
+}
+
+.gs-preview-info {
+  flex: none;
+  min-height: var(--space-4);
+  font-size: var(--font-size-xs);
+  color: var(--color-text-secondary);
+}
+.gs-preview-info:empty { min-height: 0; }
+.gs-warn {
+  flex: none;
+  font-size: var(--font-size-xs);
+  color: var(--color-warning);
+}
+
+/* —— 底部操作条 —— */
+.gs-actions { display: flex; align-items: center; gap: var(--space-3); flex: none; }
+.gs-result {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-size: var(--font-size-xs);
+  color: var(--color-text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* 窄窗口下改成上下排布，预览不至于被挤没 */
+@media (max-width: 900px) {
+  .gs-body { flex-direction: column; }
+  .gs-files, .gs-preview { flex: 1 1 auto; }
+}

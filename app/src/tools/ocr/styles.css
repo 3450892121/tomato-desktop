@@ -1,0 +1,242 @@
+/* ============================================================
+   工具「文字识别」的专属样式
+   只引用 shell/theme.css 的令牌；按钮/卡片/输入等通用组件来自 shell/components.css
+   ============================================================ */
+
+.ocr-tool {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  height: 100%;
+  min-height: 0;
+}
+
+/* —— 顶部：参数与引擎状态 —— */
+.ocr-controls {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  flex: none;
+  padding: var(--space-3) var(--space-4);
+}
+.ocr-params {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) var(--space-4);
+}
+.ocr-param { display: flex; align-items: center; gap: var(--space-2); }
+.ocr-param .select { min-height: 32px; min-width: 200px; }
+.ocr-mode { min-width: 300px; }
+.ocr-preset { min-width: 190px; min-height: 32px; }
+.ocr-steps {
+  font-size: var(--font-size-xs);
+  color: var(--color-text-secondary);
+}
+.ocr-note { font-size: var(--font-size-xs); color: var(--color-text-secondary); }
+.ocr-note.is-ok { color: var(--color-success); }
+.ocr-note.is-warn { color: var(--color-warning); }
+
+/* 复选框紧凑一点（一行能放下三个增强项 + 说明） */
+.ocr-params .field-check { font-size: var(--font-size-sm); }
+
+/* —— 中部：文件区 —— */
+.ocr-files {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 200px;
+  padding: var(--space-3);
+  overflow: hidden;
+  background: var(--color-surface-soft);
+}
+.ocr-drop {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  flex: 1 1 auto;
+}
+.ocr-drop-hint { font-size: var(--font-size-xs); color: var(--color-text-secondary); }
+
+.ocr-list-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  flex: 1 1 auto;
+  min-height: 0;
+}
+.ocr-list-head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex: none;
+  font-size: var(--font-size-xs);
+  color: var(--color-text-secondary);
+}
+.ocr-list-head .btn { min-height: 28px; padding: 0 var(--space-3); font-size: var(--font-size-xs); }
+.ocr-spacer { flex: 1 1 auto; }
+
+.ocr-body {
+  display: flex;
+  gap: var(--space-3);
+  flex: 1 1 auto;
+  min-height: 0;
+}
+.ocr-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  flex: 0 0 300px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  overflow-y: auto;
+}
+.ocr-item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: border-color var(--transition-fast), background var(--transition-fast),
+              box-shadow var(--transition-base);
+}
+.ocr-item:hover { border-color: var(--color-border-strong); }
+/* 当前图（v2.1.0 强化）：原来只换了个边框色，现在染色块 + 描边 + 外发光环 */
+.ocr-item.is-active {
+  border-color: var(--color-select-border);
+  background: var(--color-select-bg);
+  box-shadow: var(--shadow-select);
+}
+.ocr-item-main { flex: 1 1 auto; min-width: 0; }
+.ocr-item-name {
+  font-size: var(--font-size-sm);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ocr-item-meta { font-size: var(--font-size-xs); color: var(--color-text-secondary); }
+.ocr-item-result {
+  font-size: var(--font-size-xs);
+  color: var(--color-text-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ocr-item-result.is-ok { color: var(--color-success); }
+.ocr-item-result.is-fail { color: var(--color-danger); }
+.ocr-item-actions { display: flex; gap: var(--space-1); flex: none; }
+.ocr-icon-btn {
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-xs);
+  cursor: pointer;
+}
+.ocr-icon-btn:hover { background: var(--color-surface-soft); }
+.ocr-icon-btn:disabled { opacity: 0.4; cursor: default; }
+
+/* —— 预览 —— */
+.ocr-preview {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 0;
+  padding: var(--space-2);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+}
+.ocr-preview-head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex: none;
+  font-size: var(--font-size-xs);
+  color: var(--color-text-secondary);
+}
+.ocr-preview-title {
+  max-width: 40%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ocr-page-label { flex: none; }
+.ocr-mini { min-height: 26px; padding: 0 var(--space-2); font-size: var(--font-size-xs); }
+.ocr-preview-body {
+  display: flex;
+  gap: var(--space-2);
+  flex: 1 1 auto;
+  min-height: 0;
+}
+.ocr-canvas-wrap {
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  flex: 1 1 55%;
+  min-width: 0;
+  min-height: 0;
+  overflow: auto;
+  background: var(--color-surface-soft);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+}
+.ocr-canvas-wrap canvas {
+  display: block;
+  max-width: 100%;
+  height: auto;
+}
+.ocr-thumb-msg {
+  align-self: center;
+  font-size: var(--font-size-xs);
+  color: var(--color-text-secondary);
+  padding: var(--space-4);
+}
+.ocr-text {
+  flex: 1 1 45%;
+  min-width: 0;
+  padding: var(--space-2);
+  background: var(--color-surface-soft);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  color: var(--color-text);
+  font-family: inherit;
+  font-size: var(--font-size-sm);
+  line-height: 1.6;
+  resize: none;
+  outline: none;
+}
+.ocr-text:focus { border-color: var(--color-primary); }
+
+/* —— 底部：操作与结果 —— */
+.ocr-actions { display: flex; align-items: center; gap: var(--space-2); flex: none; }
+.ocr-actions .ocr-run { min-width: 140px; }
+.ocr-result {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-size: var(--font-size-xs);
+  color: var(--color-text-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 窄窗口下：列表与预览改为上下排 */
+@media (max-width: 900px) {
+  .ocr-body { flex-direction: column; }
+  .ocr-list { flex: 0 0 auto; max-height: 30%; }
+  .ocr-preview-body { flex-direction: column; }
+  .ocr-canvas-wrap { flex: 1 1 auto; }
+}

@@ -1,0 +1,28 @@
+/* 内置降级渲染页的样式（仅本页使用；不进主界面）
+ *
+ * 关于深色主题：本页是**纸张语义**的独立打印页，故意不引用 theme.css 的主题变量——
+ * 它渲染出来就是要打印的纸面，必须永远白底黑字（反色会既费墨又不可读）。
+ * 所以这里的色值是刻意写死的，不是遗漏；深色主题只作用于软件外壳，不影响纸面。 */
+
+html, body {
+  margin: 0;
+  padding: 0;
+  background: #ffffff; /* 纸面底色：固定白色（打印语义） */
+  color: #111111;      /* 正文墨色：固定近黑（打印语义） */
+  font-family: "Microsoft YaHei", "Segoe UI", sans-serif;
+}
+#content { padding: 0; }
+#status {
+  position: fixed;
+  right: 8px;
+  bottom: 8px;
+  font-size: 12px;
+  color: #888888;
+}
+
+/* Excel：每个工作表一段，第二段起另起一页 */
+.xlsx-sheet { padding: 0 0 8px; }
+.xlsx-sheet h2 { margin: 8px 0 4px; font-size: 14px; }
+.xlsx-sheet + .xlsx-sheet { break-before: page; }
+.xlsx-sheet table { border-collapse: collapse; font-size: 12px; }
+.xlsx-sheet td, .xlsx-sheet th { border: 1px solid #bbbbbb; padding: 2px 6px; }

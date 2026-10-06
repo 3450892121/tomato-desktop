@@ -1,0 +1,205 @@
+/* ============================================================
+   工具「视频播放器」的专属样式
+   规则：颜色/字号/间距一律引用 shell/theme.css 的令牌；
+    例外只有「播放区」——它是视频画面，浅色主题下也必须保持深色底（影院观感），
+    所以这里用固定的深色半透明值，深浅色下表现一致（不是「写死浅色」）。
+   ============================================================ */
+
+.pl-tool {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  height: 100%;
+  min-height: 0;
+}
+
+/* —— 顶部：打开文件与当前文件信息 —— */
+.pl-top {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  flex: none;
+  padding: var(--space-3) var(--space-4);
+}
+.pl-top-row { display: flex; align-items: center; gap: var(--space-3); }
+.pl-file { flex: 1 1 auto; min-width: 0; }
+.pl-file-name {
+  font-size: var(--font-size-sm);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.pl-file-meta {
+  font-size: var(--font-size-xs);
+  color: var(--color-text-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.pl-note { font-size: var(--font-size-xs); color: var(--color-text-secondary); }
+.pl-note.is-ok { color: var(--color-success); }
+.pl-note.is-warn { color: var(--color-warning); }
+.pl-note.is-error { color: var(--color-danger); }
+
+/* —— 播放区（含控制条；全屏请求就是发给这个容器的） —— */
+.pl-screen {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 240px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  background: rgba(12, 14, 18, 0.92);
+  box-shadow: var(--shadow-card);
+}
+.pl-screen:fullscreen {
+  border: none;
+  border-radius: 0;
+  background: rgba(0, 0, 0, 1);
+}
+.pl-tool.is-drag .pl-screen { border-color: var(--color-select-border); }
+
+.pl-stage {
+  position: relative;
+  display: flex;
+  flex: 1 1 auto;
+  min-height: 0;
+  align-items: center;
+  justify-content: center;
+}
+.pl-video {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;   /* 不拉伸、不裁切：竖屏视频也完整显示 */
+  background: transparent;
+  outline: none;
+}
+
+/* 空态与覆盖层都绝对定位盖在画面之上：不能当普通流内元素——
+   否则会和 width:100% 的 <video> 并排，被挤到右边去（踩过一次，见截图 31）。 */
+.pl-empty {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  padding: var(--space-5);
+  text-align: center;
+  color: rgba(255, 255, 255, 0.82);
+}
+.pl-empty[hidden] { display: none; }   /* 必须显式写：上面的 display:flex 会盖掉 [hidden] 的 UA 规则 */
+.pl-empty-icon { font-size: 40px; line-height: 1; opacity: 0.9; }
+.pl-empty-title { font-size: var(--font-size-lg); }
+.pl-empty-hint { font-size: var(--font-size-xs); color: rgba(255, 255, 255, 0.55); }
+
+/* 准备副本（换封装/重编码）时的覆盖层 */
+.pl-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-3);
+  color: rgba(255, 255, 255, 0.9);
+  background: rgba(12, 14, 18, 0.72);
+  backdrop-filter: blur(var(--glass-blur-overlay));  /* 与框架其它遮罩一致：模糊刻意做浅，避免拖慢任务 */
+}
+.pl-overlay[hidden] { display: none; }
+.pl-overlay-text { font-size: var(--font-size-sm); }
+.pl-overlay-track {
+  width: min(320px, 60%);
+  height: 6px;
+  border-radius: 999px;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.18);
+}
+.pl-overlay-fill {
+  height: 100%;
+  width: 0;
+  border-radius: 999px;
+  background: var(--color-primary);
+  transition: width var(--transition-fast);
+}
+
+/* —— 控制条 —— */
+/* 位于深色播放区内，所以文字用「反色」令牌（深浅色主题下都是白色），
+   悬停底色是半透明白——播放区的固定深色底上才成立，不随主题变。 */
+.pl-bar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  flex: none;
+  padding: var(--space-2) var(--space-3);
+  background: rgba(0, 0, 0, 0.35);
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+.pl-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-1);
+  min-width: 34px;
+  height: 30px;
+  padding: 0 var(--space-2);
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--color-text-inverse);
+  font-size: var(--font-size-sm);
+  cursor: pointer;
+  transition: background var(--transition-fast), color var(--transition-fast);
+}
+.pl-btn:hover { background: rgba(255, 255, 255, 0.16); }
+.pl-btn:disabled { opacity: 0.4; cursor: default; background: transparent; }
+.pl-btn:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 1px; }
+.pl-play { min-width: 40px; font-size: var(--font-size-md); }
+.pl-full { min-width: 56px; }
+
+.pl-time {
+  flex: none;
+  font-size: var(--font-size-xs);
+  color: rgba(255, 255, 255, 0.78);
+  font-variant-numeric: tabular-nums;
+}
+
+/* 进度条 / 音量条：同一个滑块外观，用 --pl-fill 画已播放（已选）部分 */
+.pl-seek,
+.pl-vol {
+  -webkit-appearance: none;
+  appearance: none;
+  height: 6px;
+  margin: 0;
+  border-radius: 999px;
+  background: linear-gradient(
+    to right,
+    var(--color-primary) var(--pl-fill, 0%),
+    rgba(255, 255, 255, 0.22) var(--pl-fill, 0%)
+  );
+  cursor: pointer;
+}
+.pl-seek { flex: 1 1 auto; min-width: 80px; }
+.pl-vol { flex: none; width: 88px; }
+/* 禁用（还没打开视频）时：不要还画着一条满格的主色，看起来像「已经选满了」 */
+.pl-seek:disabled, .pl-vol:disabled {
+  cursor: default;
+  opacity: 0.5;
+  background: rgba(255, 255, 255, 0.22);
+}
+.pl-seek::-webkit-slider-thumb,
+.pl-vol::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 14px;
+  height: 14px;
+  border: none;
+  border-radius: 50%;
+  background: var(--color-primary);
+  box-shadow: var(--shadow-btn);
+  cursor: pointer;
+}
+.pl-seek:disabled::-webkit-slider-thumb,
+.pl-vol:disabled::-webkit-slider-thumb { background: var(--color-text-secondary); }
