@@ -38,3 +38,6 @@ artifacts
 # Mimosa 安全扫描工具的本地状态（钩子缓存等，不进 git）
 .mimosa/
 app/.mimosa/
+
+# 本地私人笔记目录：不入库（AGENTS.md「隐私防漏」）
+/notes/
