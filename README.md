@@ -24,13 +24,22 @@ PDF 与老文档处理、语音转文字、视频下载与压缩、把文件藏�
 
 ---
 
-## 一、想要成品包，自己打一次
+## 一、直接下成品包（不用碰代码）
 
-本仓库不托管安装包：免安装版含 LibreOffice 等加装包，解压后约 1.5 GB。
-按第二节装好依赖、把要随包的加装包放进 `app/addons/`（缺哪个就少哪个功能，打包会如实提示），
-然后 `npm run pack`，产物在 `app/release/番茄图片混淆-桌面版-v<版本>-win64/` 与同名 `.zip`。
-那个文件夹或压缩包拷给别人就能直接用：配置写在同目录的 `userdata/` 里（不写注册表、不写系统目录），
-`docs/使用说明.txt` 随包分发给使用者。
+Releases 里有免安装版 `tomato-desktop-v2.13.0-win64.zip`（约 812 MB）：解压到任意文件夹，
+双击里面的 `番茄图片混淆桌面版.exe` 即可。配置写在同目录的 `userdata/` 里（不写注册表、不写系统目录），
+整个文件夹拷给别人就是同一套东西；`docs/使用说明.txt` 随包分发给使用者。
+
+成品包里已经放了 ffmpeg、LibreOffice、Real-ESRGAN、FunASR、OCR 模型、7-Zip、yt-dlp 等加装包。
+出于第三方许可，包里**没有放**两样东西：
+
+- HiBit Uninstaller（`addons/hibit/`）——官网未明文允许再分发。所以「软件卸载」工具会提示缺加装包；
+  想去 HiBit 官网下便携版，把 `HiBitUninstaller-Portable.exe` 放进 `addons/hibit/` 就恢复，其余工具不受影响。
+- 两个 `.heic` 自检夹具（`resources/app/tests/assets/`）——Nokia HEIF License 限定非商业测试用途。
+  只影响开发者跑 `--media-test` 的 HEIC 段。
+
+想自己打一份：按第二节装好依赖，把要随包的加装包放进 `app/addons/`（缺哪个就少哪个功能，打包会如实提示），
+再跑 `npm run pack`，产物在 `app/release/` 里。
 
 ## 二、从源码跑起来
 
