@@ -16,14 +16,14 @@
   - `src/tools/<工具名>/`：各工具自包含目录（声明 + 界面 + 逻辑 + 样式）；工具清单与分组见 `README.md` 与 `src/shell/registry.js`；`_template` 为新工具模板。
   - `src/shared/`：跨工具复用能力（图片读写、ffmpeg 封装、HEIC 解码、文件封装、设置等）；含主进程专用 `unique-target-path.cjs`（输出文件名原子分配，main.js 与单测共用）。
   - `vendor/`：不走 npm 的第三方库（进 git），如 `xlsx/`（SheetJS，「PDF 转格式」降级解析用；来源与升级方法见目录内说明）。
-  - `addons/`：随包加装包（不进 git：libreoffice / ffmpeg / realesrgan / asr / ocr / hibit / 7zip / ytdlp）；用途、许可、缺失时行为见 `docs/加装包说明.txt`。
+  - `addons/`：随包加装包（不进 git：libreoffice / ffmpeg / realesrgan / asr / ocr / hibit / 7zip / ytdlp）；`docs/加装包说明.txt` 目前只写了 libreoffice / ffmpeg / realesrgan 三种，其余几种的用途与许可看 `README.md` 功能表（要补文档就补 `docs/加装包说明.txt`）。
 - `app/release/`：打包产物（不进 git）。
 - `番茄图片混淆.apk`：参考实现样本（只读，不修改、不覆盖）。
 - `.tools/`：本机构建工具（Node 便携版等，不进 git）。
 
 ## 新增工具约定（工具箱架构）
 - 新功能一律做成 `src/tools/<工具名>/` 下的独立工具，禁止写进既有工具或 shell。
-- 接入步骤：复制 `src/tools/_template/` → 改 `id`/`name`/`icon`/`group`/`order` → 在 `src/shell/registry.js` 加一行；详见 `docs/新增工具指南.md`。
+- 接入步骤：复制 `src/tools/_template/` → 改 `id`/`name`/`icon`/`group`/`order` → 在 `src/shell/registry.js` 补两处（顶部 `import` ＋ 工具清单数组各一行）；详见 `docs/新增工具指南.md`。
 - 左侧导航按分组显示（定义与顺序见 `shell/registry.js` 的 `GROUPS`：图片 / 视频 / 音频 / 文档 / 压缩 / 系统）：同类工具放同一组，保证用户好找；未声明 `group` 会归入末尾「其它」。
 - 工具之间禁止互相 import；可复用的能力放 `src/shared/`。
 - 工具界面样式只用自己的 `styles.css`，颜色/字号/间距必须引用 `shell/theme.css` 的变量。
