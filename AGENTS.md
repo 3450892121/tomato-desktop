@@ -44,7 +44,7 @@
 - Node 环境：`.tools/node/node.exe`（便携版 v22.20.0，不进 git；命令行里先把 `.tools/node` 加入 PATH）。
 - 安装依赖：`cd app` → `npm install`（npm registry 用 `https://registry.npmmirror.com`；Electron 二进制需设 `ELECTRON_MIRROR=https://registry.npmmirror.com/-/binary/electron/`）。
 - 启动调试：`cd app` → `npm start`。
-- 纯逻辑单测：`cd app` → `npm test`（297 项，全绿为准；测试文件在 `tests/`，**新增测试文件必须同步加进 `pack.js` 的逐文件白名单**，否则产物里跑不起来）。
+- 纯逻辑单测：`cd app` → `npm test`（以全绿为准；测试文件在 `tests/`，**新增测试文件必须同步加进 `pack.js` 的逐文件白名单**，否则产物里跑不起来）。
 - 自检与界面自动测试：`cd app` 后运行 `.\node_modules\electron\dist\electron.exe . --<开关>`；结果都写 `%TEMP%\tomato-*.json`，判定看 `pass:true` / `ok:true`，截图在 `%TEMP%\tomato-uitest`。各开关：
   - `--smoke-test` 冒烟硬断言（工具数须等于 registry 实况；失败输出 `SMOKE_TEST_FAIL` 且进程退出码 1，可直接用于 CI）；`--self-test` 端到端（PNG 往返 + 算法 + JPG + 方块填充）。
   - `--ui-test` 图片混淆界面全流程（像素级校验；**跑前清空 `userdata/settings.json`**——有自定义 `navOrder` 时 `navSort.resetHiddenInitially` 断言必挂，产物上尤其注意）。

@@ -3,7 +3,7 @@
 把安卓 App「番茄图片混淆」（`番茄图片混淆.apk`）的图片混淆 / 解混淆能力完整搬到 Windows 电脑上：
 **免安装绿色版、纯离线、与手机版互相兼容**，给身边人用的傻瓜化工具。
 
-软件按「工具箱」形态搭建：左侧按「图片 / 视频 / 音频 / 文档 / 压缩 / 系统」分组列出全部 **23 个工具**——
+软件按「工具箱」形态搭建：左侧按「图片 / 视频 / 音频 / 文档 / 压缩 / 系统」分组列出全部工具——
 - 图片：图片混淆、图片压缩、图片变清晰、图片格式转换、批量重命名、加水印、长图拼接、九宫格切图、文件藏图
 - 视频：视频下载、视频播放器、视频格式转换、视频压缩、动图与视频互转
 - 音频：音频格式转换、音频剪辑、语音转文字
@@ -86,7 +86,7 @@ npm start
 ### 测试与自检（交付前必须全绿）
 ```powershell
 cd app
-npm test                                                    # 纯逻辑单测共 297 项（算法 55 + 任务队列 13 + 压缩与解压 71 + 文件藏图 41 + 导航排序 33 + 软件卸载 19 + 设置校验与转义 21 + 输出文件名分配 11 + 视频下载 22 + 文档格式转换 11）
+npm test                                                    # 纯逻辑单测（分项与总数以本地运行输出为准；覆盖算法、任务队列、压缩与解压、文件藏图、导航排序、软件卸载、设置校验、输出文件名分配、视频下载、文档格式转换等）
 .\node_modules\electron\dist\electron.exe . --smoke-test     # 冒烟自检（元素/按钮）
 .\node_modules\electron\dist\electron.exe . --self-test      # 端到端（编解码 + 算法 + 性能）
 .\node_modules\electron\dist\electron.exe . --ui-test        # 图片混淆 界面自动测试（含截图与像素级校验）
@@ -148,7 +148,7 @@ electron . --verify-samples <目录> --key <密钥>
 ├─ CHANGELOG.md              版本与里程碑
 ├─ spec/                     目标规格（地图 / 各模块 / 验收标准）
 │  ├─ 00-overview.md         全局地图
-│  ├─ modules/               每个工具与框架模块一个文件（28 个：toolkit / engine / imageio / archive / ocr / player / uninstall 等）
+│  ├─ modules/               每个工具与框架模块一个文件（toolkit / engine / imageio / archive / ocr / player / uninstall 等，以目录内实际文件为准）
 │  └─ acceptance.md          验收标准（A1 起逐条，含实测证据）
 ├─ docs/                     文档
 │  ├─ 使用说明.txt           面向使用者的说明（随安装包分发）
@@ -163,7 +163,7 @@ electron . --verify-samples <目录> --key <密钥>
 │  ├─ src/tools/pdf-convert/ PDF 转格式工具（core 核心 / preview 内置降级渲染页）
 │  ├─ src/tools/_template/   新工具模板
 │  ├─ src/shared/            跨工具复用（图片读写、ffmpeg 封装、HEIC 解码、任务队列、设置、转义等）
-│  ├─ tests/                 自动测试（297 项纯逻辑单测 + 各工具自检与界面测试 / 样本工具）
+│  ├─ tests/                 自动测试（纯逻辑单测 + 各工具自检与界面测试 / 样本工具）
 │  └─ tools/                 构建脚本（图标生成、打包）
 ├─ artifacts/                测试证据（截图等，不进 git）
 └─ 番茄图片混淆.apk           参考实现样本（只读）
