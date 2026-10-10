@@ -1,0 +1,18 @@
+# 知识卡导出索引文件
+schema_version: 1
+locale: zh-CN
+commit: 4211b543612a423d30f7f0f8153c8bdb27d5bc79
+branch: main
+exported_at: "2026-10-10T09:02:19Z"
+modules:
+    root:
+        dir_name: 项目根目录说明与工作守则
+        title: 项目根目录说明与工作守则
+        scope:
+            - README.md
+            - AGENTS.md
+            - .gitignore
+        source_files: []
+        children: []
+        depends_on: []
+        related_to: []

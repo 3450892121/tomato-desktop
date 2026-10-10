@@ -1,0 +1,2453 @@
+{
+  "wiki_repo": {
+    "id": "f9cd102c-a01c-faa8-7008-3882f901b045",
+    "name": "番茄混淆",
+    "progress_status": "completed",
+    "wiki_present_status": "COMPLETED",
+    "recovery_checkpoint": "wiki_generation_completed",
+    "last_commit_id": "4211b543612a423d30f7f0f8153c8bdb27d5bc79",
+    "last_commit_update": "2026-10-10T09:02:19Z",
+    "gmt_create": "2026-10-10T09:02:19Z",
+    "gmt_modified": "2026-10-10T09:02:19Z",
+    "extend_info": "{\"language\":\"zh\",\"active\":true,\"branch\":\"main\"}"
+  },
+  "wiki_catalogs": [
+    {
+      "id": "3b0be518-299e-4fb2-a005-dac6614fb658",
+      "repo_id": "f9cd102c-a01c-faa8-7008-3882f901b045",
+      "name": "项目概述",
+      "description": "project-overview",
+      "prompt": "为「番茄混淆桌面版」创建全面的项目概述文档。解释项目的核心目标——将 Android App「番茄图片混淆」的能力移植到 Windows 桌面，并扩展为包含 23 个工具的完整工具箱。说明项目的技术栈（Electron、JavaScript/ES6+、CSS、HTML）、主要特性（免安装绿色版、纯离线、与手机版兼容）和目标用户群体（非技术使用者）。介绍六大工具分组：图片处理、视频处理、音频处理、文档处理、压缩解压和系统工具。提供快速开始指南，包括安装、基本使用和常见用例。使用与代码库一致的术语，为初学者提供概念性概览，同时为有经验的开发者提供足够的技术深度。",
+      "progress_status": "completed",
+      "dependent_files": "README.md,AGENTS.md,app/package.json",
+      "gmt_create": "2026-10-10T09:02:19Z",
+      "gmt_modified": "2026-10-10T09:02:19Z",
+      "kk_dependent_files": [
+        "README.md",
+        "AGENTS.md",
+        "app/package.json"
+      ]
+    },
+    {
+      "id": "5406a610-cc60-40b4-8351-6163fd0c8a45",
+      "repo_id": "f9cd102c-a01c-faa8-7008-3882f901b045",
+      "name": "工具注册机制",
+      "description": "tool-registration",
+      "prompt": "为番茄混淆桌面版的工具注册机制创建详细文档。解释 registry.js 中 TOOLS 数组的组织结构：每个工具通过 import 引入后添加到 TOOLS 数组，形成全局唯一的工具清单。说明 GROUPS 分组的定义方式：图片、视频、音频、文档、压缩、系统六个分组及其图标和显示顺序。描述工具声明对象的结构规范：id、name、group、order、icon 等字段的含义和作用。解释分组与工具的关联关系：工具的 group 字段对应 GROUPS 中的 id，未声明或未知分组自动归入「其它」。介绍新增工具的标准流程：复制 _template 模板、修改 index.js、在 registry.js 中添加 import 和 TOOLS 条目。包含工具注册的数据流图和实际代码示例。",
+      "progress_status": "completed",
+      "dependent_files": "app/src/shell/registry.js",
+      "gmt_create": "2026-10-10T09:02:19Z",
+      "gmt_modified": "2026-10-10T09:02:19Z",
+      "parent_id": "eb45c52e-877a-4301-97df-df71c91b51c6",
+      "layer_level": 2,
+      "kk_dependent_files": [
+        "app/src/shell/registry.js"
+      ]
+    },
+    {
+      "id": "5d1cd129-e78a-42d6-8d07-bfec04928c16",
+      "repo_id": "f9cd102c-a01c-faa8-7008-3882f901b045",
+      "name": "PDF 转换工具",
+      "description": "pdf-convert-tool",
+      "prompt": "为 PDF 转换工具创建详细的技术文档。深入介绍图片转 PDF、PDF 合并、拆分和页面提取的核心实现。详细说明 imagesToPdf 函数的图片类型检测机制（JPG/PNG 魔数识别）、A4 模式缩放算法和原始尺寸模式的处理逻辑。解释 mergePdfs 的页面复制策略和 splitPdf 的分页算法，包括每 N 页切分的边界处理。文档化 extractPages 的页码验证和重排序功能。说明 getPageCount 的只读操作优化。提供实际的文档处理工作流示例，包括批量图片生成 PDF、多份文档合并整理和按章节拆分归档。包含错误处理机制，特别是加密 PDF 的友好提示。",
+      "progress_status": "completed",
+      "dependent_files": "app/src/tools/pdf-convert/core/build.js,app/src/tools/pdf-convert/core/pages.js,app/src/tools/pdf-convert/core/pdfjs.js",
+      "gmt_create": "2026-10-10T09:02:19Z",
+      "gmt_modified": "2026-10-10T09:02:19Z",
+      "parent_id": "67c3129a-d2ef-4e04-a5b0-506bd0aafc4e",
+      "layer_level": 1,
+      "kk_dependent_files": [
+        "app/src/tools/pdf-convert/core/build.js",
+        "app/src/tools/pdf-convert/core/pages.js",
+        "app/src/tools/pdf-convert/core/pdfjs.js"
+      ]
+    },
+    {
+      "id": "8b412c51-1570-4379-a19d-c5d1f4ac529d",
+      "repo_id": "f9cd102c-a01c-faa8-7008-3882f901b045",
+      "name": "工具箱框架",
+      "description": "toolbox-framework",
+      "prompt": "为工具箱框架核心 shell.js 创建详细的技术文档。深入解释工具的生命周期管理，包括工具的挂载、卸载和 LRU 保活机制。文档化 ctx 上下文对象提供的通用能力，包括文件操作 API（openImages、saveFile、readFile 等）、UI 反馈方法（setStatus、showProgress）和设置管理。详细说明主题系统的实现，包括浅色/深色模式切换和系统偏好跟随。解释任务队列的集成方式，展示如何从框架获取任务管理能力。包含具体的代码示例，演示工具如何正确使用 ctx 中的各种方法。提供故障排除指南，涵盖常见的生命周期问题和内存泄漏防护。",
+      "progress_status": "completed",
+      "dependent_files": "app/src/shell/shell.js",
+      "gmt_create": "2026-10-10T09:02:19Z",
+      "gmt_modified": "2026-10-10T09:02:19Z",
+      "parent_id": "a242c8ac-4c32-4fca-aafe-90e97748b28c",
+      "layer_level": 1,
+      "kk_dependent_files": [
+        "app/src/shell/shell.js"
+      ]
+    },
+    {
+      "id": "8c8918c4-b4e4-4be2-8419-bbd1c1b2f852",
+      "repo_id": "f9cd102c-a01c-faa8-7008-3882f901b045",
+      "name": "Electron 双进程模型",
+      "description": "electron-process-model",
+      "prompt": "为番茄混淆桌面版创建 Electron 双进程模型文档。详细解释主进程（main.js）的职责：创建 BrowserWindow、注册自定义媒体协议 tomato-media://、处理系统级操作（文件对话框、剪贴板、原生主题）、管理测试模式和日志记录。说明渲染进程的职责：用户界面渲染、工具页生命周期管理、UI 交互。重点描述预加载脚本（preload.js）作为安全桥的作用，如何通过 contextBridge.exposeInMainWorld 暴露 window.desktop API，实现 IPC 通信的白名单机制。包含进程间数据流图，展示从用户操作到主进程调用的完整路径。解释为什么选择这种架构设计，以及与其他 Electron 应用架构模式的对比。",
+      "progress_status": "completed",
+      "dependent_files": "app/main.js,app/preload.js",
+      "gmt_create": "2026-10-10T09:02:19Z",
+      "gmt_modified": "2026-10-10T09:02:19Z",
+      "parent_id": "932ca1ef-316e-4a70-be82-61d7fedd857b",
+      "layer_level": 1,
+      "kk_dependent_files": [
+        "app/main.js",
+        "app/preload.js"
+      ]
+    },
+    {
+      "id": "a56a7329-2af2-4246-9edc-400c486aea19",
+      "repo_id": "f9cd102c-a01c-faa8-7008-3882f901b045",
+      "name": "图片编解码模块",
+      "description": "imageio-module",
+      "prompt": "为图片编解码共享模块创建详细的 API 文档。深入解释基于 Chromium 内核 createImageBitmap 和 OffscreenCanvas 的图片处理实现，包括 decodeImageFromBytes、encodeImageToBytes、drawPixelsToCanvas、makeThumbnail 和 makeThumbnailFromBytes 等核心函数。详细说明像素缓冲格式（Uint8ClampedArray RGBA）、尺寸限制（4000 万像素上限）和内存管理机制。提供具体的代码示例，展示如何正确使用这些函数进行图片解码、编码、缩略图生成和 Canvas 绘制。解释与 HEIC 模块的协作关系，说明为什么某些场景需要走不同的处理路径。文档化错误处理策略、性能优化建议和最佳实践。包含实际使用案例，如批量图片处理、预览生成和格式转换中的调用模式。",
+      "progress_status": "completed",
+      "dependent_files": "app/src/shared/imageio.js",
+      "gmt_create": "2026-10-10T09:02:19Z",
+      "gmt_modified": "2026-10-10T09:02:19Z",
+      "parent_id": "f435c2f5-4d6d-4133-9508-ea6079066f0b",
+      "layer_level": 1,
+      "kk_dependent_files": [
+        "app/src/shared/imageio.js"
+      ]
+    },
+    {
+      "id": "b354a828-941e-4a22-bf64-95bcc5af6037",
+      "repo_id": "f9cd102c-a01c-faa8-7008-3882f901b045",
+      "name": "视频下载工具",
+      "description": "video-download",
+      "prompt": "为视频下载工具创建详细的技术文档。深入介绍基于 yt-dlp 的视频下载架构，包括下载器核心、管理器模块和引擎更新机制。详细说明多平台解析器的实现：Bilibili、抖音、央视频等平台的特定处理逻辑。文档化浏览器解析器的工作原理，包括 Cookie 处理和登录状态管理。解释纯 JavaScript 解析模式和外部命令调用模式的切换策略。提供错误处理机制、进度监控和网络异常恢复的实现细节。包含常见问题的排查方法，如网络超时、格式不支持、平台反爬限制等解决方案。",
+      "progress_status": "completed",
+      "dependent_files": "app/src/tools/videodl/core/downloader.mjs,app/src/tools/videodl/core/manager.mjs,app/src/tools/videodl/core/engine-update.mjs,app/src/tools/videodl/core/errors.mjs,app/src/tools/videodl/core/browser-resolver.cjs,app/src/tools/videodl/core/pure.mjs,app/src/tools/videodl/core/bilibili.mjs,app/src/tools/videodl/core/douyin-resolver.cjs,app/src/tools/videodl/core/yangshipin.mjs",
+      "gmt_create": "2026-10-10T09:02:19Z",
+      "gmt_modified": "2026-10-10T09:02:19Z",
+      "parent_id": "8c0a1118-f6a7-45d9-8f43-3e2032845eb0",
+      "layer_level": 1,
+      "kk_dependent_files": [
+        "app/src/tools/videodl/core/downloader.mjs",
+        "app/src/tools/videodl/core/manager.mjs",
+        "app/src/tools/videodl/core/engine-update.mjs",
+        "app/src/tools/videodl/core/errors.mjs",
+        "app/src/tools/videodl/core/browser-resolver.cjs",
+        "app/src/tools/videodl/core/pure.mjs",
+        "app/src/tools/videodl/core/bilibili.mjs",
+        "app/src/tools/videodl/core/douyin-resolver.cjs",
+        "app/src/tools/videodl/core/yangshipin.mjs"
+      ]
+    },
+    {
+      "id": "c38b928b-3986-429b-b72c-b5e8ea6fcdf6",
+      "repo_id": "f9cd102c-a01c-faa8-7008-3882f901b045",
+      "name": "FFmpeg 集成",
+      "description": "ffmpeg-integration",
+      "prompt": "为 FFmpeg 引擎集成创建详细的技术文档。深入介绍 FFmpeg 在应用中的集成方式，包括进程发现、状态检测和多媒体处理功能封装。详细说明 ffmpegStatus()、probeMedia()、convertMedia()、convertMediaTwoPass()、convertMediaMulti() 等核心 API 的参数和返回值。解释单遍编码与两遍编码的区别，以及多输入音频拼接的实现原理。文档化 IPC 通信机制，说明界面进程如何通过 window.desktop 调用主进程的 FFmpeg 操作。包含 FFmpeg 加装包与系统安装的查找逻辑，版本兼容性检查和错误处理策略。提供性能优化建议，包括内存管理、并行处理和资源清理。包含故障排除指南，涵盖 FFmpeg 启动失败、格式不支持和执行超时的解决方案。",
+      "progress_status": "completed",
+      "dependent_files": "app/src/shared/ffmpeg.js,app/main.js",
+      "gmt_create": "2026-10-10T09:02:19Z",
+      "gmt_modified": "2026-10-10T09:02:19Z",
+      "parent_id": "92f2a93e-3ac0-4082-ad95-37563fea985b",
+      "layer_level": 1,
+      "kk_dependent_files": [
+        "app/src/shared/ffmpeg.js",
+        "app/main.js"
+      ]
+    },
+    {
+      "id": "d46ed682-dc7c-4464-8e4b-5d8296c48b90",
+      "repo_id": "f9cd102c-a01c-faa8-7008-3882f901b045",
+      "name": "图片混淆（核心功能）",
+      "description": "image-obfuscate",
+      "prompt": "为图片混淆工具创建详细文档。深入解释核心的像素重排算法，包括 Gilbert 曲线、MD5 方块混淆、Logistic 混沌序列等多种混淆变体的实现原理和适用场景。详细说明 processPixels 函数的参数配置，包括 mode、key、direction、width、height、pixels 等参数的作用和取值范围。文档化兼容性变体系统 variants.js 的设计，解释如何保持与 Android 手机版的算法一致性。提供具体的混淆和解混淆代码示例，展示不同密钥和模式下的效果对比。说明 BLOCK_SIZE=32 的设计决策和性能考量。包含常见问题的排查方法和调试技巧。",
+      "progress_status": "completed",
+      "dependent_files": "app/src/tools/obfuscate/core/engine.js,app/src/tools/obfuscate/core/tomato.js,app/src/tools/obfuscate/core/scramble_md5.js,app/src/tools/obfuscate/core/scramble_logistic.js,app/src/tools/obfuscate/core/modes.js,app/src/tools/obfuscate/core/variants.js",
+      "gmt_create": "2026-10-10T09:02:19Z",
+      "gmt_modified": "2026-10-10T09:02:19Z",
+      "parent_id": "dcd487e8-4a84-49d0-a942-fb34394b1562",
+      "layer_level": 1,
+      "kk_dependent_files": [
+        "app/src/tools/obfuscate/core/engine.js",
+        "app/src/tools/obfuscate/core/tomato.js",
+        "app/src/tools/obfuscate/core/scramble_md5.js",
+        "app/src/tools/obfuscate/core/scramble_logistic.js",
+        "app/src/tools/obfuscate/core/modes.js",
+        "app/src/tools/obfuscate/core/variants.js"
+      ]
+    },
+    {
+      "id": "eb6e3422-594a-4f98-bb7c-61864a91d040",
+      "repo_id": "f9cd102c-a01c-faa8-7008-3882f901b045",
+      "name": "扫描件预处理模块",
+      "description": "ocr-preprocessing",
+      "prompt": "为 OCR 扫描件预处理模块创建详细的技术文档。深入介绍纯像素算法实现，包括灰度化、反色、纠偏、去噪、锐化和二值化的完整处理链。详细说明每个预处理步骤的算法原理和参数配置。解释投影方差搜索的自动纠偏算法实现，包括角度扫描范围和精度控制。文档化自适应阈值、大津法和手动阈值的黑白化处理策略及其适用场景。说明预处理参数的规范化逻辑和步骤生成机制。提供具体的代码示例展示如何处理不同类型的扫描件（如模糊、倾斜、噪声严重的图像）。包含性能优化技巧和识别质量调优建议，以及常见预处理问题的解决方案。",
+      "progress_status": "completed",
+      "dependent_files": "app/src/tools/ocr/core/preprocess.js",
+      "gmt_create": "2026-10-10T09:02:19Z",
+      "gmt_modified": "2026-10-10T09:02:19Z",
+      "parent_id": "d58742bf-665d-4731-bf10-2e2bec92a560",
+      "layer_level": 2,
+      "kk_dependent_files": [
+        "app/src/tools/ocr/core/preprocess.js"
+      ]
+    },
+    {
+      "id": "10abb6da-4360-48cf-8263-0f347f0791da",
+      "repo_id": "f9cd102c-a01c-faa8-7008-3882f901b045",
+      "name": "FFmpeg 封装模块",
+      "description": "ffmpeg-wrapper",
+      "prompt": "为 FFmpeg 封装模块创建全面的 API 参考文档。详细介绍跨工具复用的媒体处理接口，包括 ffmpegStatus、probeMedia、convertMedia、convertMediaTwoPass、convertMediaMulti、transformImageBytes、transformFileToBytes、cancelMediaJob 和 onMediaProgress 等核心函数。深入解释参数拼装逻辑，包括 QUALITY_PRESETS 质量预设、RESOLUTION_PRESETS 分辨率预设、videoEncodeArgs 视频编码参数、videoToGifArgs、videoToWebpArgs 等转换参数生成器。详细说明 IPC 通信机制，解释界面进程如何通过 window.desktop 与主进程交互。提供具体的使用示例，展示视频转码、音频剪辑、图片格式转换等常见场景。文档化进度回调机制、任务取消策略和错误处理模式。包含性能优化建议，如两遍编码的使用场景、并发控制和内存管理最佳实践。",
+      "progress_status": "completed",
+      "dependent_files": "app/src/shared/ffmpeg.js",
+      "gmt_create": "2026-10-10T09:02:19Z",
+      "gmt_modified": "2026-10-10T09:02:19Z",
+      "parent_id": "f435c2f5-4d6d-4133-9508-ea6079066f0b",
+      "layer_level": 1,
+      "order": 1,
+      "kk_dependent_files": [
+        "app/src/shared/ffmpeg.js"
+      ]
+    },
+    {
+      "id": "3299e14c-a7e4-4034-a102-953d47d63f45",
+      "repo_id": "f9cd102c-a01c-faa8-7008-3882f901b045",
+      "name": "图片压缩优化",
+      "description": "image-compress",
+      "prompt": "为图片压缩工具创建详细文档。解释基于 OffscreenCanvas 的压缩实现原理，说明 PNG、JPG、WebP 三种格式的压缩策略和质量控制。详细介绍 autoFormat 函数的格式自动选择逻辑和 computeTargetSize 的尺寸计算算法。文档化 longestEdge 和 percent 参数的组合使用规则，解释尺寸缩放的最优策略。提供不同质量设置下的体积对比示例，说明无损和有损压缩的选择建议。包含浏览器兼容性考虑和性能优化技巧。",
+      "progress_status": "completed",
+      "dependent_files": "app/src/tools/compress/core/compress.js",
+      "gmt_create": "2026-10-10T09:02:19Z",
+      "gmt_modified": "2026-10-10T09:02:19Z",
+      "parent_id": "dcd487e8-4a84-49d0-a942-fb34394b1562",
+      "layer_level": 1,
+      "order": 1,
+      "kk_dependent_files": [
+        "app/src/tools/compress/core/compress.js"
+      ]
+    },
+    {
+      "id": "3ea4cce1-f8b7-4666-aada-54374e5bc1f5",
+      "repo_id": "f9cd102c-a01c-faa8-7008-3882f901b045",
+      "name": "安全边界设计",
+      "description": "security-boundary",
+      "prompt": "为番茄混淆桌面版创建安全边界设计文档。详细说明 IPC 白名单机制的实现原理：通过 preload.js 中的 contextBridge.exposeInMainWorld 方法只暴露必要的方法，严格限制渲染进程对 Node.js 和 Electron API 的直接访问。解释白名单设计的分类策略：系统信息、文件操作、工具专用功能、外部引擎调用等不同类型的 API 分组管理。描述安全防护措施：CSP（Content Security Policy）配置、沙箱模式、权限控制。说明如何防止 XSS 攻击和数据泄露，包括输入验证、输出转义、敏感操作审计。提供安全最佳实践指南，帮助开发者理解如何在扩展功能时保持安全性。",
+      "progress_status": "completed",
+      "dependent_files": "app/preload.js,app/main.js",
+      "gmt_create": "2026-10-10T09:02:19Z",
+      "gmt_modified": "2026-10-10T09:02:19Z",
+      "parent_id": "932ca1ef-316e-4a70-be82-61d7fedd857b",
+      "layer_level": 1,
+      "order": 1,
+      "kk_dependent_files": [
+        "app/preload.js",
+        "app/main.js"
+      ]
+    },
+    {
+      "id": "825fab74-90b0-4700-8ef5-099337c71b80",
+      "repo_id": "f9cd102c-a01c-faa8-7008-3882f901b045",
+      "name": "工具注册机制",
+      "description": "tool-registry",
+      "prompt": "为工具注册机制 registry.js 创建详细的技术文档。深入解释 TOOLS 数组的结构和每个工具声明对象的字段定义，包括 id、name、group、order 等元数据的作用。详细说明 GROUPS 分组系统的实现，包括分组图标、名称和组织逻辑。文档化新工具的注册流程，展示如何在 registry.js 中添加新工具引用。解释工具与分组的映射关系，说明 group 字段如何决定工具在左侧导航中的位置。包含具体的代码示例，演示正确的工具声明格式和分组配置。提供最佳实践指南，涵盖工具命名规范、分组策略和排序规则。",
+      "progress_status": "completed",
+      "dependent_files": "app/src/shell/registry.js",
+      "gmt_create": "2026-10-10T09:02:19Z",
+      "gmt_modified": "2026-10-10T09:02:19Z",
+      "parent_id": "a242c8ac-4c32-4fca-aafe-90e97748b28c",
+      "layer_level": 1,
+      "order": 1,
+      "kk_dependent_files": [
+        "app/src/shell/registry.js"
+      ]
+    },
+    {
+      "id": "8c12760b-014d-4b04-a591-885596cfd17a",
+      "repo_id": "f9cd102c-a01c-faa8-7008-3882f901b045",
+      "name": "PDF 编辑工具",
+      "description": "pdf-edit-tool",
+      "prompt": "为 PDF 编辑工具创建详细的技术文档。深入介绍基于 @cantoo/pdf-lib 的 PDF 编辑能力，包括水印添加、文本插入、图像嵌入和页面操作。详细说明字体系统的设计，包括中文字体动态加载、fontkit 引擎集成和 Helvetica 降级策略。解释九宫格位置系统的实现和用户友好的错误翻译机制。文档化压缩功能的集成方式和取消操作的统一处理模式。说明 PDF 文档的生命周期管理，包括资源释放和内存优化。提供具体的编辑操作示例，如批量加水印、文本替换和页面重组。包含性能优化建议和常见问题解决方案。",
+      "progress_status": "completed",
+      "dependent_files": "app/src/tools/pdf-edit/core/ops.js,app/src/tools/pdf-edit/core/pages.js",
+      "gmt_create": "2026-10-10T09:02:19Z",
+      "gmt_modified": "2026-10-10T09:02:19Z",
+      "parent_id": "67c3129a-d2ef-4e04-a5b0-506bd0aafc4e",
+      "layer_level": 1,
+      "order": 1,
+      "kk_dependent_files": [
+        "app/src/tools/pdf-edit/core/ops.js",
+        "app/src/tools/pdf-edit/core/pages.js"
+      ]
+    },
+    {
+      "id": "932ca1ef-316e-4a70-be82-61d7fedd857b",
+      "repo_id": "f9cd102c-a01c-faa8-7008-3882f901b045",
+      "name": "架构设计",
+      "description": "architecture-design",
+      "prompt": "为番茄混淆桌面版创建架构设计文档。详细描述 Electron 双进程模型的设计：主进程负责系统级操作，渲染进程负责用户界面，预加载脚本实现安全桥接。解释插件式工具架构的设计理念，包括工具注册机制、生命周期管理和 LRU 保活策略。文档化 IPC 白名单机制的安全边界设计，说明如何通过严格的安全隔离保护用户数据。介绍整体架构图，包括组件交互关系、数据流向和集成模式。解释技术决策的权衡考虑，如为什么选择 Electron 而非其他框架。包含基础设施要求、可扩展性考虑和部署拓扑图。",
+      "progress_status": "completed",
+      "dependent_files": "app/main.js,app/preload.js,app/src/shell/shell.js,app/src/shell/registry.js",
+      "gmt_create": "2026-10-10T09:02:19Z",
+      "gmt_modified": "2026-10-10T09:02:19Z",
+      "order": 1,
+      "kk_dependent_files": [
+        "app/main.js",
+        "app/preload.js",
+        "app/src/shell/shell.js",
+        "app/src/shell/registry.js"
+      ]
+    },
+    {
+      "id": "99023695-68c4-48fd-b28c-d710b55b03e0",
+      "repo_id": "f9cd102c-a01c-faa8-7008-3882f901b045",
+      "name": "7-Zip 集成",
+      "description": "7zip-integration",
+      "prompt": "为 7-Zip 引擎集成创建详细的技术文档。深入介绍 7-Zip 在压缩解压工具中的集成方式，包括可执行文件查找、参数构建和输出解析。详细说明 findSevenZip() 的查找顺序（加装包、系统 PATH、常见安装目录），以及复合格式（tar.gz/tar.xz/tar.zst）的两趟处理机制。文档化密码处理的特殊要求，解释为什么必须使用 -p 参数并设置 stdin 为 'ignore'。说明中文文件名乱码问题的解决方案（-sccUTF-8 参数）。详细介绍进度解析、错误翻译和临时文件清理机制。包含 Node.js 内置 zlib 对 zstd/brotli 的支持检测，以及 job 取消和资源管理。提供性能调优指南，包括压缩级别选择和并行处理策略。包含故障排除指南，涵盖 7-Zip 找不到、密码错误和输出异常的处理方法。",
+      "progress_status": "completed",
+      "dependent_files": "app/src/tools/archive/core/engine.mjs,app/src/tools/archive/core/params.mjs,app/src/tools/archive/core/formats.mjs",
+      "gmt_create": "2026-10-10T09:02:19Z",
+      "gmt_modified": "2026-10-10T09:02:19Z",
+      "parent_id": "92f2a93e-3ac0-4082-ad95-37563fea985b",
+      "layer_level": 1,
+      "order": 1,
+      "kk_dependent_files": [
+        "app/src/tools/archive/core/engine.mjs",
+        "app/src/tools/archive/core/params.mjs",
+        "app/src/tools/archive/core/formats.mjs"
+      ]
+    },
+    {
+      "id": "b98b0148-5d27-455e-ae38-b83b749eb819",
+      "repo_id": "f9cd102c-a01c-faa8-7008-3882f901b045",
+      "name": "OCR 结果转换模块",
+      "description": "ocr-conversion",
+      "prompt": "为 OCR 结果转换模块创建详细的技术文档。深入介绍如何将 ppu-paddle-ocr 引擎返回的原始识别结果转换为标准化的数据结构。详细说明坐标系统转换、文本块合并和排序算法。文档化识别结果的格式规范，包括文本内容、位置信息、置信度评分等字段定义。解释多语言识别结果的处理策略和字符编码转换。说明与不同输出格式（文本、JSON、结构化数据）的映射关系。提供具体的转换流程示例，从原始 OCR 结果到最终格式化输出的完整过程。包含错误处理机制和数据验证规则，以及转换过程中的性能优化技巧。",
+      "progress_status": "completed",
+      "dependent_files": "app/src/tools/ocr/core/convert.js",
+      "gmt_create": "2026-10-10T09:02:19Z",
+      "gmt_modified": "2026-10-10T09:02:19Z",
+      "parent_id": "d58742bf-665d-4731-bf10-2e2bec92a560",
+      "layer_level": 2,
+      "order": 1,
+      "kk_dependent_files": [
+        "app/src/tools/ocr/core/convert.js"
+      ]
+    },
+    {
+      "id": "d0352020-2598-422f-bbca-2ab19ce30565",
+      "repo_id": "f9cd102c-a01c-faa8-7008-3882f901b045",
+      "name": "工具生命周期管理",
+      "description": "lifecycle-management",
+      "prompt": "为番茄混淆桌面版的工具生命周期管理系统创建详细文档。解释工具页的挂载（mount）和卸载（unmount）过程：首次进入时创建 .tool-page DOM 元素并调用工具的 mount(ctx) 方法，切走时从文档中移除但保留在内存中。说明 ctx 上下文对象的创建和管理：makeToolCtx 函数为每个工具提供隔离的上下文，包含状态设置、文件操作、任务队列等能力。详细描述 LRU 保活策略的实现：MAX_ALIVE_PAGES 限制、lastUsed 访问时间戳、touched 标记机制。解释「动过」页面的判定逻辑：pointerdown、click、keydown、input、change、drop、paste 等事件触发 touched 标记。介绍页面回收算法：evictPages 函数如何按 lastUsed 排序淘汰最久未用的页面。说明工具切换时的状态恢复机制：scrollTop、status、info、progress 等状态的持久化和恢复。包含生命周期流程图和关键代码示例。",
+      "progress_status": "completed",
+      "dependent_files": "app/src/shell/shell.js",
+      "gmt_create": "2026-10-10T09:02:19Z",
+      "gmt_modified": "2026-10-10T09:02:19Z",
+      "parent_id": "eb45c52e-877a-4301-97df-df71c91b51c6",
+      "layer_level": 2,
+      "order": 1,
+      "kk_dependent_files": [
+        "app/src/shell/shell.js"
+      ]
+    },
+    {
+      "id": "fc52dc2f-4ca4-4604-83c4-9c2599aba6c1",
+      "repo_id": "f9cd102c-a01c-faa8-7008-3882f901b045",
+      "name": "视频播放器",
+      "description": "video-player",
+      "prompt": "为视频播放器工具创建详细的技术文档。深入介绍播放器的核心计划和媒体处理管道，包括文件加载、解码和渲染流程。详细说明支持的媒体格式、编解码器和硬件加速选项。文档化播放控制接口，包括播放、暂停、快进、音量调节等用户交互功能。解释播放器与 FFmpeg 的集成方式，以及如何处理不同编码格式的兼容性问题。提供性能优化建议，包括内存管理、缓冲策略和播放流畅度调优。包含常见问题解决方案，如黑屏、卡顿、音画不同步等故障排除方法。",
+      "progress_status": "completed",
+      "dependent_files": "app/src/tools/player/core/plan.js,app/src/tools/player/index.js,app/src/tools/player/ui.js,app/src/tools/player/styles.css",
+      "gmt_create": "2026-10-10T09:02:19Z",
+      "gmt_modified": "2026-10-10T09:02:19Z",
+      "parent_id": "8c0a1118-f6a7-45d9-8f43-3e2032845eb0",
+      "layer_level": 1,
+      "order": 1,
+      "kk_dependent_files": [
+        "app/src/tools/player/core/plan.js",
+        "app/src/tools/player/index.js",
+        "app/src/tools/player/ui.js",
+        "app/src/tools/player/styles.css"
+      ]
+    },
+    {
+      "id": "23a1a5af-be1c-4f1c-a102-d1390bcca70b",
+      "repo_id": "f9cd102c-a01c-faa8-7008-3882f901b045",
+      "name": "导航排序系统",
+      "description": "navigation-sorting",
+      "prompt": "为导航排序系统 navsort.js 创建详细的技术文档。深入解释 computeNavPlan 函数的算法逻辑，包括分组净化、工具归组和顺序计算。详细说明拖拽排序的实现机制，包括长按检测、Pointer Events 处理和视觉反馈。文档化 readNavOrderFromDOM 函数的 DOM 解析逻辑，说明如何从当前界面状态读取用户自定义的顺序。解释 pickStartupTool 函数的启动工具选择算法。包含具体的代码示例，展示拖拽操作的完整流程和错误处理。提供性能优化建议，包括避免不必要的重排和高效的数据结构使用。",
+      "progress_status": "completed",
+      "dependent_files": "app/src/shell/navsort.js",
+      "gmt_create": "2026-10-10T09:02:19Z",
+      "gmt_modified": "2026-10-10T09:02:19Z",
+      "parent_id": "a242c8ac-4c32-4fca-aafe-90e97748b28c",
+      "layer_level": 1,
+      "order": 2,
+      "kk_dependent_files": [
+        "app/src/shell/navsort.js"
+      ]
+    },
+    {
+      "id": "5b28cb1e-26d3-46f7-8580-a9f4de9da7ac",
+      "repo_id": "f9cd102c-a01c-faa8-7008-3882f901b045",
+      "name": "HEIC 格式支持模块",
+      "description": "heic-support",
+      "prompt": "为 HEIC 格式支持模块创建详细的 API 文档。解释 Chromium 内核不支持 HEIC 解码的技术背景，以及通过主进程 worker 线程中 libheif WASM 引擎实现的解决方案。详细介绍 heicStatus 状态检查和 decodeHeicFromBytes 解码函数的使用方法。说明返回数据结构与 imageio 模块的兼容性设计，确保解码后的像素数据可以直接进入统一的图像处理管线。提供具体的代码示例，展示如何在图片格式转换工具中正确处理手机拍摄的 HEIC/HEIF/HIF 文件。解释 irot/imir 旋转属性的自动处理机制，确保竖拍照片方向正确。文档化错误处理策略和异常情况的处理方法。包含与其他图片处理模块的集成模式和最佳实践。",
+      "progress_status": "completed",
+      "dependent_files": "app/src/shared/heic.js",
+      "gmt_create": "2026-10-10T09:02:19Z",
+      "gmt_modified": "2026-10-10T09:02:19Z",
+      "parent_id": "f435c2f5-4d6d-4133-9508-ea6079066f0b",
+      "layer_level": 1,
+      "order": 2,
+      "kk_dependent_files": [
+        "app/src/shared/heic.js"
+      ]
+    },
+    {
+      "id": "66ba0f6a-503b-4456-a206-74d7ec3ae627",
+      "repo_id": "f9cd102c-a01c-faa8-7008-3882f901b045",
+      "name": "文档格式转换工具",
+      "description": "doc-convert-tool",
+      "prompt": "为文档格式转换工具创建详细的技术文档。深入介绍基于 LibreOffice 的文档格式转换规则和智能转换逻辑。详细说明支持的输入格式（.doc/.docx/.xls/.xlsx/.ppt/.pptx/.pps/.rtf）和输出目标（docx/xlsx/pptx/pdf）。解释家族分类系统（word/excel/ppt）和同族转换限制的实现原理。文档化 AUTO_TARGET 的智能模式算法，包括老格式自动升级和新格式的无需转换提示。说明 planOne 函数的转换规则验证逻辑和 formatMeta 的显示文案生成。提供实际的转换场景示例，包括批量格式升级、跨格式转换和 PDF 导出。包含错误处理和用户友好的提示信息设计。",
+      "progress_status": "completed",
+      "dependent_files": "app/src/tools/doc-convert/core/plan.mjs",
+      "gmt_create": "2026-10-10T09:02:19Z",
+      "gmt_modified": "2026-10-10T09:02:19Z",
+      "parent_id": "67c3129a-d2ef-4e04-a5b0-506bd0aafc4e",
+      "layer_level": 1,
+      "order": 2,
+      "kk_dependent_files": [
+        "app/src/tools/doc-convert/core/plan.mjs"
+      ]
+    },
+    {
+      "id": "7ca05951-3be2-4afc-8237-c040aa2862d2",
+      "repo_id": "f9cd102c-a01c-faa8-7008-3882f901b045",
+      "name": "可搜索文档生成模块",
+      "description": "ocr-searchable-documents",
+      "prompt": "为可搜索文档生成模块创建详细的技术文档。深入介绍如何基于 OCR 识别结果构建可搜索的 PDF 文档。详细说明 PDF 结构生成、文本层叠加和索引构建技术。文档化 PDF 元数据设置、页面布局和内容流操作。解释文本定位算法，将 OCR 坐标映射到 PDF 页面的精确位置。说明字体嵌入、颜色管理和文本渲染优化策略。提供完整的可搜索 PDF 生成流程示例，从 OCR 结果到最终可搜索文档的全过程。包含 PDF 文件优化技巧，如文件大小控制和加载性能提升。文档化与其他 PDF 工具的兼容性和标准遵循情况。",
+      "progress_status": "completed",
+      "dependent_files": "app/src/tools/ocr/core/searchable.js",
+      "gmt_create": "2026-10-10T09:02:19Z",
+      "gmt_modified": "2026-10-10T09:02:19Z",
+      "parent_id": "d58742bf-665d-4731-bf10-2e2bec92a560",
+      "layer_level": 2,
+      "order": 2,
+      "kk_dependent_files": [
+        "app/src/tools/ocr/core/searchable.js"
+      ]
+    },
+    {
+      "id": "7d75d25b-b729-4ea8-8999-4712a1ed4029",
+      "repo_id": "f9cd102c-a01c-faa8-7008-3882f901b045",
+      "name": "视频格式转换",
+      "description": "video-convert",
+      "prompt": "为视频格式转换工具创建详细的技术文档。深入介绍基于 FFmpeg 的视频转码架构，包括转换计划生成、参数配置和执行流程。详细说明支持的输入输出格式、编码器和质量设置选项。文档化视频参数配置，包括分辨率、帧率、比特率、音频参数的调整方法。解释批量转换的处理逻辑和任务调度机制。提供转换质量优化指南，包括压缩比与画质的平衡策略。包含常见转换问题的解决方案，如格式不兼容、编码失败、音质损失等问题的排查和处理方法。",
+      "progress_status": "completed",
+      "dependent_files": "app/src/tools/video-convert/core/plan.js,app/src/tools/video-convert/index.js,app/src/tools/video-convert/ui.js,app/src/tools/video-convert/styles.css",
+      "gmt_create": "2026-10-10T09:02:19Z",
+      "gmt_modified": "2026-10-10T09:02:19Z",
+      "parent_id": "8c0a1118-f6a7-45d9-8f43-3e2032845eb0",
+      "layer_level": 1,
+      "order": 2,
+      "kk_dependent_files": [
+        "app/src/tools/video-convert/core/plan.js",
+        "app/src/tools/video-convert/index.js",
+        "app/src/tools/video-convert/ui.js",
+        "app/src/tools/video-convert/styles.css"
+      ]
+    },
+    {
+      "id": "9a08a00f-1945-460c-9b4d-5d9e49b9a99f",
+      "repo_id": "f9cd102c-a01c-faa8-7008-3882f901b045",
+      "name": "图片增强修复",
+      "description": "image-enhance",
+      "prompt": "为图片增强工具创建详细文档。深入解释 AI 超分和图像增强的分层处理架构，说明 blurFn 注入机制和逐像素差分合成算法。详细介绍 CUSTOM_DEFAULT 预设参数体系，包括 sharpen、radius、threshold、denoise、brightness、contrast、saturation、scale 等参数的作用机制和调整范围。文档化 PRESETS 预设方案的科学依据和使用场景，特别是「一键变清晰」模式的参数组合原理。提供不同增强效果的对比示例和参数调优指南。说明 GPU 加速的实现方式和性能优化策略。",
+      "progress_status": "completed",
+      "dependent_files": "app/src/tools/enhance/core/enhance.js",
+      "gmt_create": "2026-10-10T09:02:19Z",
+      "gmt_modified": "2026-10-10T09:02:19Z",
+      "parent_id": "dcd487e8-4a84-49d0-a942-fb34394b1562",
+      "layer_level": 1,
+      "order": 2,
+      "kk_dependent_files": [
+        "app/src/tools/enhance/core/enhance.js"
+      ]
+    },
+    {
+      "id": "a242c8ac-4c32-4fca-aafe-90e97748b28c",
+      "repo_id": "f9cd102c-a01c-faa8-7008-3882f901b045",
+      "name": "核心框架",
+      "description": "core-framework",
+      "prompt": "为核心框架模块创建详细的技术文档。深入解释工具箱框架的实现细节，包括 shell.js 中的工具注册、导航管理和生命周期控制。文档化 registry.js 中的工具注册机制，说明工具元数据的结构和配置选项。详细介绍 navsort.js 中的导航排序算法和任务中心 taskcenter.js 的任务调度系统。包含具体的代码示例，展示如何注册新工具、处理事件和状态管理。解释与其他组件的关系，特别是工具层和共享模块的依赖关系。提供故障排除指南，涵盖常见的框架级别问题和解决方案。",
+      "progress_status": "completed",
+      "dependent_files": "app/src/shell/shell.js,app/src/shell/registry.js,app/src/shell/navsort.js,app/src/shell/taskcenter.js",
+      "gmt_create": "2026-10-10T09:02:19Z",
+      "gmt_modified": "2026-10-10T09:02:19Z",
+      "order": 2,
+      "kk_dependent_files": [
+        "app/src/shell/shell.js",
+        "app/src/shell/registry.js",
+        "app/src/shell/navsort.js",
+        "app/src/shell/taskcenter.js"
+      ]
+    },
+    {
+      "id": "e22db193-07fa-438d-9f0e-76665a5ec85f",
+      "repo_id": "f9cd102c-a01c-faa8-7008-3882f901b045",
+      "name": "yt-dlp 集成",
+      "description": "yt-dlp-integration",
+      "prompt": "为 yt-dlp 视频下载引擎集成创建详细的技术文档。深入介绍 yt-dlp 在视频下载工具中的集成架构，包括三条下载通道（原生解析器、网页兜底、音画校验）的设计模式。详细说明下载器上下文（ctx）注入机制，如何动态配置外部依赖路径。文档化各平台解析器的实现，包括 Bilibili、抖音、YouTube、小红书等平台的特定处理逻辑。解释进程树管理，包括子进程启动、监控和优雅终止机制。说明进度推送系统，通过 ctx.emit() 实现阶段变化和进度更新。详细介绍错误分类和处理，包括网络错误、格式不支持和用户取消的场景。包含代理配置、Cookie 管理和用户代理设置。提供性能优化建议，包括并发下载控制和带宽限制。包含故障排除指南，涵盖 yt-dlp 更新、插件加载和网络连接问题。",
+      "progress_status": "completed",
+      "dependent_files": "app/src/tools/videodl/core/downloader.mjs,app/src/tools/videodl/core/manager.mjs,app/src/tools/videodl/core/childutil.mjs",
+      "gmt_create": "2026-10-10T09:02:19Z",
+      "gmt_modified": "2026-10-10T09:02:19Z",
+      "parent_id": "92f2a93e-3ac0-4082-ad95-37563fea985b",
+      "layer_level": 1,
+      "order": 2,
+      "kk_dependent_files": [
+        "app/src/tools/videodl/core/downloader.mjs",
+        "app/src/tools/videodl/core/manager.mjs",
+        "app/src/tools/videodl/core/childutil.mjs"
+      ]
+    },
+    {
+      "id": "e6d66999-6f60-46d8-9d15-c8431ba12db2",
+      "repo_id": "f9cd102c-a01c-faa8-7008-3882f901b045",
+      "name": "导航排序算法",
+      "description": "nav-sorting-algorithm",
+      "prompt": "为番茄混淆桌面版的导航排序算法创建详细文档。解释 computeNavPlan 函数的核心逻辑：将 GROUPS 和 TOOLS 组合成最终的导航计划，处理用户自定义排序和数据净化。说明数据净化规则：验证 saved.navOrder 的形状，过滤非法分组 ID，确保工具只能在其所属组内排序。描述分组排序算法：用户排过的分组在前，未排过的按注册序追加，'other' 组固定置底。详细介绍组内工具排序：saved.tools[groupId] 只保留属于该组的工具 ID，去重后按用户顺序排列，新工具按 order 追加到尾部。解释 pickStartupTool 函数的启动工具选择逻辑：返回第一个非空分组的第一个工具。说明 readNavOrderFromDOM 函数的 DOM 读取机制：从渲染后的导航结构中解析当前排序状态。包含排序算法的流程图和数据转换示例。",
+      "progress_status": "completed",
+      "dependent_files": "app/src/shell/navsort.js",
+      "gmt_create": "2026-10-10T09:02:19Z",
+      "gmt_modified": "2026-10-10T09:02:19Z",
+      "parent_id": "eb45c52e-877a-4301-97df-df71c91b51c6",
+      "layer_level": 2,
+      "order": 2,
+      "kk_dependent_files": [
+        "app/src/shell/navsort.js"
+      ]
+    },
+    {
+      "id": "eb45c52e-877a-4301-97df-df71c91b51c6",
+      "repo_id": "f9cd102c-a01c-faa8-7008-3882f901b045",
+      "name": "插件式工具架构",
+      "description": "plugin-architecture",
+      "prompt": "为番茄混淆桌面版创建插件式工具架构文档。详细解释工具箱框架的设计理念：每个工具作为独立的插件模块，遵循统一的结构规范。说明工具注册机制：registry.js 中 TOOLS 数组的管理方式，GROUPS 分组的组织逻辑。描述工具生命周期管理：工具的挂载、卸载、LRU 保活策略的实现原理。解释工具与框架的解耦设计：通过 ctx 上下文对象提供统一的能力接口，避免工具直接操作 DOM 或系统资源。介绍导航排序算法：navsort.js 中 computeNavPlan 和 pickStartupTool 的逻辑。说明如何扩展现有工具组或添加新的工具分组。包含架构图展示工具、框架、注册表之间的交互关系。",
+      "progress_status": "completed",
+      "dependent_files": "app/src/shell/shell.js,app/src/shell/registry.js,app/src/shell/navsort.js",
+      "gmt_create": "2026-10-10T09:02:19Z",
+      "gmt_modified": "2026-10-10T09:02:19Z",
+      "parent_id": "932ca1ef-316e-4a70-be82-61d7fedd857b",
+      "layer_level": 1,
+      "order": 2,
+      "kk_dependent_files": [
+        "app/src/shell/shell.js",
+        "app/src/shell/registry.js",
+        "app/src/shell/navsort.js"
+      ]
+    },
+    {
+      "id": "47aedc1a-0b1d-401c-9d1b-45442b8c0c5d",
+      "repo_id": "f9cd102c-a01c-faa8-7008-3882f901b045",
+      "name": "拖拽交互接口",
+      "description": "drag-drop-interface",
+      "prompt": "为番茄混淆桌面版的导航拖拽交互接口创建详细文档。解释 createNavSort 函数的设计目标：实现长按拖动排序，无需进入专门的排序模式，点击行为完全不受影响。详细说明拖拽类型区分：工具条目拖拽（组内移动）vs 分组标题拖拽（整组移动）。描述长按检测机制：400ms 延迟阈值、4px 移动取消阈值、Pointer Events 的 pointerdown/move/up/cancel 事件处理。解释拖拽视觉反馈：被拖条目的玻璃卡效果、兄弟元素的 transform 让位动画、指针跟随效果。详细介绍坐标计算逻辑：内容坐标（clientY + nav.scrollTop）的处理，避免容器滚动和列表滚动的干扰。说明拖拽结束后的数据处理：visual order 到 DOM order 的映射，persist 回调的调用时机。包含拖拽状态机的时序图和交互流程图。",
+      "progress_status": "completed",
+      "dependent_files": "app/src/shell/navsort.js",
+      "gmt_create": "2026-10-10T09:02:19Z",
+      "gmt_modified": "2026-10-10T09:02:19Z",
+      "parent_id": "eb45c52e-877a-4301-97df-df71c91b51c6",
+      "layer_level": 2,
+      "order": 3,
+      "kk_dependent_files": [
+        "app/src/shell/navsort.js"
+      ]
+    },
+    {
+      "id": "5822f281-9d95-4d1a-a7fe-ba246af7e081",
+      "repo_id": "f9cd102c-a01c-faa8-7008-3882f901b045",
+      "name": "图片格式转换",
+      "description": "image-convert",
+      "prompt": "为图片格式转换工具创建详细文档。解释多格式编码器的架构设计，说明 PNG/JPG/WebP 使用内核编码、BMP/ICO 使用自研编码器、TIFF/GIF/AVIF 使用 ffmpeg 的技术选型原因。详细介绍 TARGETS 支持的输出格式特性对比，包括透明通道支持、压缩率、兼容性等维度。文档化 FFMPEG_DECODE_EXTS 和 HEIF_EXTS 的特殊处理逻辑，说明手机拍照格式和老旧格式的解码策略。提供格式选择的最佳实践建议和转换质量对比示例。包含错误处理和兼容性问题的解决方案。",
+      "progress_status": "completed",
+      "dependent_files": "app/src/tools/convert/core/convert.js,app/src/tools/convert/core/encoders.js",
+      "gmt_create": "2026-10-10T09:02:19Z",
+      "gmt_modified": "2026-10-10T09:02:19Z",
+      "parent_id": "dcd487e8-4a84-49d0-a942-fb34394b1562",
+      "layer_level": 1,
+      "order": 3,
+      "kk_dependent_files": [
+        "app/src/tools/convert/core/convert.js",
+        "app/src/tools/convert/core/encoders.js"
+      ]
+    },
+    {
+      "id": "664c43f2-9568-49e2-9b23-0183a1485f20",
+      "repo_id": "f9cd102c-a01c-faa8-7008-3882f901b045",
+      "name": "IPC 通信机制",
+      "description": "ipc-communication",
+      "prompt": "为番茄混淆桌面版创建 IPC 通信机制文档。详细说明 Electron 的 IPC 通信模式：ipcRenderer.invoke 用于请求-响应模式，ipcRenderer.on 用于事件订阅模式。解释 API 分类体系：文件操作 API、对话框 API、工具专用 API、外部引擎 API、设置管理等不同类别的接口设计。描述异步任务处理：进度回调、取消机制、错误处理的统一模式。说明数据传输格式：JSON 序列化、二进制数据处理、大文件传输优化。提供 IPC 通信的最佳实践：命名约定、错误处理、性能优化建议。包含常见使用场景的代码示例，展示如何在工具中调用不同的 IPC 接口。",
+      "progress_status": "completed",
+      "dependent_files": "app/preload.js,app/main.js",
+      "gmt_create": "2026-10-10T09:02:19Z",
+      "gmt_modified": "2026-10-10T09:02:19Z",
+      "parent_id": "932ca1ef-316e-4a70-be82-61d7fedd857b",
+      "layer_level": 1,
+      "order": 3,
+      "kk_dependent_files": [
+        "app/preload.js",
+        "app/main.js"
+      ]
+    },
+    {
+      "id": "76c28252-d829-4798-9837-682a43afaeeb",
+      "repo_id": "f9cd102c-a01c-faa8-7008-3882f901b045",
+      "name": "视频压缩工具",
+      "description": "video-compress",
+      "prompt": "为视频压缩工具创建详细的技术文档。深入介绍视频压缩的核心算法和优化策略，包括码率控制、关键帧间隔调整和编码器选择。详细说明压缩参数的配置方法，包括目标文件大小、质量等级、压缩速度等选项。文档化与 FFmpeg 的集成实现，包括命令行参数构建和进程管理。解释批量压缩的任务队列管理和进度反馈机制。提供压缩效果评估方法，包括文件大小对比、画质测试和性能基准。包含常见压缩问题的解决方案，如压缩后画质下降、体积减小不明显、编码时间过长等问题的优化技巧。",
+      "progress_status": "completed",
+      "dependent_files": "app/src/tools/video-compress/core/plan.js,app/src/tools/video-compress/index.js,app/src/tools/video-compress/ui.js,app/src/tools/video-compress/styles.css",
+      "gmt_create": "2026-10-10T09:02:19Z",
+      "gmt_modified": "2026-10-10T09:02:19Z",
+      "parent_id": "8c0a1118-f6a7-45d9-8f43-3e2032845eb0",
+      "layer_level": 1,
+      "order": 3,
+      "kk_dependent_files": [
+        "app/src/tools/video-compress/core/plan.js",
+        "app/src/tools/video-compress/index.js",
+        "app/src/tools/video-compress/ui.js",
+        "app/src/tools/video-compress/styles.css"
+      ]
+    },
+    {
+      "id": "7ef586a7-7aca-4a28-907f-20949cd2cd6b",
+      "repo_id": "f9cd102c-a01c-faa8-7008-3882f901b045",
+      "name": "任务中心面板",
+      "description": "task-center",
+      "prompt": "为任务中心面板 taskcenter.js 创建详细的技术文档。深入解释任务中心的 UI 架构，包括侧滑抽屉的实现和任务列表的渲染逻辑。详细说明任务状态的显示和处理，包括 queued、running、done、failed、canceled 等状态对应的界面元素。文档化任务操作方法，包括取消、重试和清空功能的实现。解释任务摘要统计的计算方式，包括总体进度和用户任务的聚合。包含具体的代码示例，展示任务行组件的构建和事件绑定。提供可访问性支持说明，包括 ARIA 属性和键盘导航。",
+      "progress_status": "completed",
+      "dependent_files": "app/src/shell/taskcenter.js",
+      "gmt_create": "2026-10-10T09:02:19Z",
+      "gmt_modified": "2026-10-10T09:02:19Z",
+      "parent_id": "a242c8ac-4c32-4fca-aafe-90e97748b28c",
+      "layer_level": 1,
+      "order": 3,
+      "kk_dependent_files": [
+        "app/src/shell/taskcenter.js"
+      ]
+    },
+    {
+      "id": "9e1c5fd9-db7c-43b5-996b-f22954cc8ace",
+      "repo_id": "f9cd102c-a01c-faa8-7008-3882f901b045",
+      "name": "OCR 引擎集成",
+      "description": "ocr-engine-integration",
+      "prompt": "为 OCR 文字识别引擎集成创建详细的技术文档。深入介绍 OCR 预处理流水线的设计，包括灰度化、反色、纠偏、去噪、锐化和二值化的处理顺序。详细说明 PREPROCESS_DEFAULTS 配置项的作用和默认值选择的原因。文档化纯像素算法实现，解释如何在 Node.js 环境和浏览器环境中复用相同的处理逻辑。介绍投影方差搜索的纠偏算法，以及自适应阈值和二值化技术的实现原理。说明坐标变换机制，解释旋转后识别框如何映射回原图坐标。详细描述 PDF 可搜索层生成过程，包括文本定位和透明覆盖层的创建。包含性能优化策略，如批量处理和内存管理。提供调参指南，针对不同扫描质量的选择建议。包含故障排除指南，涵盖识别精度低、处理速度慢和坐标偏移等常见问题。",
+      "progress_status": "completed",
+      "dependent_files": "app/src/tools/ocr/core/preprocess.js,app/src/tools/ocr/core/convert.js,app/src/tools/ocr/core/searchable.js",
+      "gmt_create": "2026-10-10T09:02:19Z",
+      "gmt_modified": "2026-10-10T09:02:19Z",
+      "parent_id": "92f2a93e-3ac0-4082-ad95-37563fea985b",
+      "layer_level": 1,
+      "order": 3,
+      "kk_dependent_files": [
+        "app/src/tools/ocr/core/preprocess.js",
+        "app/src/tools/ocr/core/convert.js",
+        "app/src/tools/ocr/core/searchable.js"
+      ]
+    },
+    {
+      "id": "a30b93b1-b69c-4fa8-9331-b37010c523e0",
+      "repo_id": "f9cd102c-a01c-faa8-7008-3882f901b045",
+      "name": "PDF 操作模块",
+      "description": "pdf-operations",
+      "prompt": "为 PDF 操作共享模块创建全面的 API 参考文档。详细介绍基于 pdfjs 和 pdf-lib 的 PDF 处理功能，包括 openPdfDoc、renderPdfPage、compressPdf 等核心函数。深入解释 PDF 压缩的实现原理：将每页渲染为位图 → 按档位重新编码为 JPG → 用 pdf-lib 重新装箱的完整流程。详细说明 PDF_COMPRESS_PRESETS 压缩档位配置，包括 light、standard、strong、extreme 四个档位的参数含义和适用场景。提供具体的代码示例，展示如何打开密码保护的 PDF、渲染指定页面、执行批量压缩等操作。解释 grayscale 灰度化处理对扫描件体积优化的效果。文档化内存管理机制，包括 releasePdfDoc 的正确使用方式和资源释放的最佳实践。包含进度回调、取消机制和错误处理的详细指导。说明与 pdf-edit 和 ocr 工具的集成模式。",
+      "progress_status": "completed",
+      "dependent_files": "app/src/shared/pdfops.js",
+      "gmt_create": "2026-10-10T09:02:19Z",
+      "gmt_modified": "2026-10-10T09:02:19Z",
+      "parent_id": "f435c2f5-4d6d-4133-9508-ea6079066f0b",
+      "layer_level": 1,
+      "order": 3,
+      "kk_dependent_files": [
+        "app/src/shared/pdfops.js"
+      ]
+    },
+    {
+      "id": "b18f01b5-c63c-462f-8051-8b53dd11b14e",
+      "repo_id": "f9cd102c-a01c-faa8-7008-3882f901b045",
+      "name": "工具开发指南",
+      "description": "tool-development-guide",
+      "prompt": "为开发者创建全面的工具开发指南。基于 _template 模板详细说明如何开发新的工具模块，包括目录结构规范、文件组织约定和命名规则。解释工具的三个核心文件：index.js（入口点）、ui.js（用户界面）和 styles.css（样式定义）的作用和实现方式。提供完整的开发示例，从简单的 Hello World 工具到复杂的多步骤处理工具。文档化工具开发最佳实践，包括错误处理、进度反馈和用户交互设计。说明如何集成共享模块、调用外部引擎和处理文件操作。包含 UI 设计规范、主题定制和响应式设计指南。",
+      "progress_status": "completed",
+      "dependent_files": "docs/新增工具指南.md,app/src/tools/_template/index.js,app/src/tools/_template/ui.js,app/src/tools/_template/styles.css",
+      "gmt_create": "2026-10-10T09:02:19Z",
+      "gmt_modified": "2026-10-10T09:02:19Z",
+      "order": 3,
+      "kk_dependent_files": [
+        "docs/新增工具指南.md",
+        "app/src/tools/_template/index.js",
+        "app/src/tools/_template/ui.js",
+        "app/src/tools/_template/styles.css"
+      ]
+    },
+    {
+      "id": "d58742bf-665d-4731-bf10-2e2bec92a560",
+      "repo_id": "f9cd102c-a01c-faa8-7008-3882f901b045",
+      "name": "OCR 文字识别工具",
+      "description": "ocr-tool",
+      "prompt": "为 OCR 文字识别工具创建详细的技术文档。深入介绍扫描件预处理的纯像素算法实现，包括灰度化、反色、纠偏、去噪、锐化和二值化的完整处理链。详细说明预处理参数的规范化逻辑和步骤生成机制。解释投影方差搜索的自动纠偏算法和坐标回映射技术。文档化自适应阈值、大津法和手动阈值的黑白化处理策略。说明与 ppu-paddle-ocr 引擎的集成方式和搜索结果生成流程。介绍可搜索 PDF 和 Word 文档的构建过程。提供完整的 OCR 工作流示例，从扫描件预处理到最终文档输出的全流程。包含性能优化技巧和识别质量调优建议。",
+      "progress_status": "completed",
+      "dependent_files": "app/src/tools/ocr/core/preprocess.js,app/src/tools/ocr/core/convert.js,app/src/tools/ocr/core/searchable.js,app/src/tools/ocr/core/docx.js",
+      "gmt_create": "2026-10-10T09:02:19Z",
+      "gmt_modified": "2026-10-10T09:02:19Z",
+      "parent_id": "67c3129a-d2ef-4e04-a5b0-506bd0aafc4e",
+      "layer_level": 1,
+      "order": 3,
+      "kk_dependent_files": [
+        "app/src/tools/ocr/core/preprocess.js",
+        "app/src/tools/ocr/core/convert.js",
+        "app/src/tools/ocr/core/searchable.js",
+        "app/src/tools/ocr/core/docx.js"
+      ]
+    },
+    {
+      "id": "fc552661-27a4-44ba-b674-f4402770abf9",
+      "repo_id": "f9cd102c-a01c-faa8-7008-3882f901b045",
+      "name": "Word 文档集成模块",
+      "description": "ocr-docx-integration",
+      "prompt": "为 Word 文档集成模块创建详细的技术文档。深入介绍如何将 OCR 识别结果插入到现有的 Word 文档中。详细说明 DOCX 文件解析、XML 结构操作和段落插入技术。文档化文本样式保持、格式继承和布局适配策略。解释图片替换、表格处理和批注添加功能。说明与 LibreOffice 或 Microsoft Office 的兼容性考虑。提供具体的 Word 文档处理示例，包括模板填充、批量处理和样式定制。包含文档结构验证、错误恢复机制和数据完整性保证。文档化与外部依赖（如 docx-preview）的集成方式和版本兼容性要求。",
+      "progress_status": "completed",
+      "dependent_files": "app/src/tools/ocr/core/docx.js",
+      "gmt_create": "2026-10-10T09:02:19Z",
+      "gmt_modified": "2026-10-10T09:02:19Z",
+      "parent_id": "d58742bf-665d-4731-bf10-2e2bec92a560",
+      "layer_level": 2,
+      "order": 3,
+      "kk_dependent_files": [
+        "app/src/tools/ocr/core/docx.js"
+      ]
+    },
+    {
+      "id": "5dca700b-72d1-4a40-977f-5337fc424377",
+      "repo_id": "f9cd102c-a01c-faa8-7008-3882f901b045",
+      "name": "LibreOffice 集成",
+      "description": "libreoffice-integration",
+      "prompt": "为 LibreOffice 文档转换引擎集成创建详细的技术文档。深入介绍 LibreOffice 在文档格式转换中的集成方式，包括进程调用、参数传递和结果处理。详细说明各种文档格式的转换流程，包括 Word、Excel、PowerPoint 到 PDF 的转换过程。文档化进程管理策略，包括进程池、超时控制和资源清理。解释文件格式检测和自动选择逻辑，以及转换参数的动态构建。说明错误处理和降级机制，当 LibreOffice 不可用时的备选方案。详细介绍内存管理和大文件处理策略。包含性能优化建议，如并发转换限制和缓存机制。提供部署指南，包括 LibreOffice 的安装要求和环境配置。包含故障排除指南，涵盖进程启动失败、格式不支持和转换失败的解决方案。",
+      "progress_status": "completed",
+      "dependent_files": "app/src/tools/pdf-convert/core/build.js,app/src/tools/doc-convert/core/plan.mjs",
+      "gmt_create": "2026-10-10T09:02:19Z",
+      "gmt_modified": "2026-10-10T09:02:19Z",
+      "parent_id": "92f2a93e-3ac0-4082-ad95-37563fea985b",
+      "layer_level": 1,
+      "order": 4,
+      "kk_dependent_files": [
+        "app/src/tools/pdf-convert/core/build.js",
+        "app/src/tools/doc-convert/core/plan.mjs"
+      ]
+    },
+    {
+      "id": "7f4ae176-31e0-44ac-a981-6b722d0a475b",
+      "repo_id": "f9cd102c-a01c-faa8-7008-3882f901b045",
+      "name": "设置管理模块",
+      "description": "settings-manager",
+      "prompt": "为设置管理模块创建详细的 API 文档。解释全局设置的存储机制和生命周期管理，包括 loadSettings、getSettings、reloadSettings、updateSettings 和 resetSettings 等核心函数。详细说明 DEFAULT_SETTINGS 默认配置项的含义和用途，包括图片混淆参数、输出目录、导航排序、主题设置和视频下载配置等。深入解释绿色版约定下的 userdata/settings.json 文件存储方式，以及配置的持久化和同步机制。提供具体的代码示例，展示如何读取用户偏好、更新配置选项和重置到默认值。说明设置变更的响应式更新机制，确保界面能够及时反映最新的配置状态。文档化错误处理策略，包括配置文件损坏、权限问题等异常情况的处理方法。包含与其他模块的设置依赖关系和最佳实践指导。",
+      "progress_status": "completed",
+      "dependent_files": "app/src/shared/settings.js",
+      "gmt_create": "2026-10-10T09:02:19Z",
+      "gmt_modified": "2026-10-10T09:02:19Z",
+      "parent_id": "f435c2f5-4d6d-4133-9508-ea6079066f0b",
+      "layer_level": 1,
+      "order": 4,
+      "kk_dependent_files": [
+        "app/src/shared/settings.js"
+      ]
+    },
+    {
+      "id": "cfc3e083-01fa-452e-9c3a-ff0dc29ba3af",
+      "repo_id": "f9cd102c-a01c-faa8-7008-3882f901b045",
+      "name": "批量重命名",
+      "description": "batch-rename",
+      "prompt": "为批量重命名工具创建详细文档。深入解释四种重命名模式（序号、查找替换、加前后缀、按日期）的实现逻辑和适用场景。详细介绍排序方式对序号分配的影响，包括修改时间排序的规则。文档化冲突处理机制，说明跳过、替换、自动编号三种策略的执行流程。提供复杂重命名场景的操作示例，包括文件名合法性校验和批量处理的性能优化。说明两阶段改名的安全机制和主进程 fs:rename-batch 接口的调用方式。",
+      "progress_status": "completed",
+      "dependent_files": "app/src/tools/batch-rename/core/plan.js",
+      "gmt_create": "2026-10-10T09:02:19Z",
+      "gmt_modified": "2026-10-10T09:02:19Z",
+      "parent_id": "dcd487e8-4a84-49d0-a942-fb34394b1562",
+      "layer_level": 1,
+      "order": 4,
+      "kk_dependent_files": [
+        "app/src/tools/batch-rename/core/plan.js"
+      ]
+    },
+    {
+      "id": "dcd487e8-4a84-49d0-a942-fb34394b1562",
+      "repo_id": "f9cd102c-a01c-faa8-7008-3882f901b045",
+      "name": "图片处理工具",
+      "description": "image-tools",
+      "prompt": "为图片处理工具组创建综合性文档。详细介绍九个图片相关工具的功能和使用方法，包括核心的图片混淆功能、图片压缩优化、AI 增强修复、格式转换、批量重命名、水印添加、长图拼接、九宫格切图和文件藏图功能。解释每个工具的核心算法和技术实现，特别是图片混淆的多种变体算法。文档化工具的配置参数、输出选项和质量设置。提供实际的使用场景和操作流程示例，包括批量处理和自动化工作流。说明与共享图片模块 imageio.js 的集成方式和性能优化技巧。",
+      "progress_status": "completed",
+      "dependent_files": "app/src/tools/obfuscate/core/engine.js,app/src/tools/compress/core/compress.js,app/src/tools/enhance/core/enhance.js,app/src/tools/convert/core/convert.js,app/src/tools/batch-rename/core/plan.js,app/src/tools/watermark/core/draw.js,app/src/tools/stitch/core/plan.js,app/src/tools/grid-slice/core/plan.js,app/src/tools/imghide/core/engine.mjs",
+      "gmt_create": "2026-10-10T09:02:19Z",
+      "gmt_modified": "2026-10-10T09:02:19Z",
+      "order": 4,
+      "kk_dependent_files": [
+        "app/src/tools/obfuscate/core/engine.js",
+        "app/src/tools/compress/core/compress.js",
+        "app/src/tools/enhance/core/enhance.js",
+        "app/src/tools/convert/core/convert.js",
+        "app/src/tools/batch-rename/core/plan.js",
+        "app/src/tools/watermark/core/draw.js",
+        "app/src/tools/stitch/core/plan.js",
+        "app/src/tools/grid-slice/core/plan.js",
+        "app/src/tools/imghide/core/engine.mjs"
+      ]
+    },
+    {
+      "id": "fdfbf4ef-6406-46f1-a2a6-8f7868726aed",
+      "repo_id": "f9cd102c-a01c-faa8-7008-3882f901b045",
+      "name": "动图与视频互转",
+      "description": "sticker-video",
+      "prompt": "为动图与视频互转工具创建详细的技术文档。深入介绍 GIF 和视频之间的双向转换机制，包括帧提取、颜色量化和动画优化算法。详细说明转换计划的生成逻辑，包括帧率调整、尺寸缩放和质量控制参数。文档化与 FFmpeg 的集成方式，包括视频到 GIF 的编码流程和 GIF 到视频的解码过程。解释颜色优化策略，包括调色板生成、抖动算法和透明通道处理。提供转换质量优化建议，包括文件大小控制、播放流畅度和视觉效果平衡。包含常见问题的解决方案，如转换后文件大小过大、颜色失真、播放卡顿等问题的处理方法。",
+      "progress_status": "completed",
+      "dependent_files": "app/src/tools/sticker/core/plan.js,app/src/tools/sticker/index.js,app/src/tools/sticker/ui.js,app/src/tools/sticker/styles.css",
+      "gmt_create": "2026-10-10T09:02:19Z",
+      "gmt_modified": "2026-10-10T09:02:19Z",
+      "parent_id": "8c0a1118-f6a7-45d9-8f43-3e2032845eb0",
+      "layer_level": 1,
+      "order": 4,
+      "kk_dependent_files": [
+        "app/src/tools/sticker/core/plan.js",
+        "app/src/tools/sticker/index.js",
+        "app/src/tools/sticker/ui.js",
+        "app/src/tools/sticker/styles.css"
+      ]
+    },
+    {
+      "id": "fe36d1b9-99a2-4011-a34e-d646ad960bca",
+      "repo_id": "f9cd102c-a01c-faa8-7008-3882f901b045",
+      "name": "系统集成层",
+      "description": "system-integration",
+      "prompt": "为番茄混淆桌面版创建系统集成层文档。详细说明主进程如何处理系统级功能：文件对话框集成、剪贴板操作、原生主题管理、窗口管理等。解释自定义协议的实现：tomato-media:// 协议的注册和使用，支持视频流的 Range 请求和分块传输。描述外部进程管理：child_process.spawn 的使用，ffmpeg、7-Zip、LibreOffice 等第三方工具的进程控制和监控。说明平台特定功能的适配：Windows 特有的 UAC 提权、注册表操作、文件关联等。介绍测试模式的设计：各种 --test 参数的处理和自动化测试支持。解释绿色版的实现：PORTABLE_DIR 和用户数据目录的管理策略。",
+      "progress_status": "completed",
+      "dependent_files": "app/main.js",
+      "gmt_create": "2026-10-10T09:02:19Z",
+      "gmt_modified": "2026-10-10T09:02:19Z",
+      "parent_id": "932ca1ef-316e-4a70-be82-61d7fedd857b",
+      "layer_level": 1,
+      "order": 4,
+      "kk_dependent_files": [
+        "app/main.js"
+      ]
+    },
+    {
+      "id": "56b32002-8e3d-413a-930a-ae277911eff9",
+      "repo_id": "f9cd102c-a01c-faa8-7008-3882f901b045",
+      "name": "AI 超分引擎",
+      "description": "ai-super-resolution",
+      "prompt": "为 AI 超分辨率引擎集成创建详细的技术文档。深入介绍 ONNX Runtime 推理引擎的集成方式，包括模型加载、推理执行和资源管理。详细说明图片增强功能的实现原理，包括模型选择、参数配置和结果后处理。文档化推理性能优化，包括批处理、内存管理和 GPU 加速选项。解释模型文件的组织结构和管理策略，包括版本控制和更新机制。说明错误处理和降级策略，当 AI 模型不可用时的回退方案。详细介绍与图像处理模块的集成，包括像素数据格式转换和结果合并。包含性能基准测试结果和优化建议。提供部署指南，包括依赖库安装和模型文件准备。包含故障排除指南，涵盖模型加载失败、推理超时和内存溢出的处理方法。",
+      "progress_status": "completed",
+      "dependent_files": "app/src/shared/imageio.js,app/main.js",
+      "gmt_create": "2026-10-10T09:02:19Z",
+      "gmt_modified": "2026-10-10T09:02:19Z",
+      "parent_id": "92f2a93e-3ac0-4082-ad95-37563fea985b",
+      "layer_level": 1,
+      "order": 5,
+      "kk_dependent_files": [
+        "app/src/shared/imageio.js",
+        "app/main.js"
+      ]
+    },
+    {
+      "id": "83ce4014-1cd0-46e3-a5e2-7f44252ab98e",
+      "repo_id": "f9cd102c-a01c-faa8-7008-3882f901b045",
+      "name": "任务队列模块",
+      "description": "task-queue",
+      "prompt": "为任务队列模块创建全面的 API 参考文档。详细介绍跨工具任务调度的核心机制，包括 createQueue、enqueue、runBatch、waitFor、list、clearDone 等关键函数。深入解释双通道并发模型（cpu/io），说明为什么 CPU 密集型任务串行执行而 I/O 密集型任务可以并行处理。详细说明任务生命周期管理，包括 queued、running、done、failed、canceled 五种状态的转换逻辑。提供具体的代码示例，展示如何创建队列、提交单任务和批量任务、订阅进度更新和处理任务完成事件。解释 LRU 保活策略与任务队列的协作关系，确保工具切换时后台任务不被意外取消。文档化任务结果数据结构、错误处理机制和取消策略。包含性能优化建议，如并发度调优、内存管理和批量任务的最佳实践。说明与 Electron 主进程的集成模式和调试技巧。",
+      "progress_status": "completed",
+      "dependent_files": "app/src/shared/taskqueue.js",
+      "gmt_create": "2026-10-10T09:02:19Z",
+      "gmt_modified": "2026-10-10T09:02:19Z",
+      "parent_id": "f435c2f5-4d6d-4133-9508-ea6079066f0b",
+      "layer_level": 1,
+      "order": 5,
+      "kk_dependent_files": [
+        "app/src/shared/taskqueue.js"
+      ]
+    },
+    {
+      "id": "8c0a1118-f6a7-45d9-8f43-3e2032845eb0",
+      "repo_id": "f9cd102c-a01c-faa8-7008-3882f901b045",
+      "name": "视频处理工具",
+      "description": "video-tools",
+      "prompt": "为视频处理工具组创建详细的技术文档。深入介绍五个视频相关工具：视频下载、播放器、格式转换、压缩和动图互转。重点说明视频下载功能作为唯一联网工具的架构设计，包括 yt-dlp 集成、浏览器解析器和多平台支持。文档化 FFmpeg 的封装使用和媒体处理管道。解释播放器的工作原理、编解码器支持和播放控制接口。详细说明视频格式转换的参数配置、质量设置和性能优化。提供故障排除指南，涵盖常见的编码问题、格式兼容性和网络下载失败的解决方案。",
+      "progress_status": "completed",
+      "dependent_files": "app/src/tools/videodl/core/downloader.mjs,app/src/tools/player/core/plan.js,app/src/tools/video-convert/core/plan.js,app/src/tools/video-compress/core/plan.js,app/src/tools/sticker/core/plan.js",
+      "gmt_create": "2026-10-10T09:02:19Z",
+      "gmt_modified": "2026-10-10T09:02:19Z",
+      "order": 5,
+      "kk_dependent_files": [
+        "app/src/tools/videodl/core/downloader.mjs",
+        "app/src/tools/player/core/plan.js",
+        "app/src/tools/video-convert/core/plan.js",
+        "app/src/tools/video-compress/core/plan.js",
+        "app/src/tools/sticker/core/plan.js"
+      ]
+    },
+    {
+      "id": "a98928e8-cb0f-4e1c-9a3b-47bb13a07959",
+      "repo_id": "f9cd102c-a01c-faa8-7008-3882f901b045",
+      "name": "水印添加",
+      "description": "watermark",
+      "prompt": "为水印工具创建详细文档。深入解释九宫格位置系统和平铺模式的水印布局算法，说明 WATERMARK_POSITIONS 的定义和坐标计算逻辑。详细介绍文字水印和图片水印的双重支持，包括字体渲染、透明度混合、旋转变换等像素绘制技术。文档化 WATERMARK_DEFAULTS 参数体系，解释 sizePercent、opacity、rotation、color、stroke 等参数的视觉效果和计算方法。提供不同类型水印的生成示例和自定义样式配置。说明 Canvas 绘制的性能优化技巧和跨平台兼容性考虑。",
+      "progress_status": "completed",
+      "dependent_files": "app/src/tools/watermark/core/draw.js",
+      "gmt_create": "2026-10-10T09:02:19Z",
+      "gmt_modified": "2026-10-10T09:02:19Z",
+      "parent_id": "dcd487e8-4a84-49d0-a942-fb34394b1562",
+      "layer_level": 1,
+      "order": 5,
+      "kk_dependent_files": [
+        "app/src/tools/watermark/core/draw.js"
+      ]
+    },
+    {
+      "id": "46966565-ac16-4347-a268-73c15b65a96f",
+      "repo_id": "f9cd102c-a01c-faa8-7008-3882f901b045",
+      "name": "HTML 转义工具",
+      "description": "html-escape",
+      "prompt": "为 HTML 转义工具创建简洁的 API 文档。详细介绍 escapeHtml 函数的功能和用法，说明如何将用户可控的值安全地嵌入到 innerHTML 模板中，防止 XSS 攻击和 HTML 结构破坏。解释支持的字符转义规则，包括 &、<、>、\"、' 等特殊字符的处理。提供具体的代码示例，展示在工具界面中安全显示文件名、密钥、错误消息等用户输入数据的正确方式。说明与 textContent 的区别和使用场景选择原则，强调优先使用 textContent 的简单直接方式。文档化该工具的安全考虑和最佳实践，帮助开发者避免常见的安全问题。包含实际的代码片段，展示在不同 UI 组件中的正确使用方法。",
+      "progress_status": "completed",
+      "dependent_files": "app/src/shared/htmlescape.js",
+      "gmt_create": "2026-10-10T09:02:19Z",
+      "gmt_modified": "2026-10-10T09:02:19Z",
+      "parent_id": "f435c2f5-4d6d-4133-9508-ea6079066f0b",
+      "layer_level": 1,
+      "order": 6,
+      "kk_dependent_files": [
+        "app/src/shared/htmlescape.js"
+      ]
+    },
+    {
+      "id": "91306f0b-9fb8-42be-91ac-518be6c7606c",
+      "repo_id": "f9cd102c-a01c-faa8-7008-3882f901b045",
+      "name": "音频处理工具",
+      "description": "audio-tools",
+      "prompt": "为音频处理工具组创建全面的功能文档。详细介绍三个音频工具：音频格式转换、音频剪辑编辑和语音转文字功能。解释音频格式转换支持的格式范围、编码参数和质量设置。深入说明音频编辑工具的波形可视化、剪辑区域选择和音频效果处理。文档化语音转文字功能的 ASR 集成、语言支持和转录精度优化。提供具体的使用示例，包括批量格式转换、精确音频剪辑和多语言语音识别。说明与 FFmpeg 的集成方式和音频处理的最佳实践。",
+      "progress_status": "completed",
+      "dependent_files": "app/src/tools/audio-convert/index.js,app/src/tools/audio-edit/core/waveform.js,app/src/tools/transcribe/core/plan.js",
+      "gmt_create": "2026-10-10T09:02:19Z",
+      "gmt_modified": "2026-10-10T09:02:19Z",
+      "order": 6,
+      "kk_dependent_files": [
+        "app/src/tools/audio-convert/index.js",
+        "app/src/tools/audio-edit/core/waveform.js",
+        "app/src/tools/transcribe/core/plan.js"
+      ]
+    },
+    {
+      "id": "a75321bd-ca05-402e-87eb-d4d2c0519fed",
+      "repo_id": "f9cd102c-a01c-faa8-7008-3882f901b045",
+      "name": "长图拼接",
+      "description": "image-stitch",
+      "prompt": "为长图拼接工具创建详细文档。深入解释竖拼和横拼两种方向的布局算法，说明对齐方式（居中、起始、末尾）在垂直于拼接方向轴线上的实现逻辑。详细介绍 MAX_CANVAS_EDGE 和 MAX_CANVAS_AREA 的安全限制设计，解释 Chromium 浏览器 canvas 上限的规避策略。文档化尺寸归一化和画布布局的计算过程，包括兼容 {width,height} 和 {w,h} 两种数据结构的处理。提供不同拼接场景的效果示例和性能优化建议。",
+      "progress_status": "completed",
+      "dependent_files": "app/src/tools/stitch/core/plan.js",
+      "gmt_create": "2026-10-10T09:02:19Z",
+      "gmt_modified": "2026-10-10T09:02:19Z",
+      "parent_id": "dcd487e8-4a84-49d0-a942-fb34394b1562",
+      "layer_level": 1,
+      "order": 6,
+      "kk_dependent_files": [
+        "app/src/tools/stitch/core/plan.js"
+      ]
+    },
+    {
+      "id": "67c3129a-d2ef-4e04-a5b0-506bd0aafc4e",
+      "repo_id": "f9cd102c-a01c-faa8-7008-3882f901b045",
+      "name": "文档处理工具",
+      "description": "document-tools",
+      "prompt": "为文档处理工具组创建详细的技术文档。深入介绍四个文档相关工具：PDF 转换编辑、文档格式转换和 OCR 文字识别。详细说明 PDF 工具的双向转换能力、页面操作和文档合并功能。解释 LibreOffice 集成的文档格式转换流程，支持的输入输出格式和转换质量设置。重点说明 OCR 功能的预处理算法、文字识别引擎集成和搜索结果生成。文档化 PDF 编辑的操作类型、页面管理和文档结构修改。提供实际的文档处理工作流示例，包括批量转换、OCR 后编辑和文档归档。",
+      "progress_status": "completed",
+      "dependent_files": "app/src/tools/pdf-convert/core/build.js,app/src/tools/pdf-edit/core/ops.js,app/src/tools/doc-convert/core/plan.mjs,app/src/tools/ocr/core/preprocess.js",
+      "gmt_create": "2026-10-10T09:02:19Z",
+      "gmt_modified": "2026-10-10T09:02:19Z",
+      "order": 7,
+      "kk_dependent_files": [
+        "app/src/tools/pdf-convert/core/build.js",
+        "app/src/tools/pdf-edit/core/ops.js",
+        "app/src/tools/doc-convert/core/plan.mjs",
+        "app/src/tools/ocr/core/preprocess.js"
+      ]
+    },
+    {
+      "id": "7d9d34eb-5300-49d8-88bb-2757743f64bf",
+      "repo_id": "f9cd102c-a01c-faa8-7008-3882f901b045",
+      "name": "九宫格切图",
+      "description": "grid-slice",
+      "prompt": "为九宫格切图工具创建详细文档。深入解释 GRID_PRESETS 预设方案的数学原理，说明 rows × cols 矩阵切分的坐标计算算法。详细介绍 MIN_CELL=8 的最小边长保护机制和 MAX_LINES=20 的最大行列数限制的安全设计。文档化编号命名规则，解释两位补零的排序保证和超过 99 后的自然扩展逻辑。提供不同网格配置的切分示例和体积估算方法。说明 OffscreenCanvas 裁切编码的性能优势和内存管理策略。",
+      "progress_status": "completed",
+      "dependent_files": "app/src/tools/grid-slice/core/plan.js",
+      "gmt_create": "2026-10-10T09:02:19Z",
+      "gmt_modified": "2026-10-10T09:02:19Z",
+      "parent_id": "dcd487e8-4a84-49d0-a942-fb34394b1562",
+      "layer_level": 1,
+      "order": 7,
+      "kk_dependent_files": [
+        "app/src/tools/grid-slice/core/plan.js"
+      ]
+    },
+    {
+      "id": "f84fd4f2-0f33-4cd7-bc5e-1b149549e371",
+      "repo_id": "f9cd102c-a01c-faa8-7008-3882f901b045",
+      "name": "唯一路径生成器",
+      "description": "unique-path",
+      "prompt": "为唯一路径生成器创建详细的 API 文档。深入解释 uniqueTargetPath 函数的实现原理，包括原子文件占位机制（openSync with 'wx' flag）如何避免并发竞争条件导致的文件覆盖问题。详细说明文件名冲突解决策略：原名 → 原名(1) → 原名(2) 的递增命名规则。解释为什么不能使用简单的 existsSync 探测方法，以及在任务队列 io 通道并发度为 2 时的竞态条件风险。提供具体的代码示例，展示在主进程中如何正确使用该函数生成安全的输出路径。说明目录自动创建机制和错误处理策略，包括 EEXIST 错误的处理和传播。文档化与任务队列的协作模式，解释 0 字节占位文件的清理责任归属。包含性能考虑和最佳实践，特别是在批量文件处理场景中的使用建议。",
+      "progress_status": "completed",
+      "dependent_files": "app/src/shared/unique-target-path.cjs",
+      "gmt_create": "2026-10-10T09:02:19Z",
+      "gmt_modified": "2026-10-10T09:02:19Z",
+      "parent_id": "f435c2f5-4d6d-4133-9508-ea6079066f0b",
+      "layer_level": 1,
+      "order": 7,
+      "kk_dependent_files": [
+        "app/src/shared/unique-target-path.cjs"
+      ]
+    },
+    {
+      "id": "7694f7fa-dded-4567-91da-d0712bad2919",
+      "repo_id": "f9cd102c-a01c-faa8-7008-3882f901b045",
+      "name": "压缩解压工具",
+      "description": "archive-tool",
+      "prompt": "为压缩解压工具创建全面的技术文档。详细介绍 7-Zip 集成的多格式压缩解压功能，支持 13 种格式的单向或双向转换。解释文件格式检测算法、压缩参数配置和解压选项设置。文档化分卷压缩、密码保护和增量更新的实现细节。说明压缩算法的选择策略、性能优化和内存管理。提供常见的使用场景示例，包括大文件处理、批量压缩和自动化归档工作流。包含故障排除指南，涵盖损坏文件恢复、密码错误和格式兼容性问题的解决方案。",
+      "progress_status": "completed",
+      "dependent_files": "app/src/tools/archive/core/engine.mjs,app/src/tools/archive/core/formats.mjs,app/src/tools/archive/core/params.mjs,app/src/tools/archive/core/plan.mjs",
+      "gmt_create": "2026-10-10T09:02:19Z",
+      "gmt_modified": "2026-10-10T09:02:19Z",
+      "order": 8,
+      "kk_dependent_files": [
+        "app/src/tools/archive/core/engine.mjs",
+        "app/src/tools/archive/core/formats.mjs",
+        "app/src/tools/archive/core/params.mjs",
+        "app/src/tools/archive/core/plan.mjs"
+      ]
+    },
+    {
+      "id": "e80bca66-c148-4a3a-9ece-aab301d050cc",
+      "repo_id": "f9cd102c-a01c-faa8-7008-3882f901b045",
+      "name": "文件藏图",
+      "description": "imghide",
+      "prompt": "为文件藏图工具创建详细文档。深入解释三层架构设计：engine.mjs 负责文件系统操作、format.mjs 处理 PNG/GIF 文件格式和载荷构建、crypto.mjs 实现密码加密解密。详细说明 PNG 和 GIF 载体的嵌入提取算法，包括 IDAT 数据块处理和动态载荷支持。文档化 uniqueTargetPath 的重名避让机制和 .part 临时文件的原子写入策略。解释 Windows 抖动问题的重试机制和 EPERM 错误的处理方法。提供藏图和取图的完整流程示例，包括密码保护和数据安全考虑。",
+      "progress_status": "completed",
+      "dependent_files": "app/src/tools/imghide/core/engine.mjs,app/src/tools/imghide/core/format.mjs,app/src/tools/imghide/core/crypto.mjs",
+      "gmt_create": "2026-10-10T09:02:19Z",
+      "gmt_modified": "2026-10-10T09:02:19Z",
+      "parent_id": "dcd487e8-4a84-49d0-a942-fb34394b1562",
+      "layer_level": 1,
+      "order": 8,
+      "kk_dependent_files": [
+        "app/src/tools/imghide/core/engine.mjs",
+        "app/src/tools/imghide/core/format.mjs",
+        "app/src/tools/imghide/core/crypto.mjs"
+      ]
+    },
+    {
+      "id": "e59c7510-ce74-4b9e-b876-477e053b5d08",
+      "repo_id": "f9cd102c-a01c-faa8-7008-3882f901b045",
+      "name": "系统工具",
+      "description": "system-tool",
+      "prompt": "为系统工具模块创建详细的技术文档。深入介绍软件卸载功能的实现原理，包括系统注册表扫描、程序列表获取和卸载流程自动化。解释与 Windows 系统的集成方式、权限要求和安全性考虑。文档化工具的配置选项、卸载参数和安全验证机制。提供使用示例和最佳实践，包括批量卸载、静默安装和卸载结果验证。说明潜在的系统风险、权限提升需求和用户确认机制。包含故障排除指南，涵盖权限不足、卸载失败和系统兼容性问题的解决方案。",
+      "progress_status": "completed",
+      "dependent_files": "app/src/tools/uninstall/core/launch.mjs",
+      "gmt_create": "2026-10-10T09:02:19Z",
+      "gmt_modified": "2026-10-10T09:02:19Z",
+      "order": 9,
+      "kk_dependent_files": [
+        "app/src/tools/uninstall/core/launch.mjs"
+      ]
+    },
+    {
+      "id": "f435c2f5-4d6d-4133-9508-ea6079066f0b",
+      "repo_id": "f9cd102c-a01c-faa8-7008-3882f901b045",
+      "name": "共享模块",
+      "description": "shared-modules",
+      "prompt": "为共享模块创建全面的 API 参考文档。详细介绍八个核心共享模块的功能接口和使用方法，包括图片编解码、FFmpeg 封装、HEIC 格式支持、PDF 操作、设置管理、任务队列、HTML 转义和路径去重。为每个模块提供详细的 API 文档，包括函数签名、参数说明、返回值类型和异常处理。解释模块间的依赖关系和数据流转。提供具体的代码示例，展示如何在工具中正确调用这些共享功能。文档化性能考虑、内存管理和错误处理的最佳实践。说明模块的版本兼容性和向后兼容性保证。",
+      "progress_status": "completed",
+      "dependent_files": "app/src/shared/imageio.js,app/src/shared/ffmpeg.js,app/src/shared/heic.js,app/src/shared/pdfops.js,app/src/shared/settings.js,app/src/shared/taskqueue.js,app/src/shared/htmlescape.js,app/src/shared/unique-target-path.cjs",
+      "gmt_create": "2026-10-10T09:02:19Z",
+      "gmt_modified": "2026-10-10T09:02:19Z",
+      "order": 10,
+      "kk_dependent_files": [
+        "app/src/shared/imageio.js",
+        "app/src/shared/ffmpeg.js",
+        "app/src/shared/heic.js",
+        "app/src/shared/pdfops.js",
+        "app/src/shared/settings.js",
+        "app/src/shared/taskqueue.js",
+        "app/src/shared/htmlescape.js",
+        "app/src/shared/unique-target-path.cjs"
+      ]
+    },
+    {
+      "id": "92f2a93e-3ac0-4082-ad95-37563fea985b",
+      "repo_id": "f9cd102c-a01c-faa8-7008-3882f901b045",
+      "name": "外部引擎集成",
+      "description": "external-engines",
+      "prompt": "为外部引擎集成创建详细的技术文档。深入介绍各种第三方工具和引擎的集成方式，包括 FFmpeg、LibreOffice、7-Zip、yt-dlp、OCR 引擎和 AI 超分引擎。详细说明每种引擎的安装要求、配置方法和调用接口。解释进程管理、资源监控和错误处理机制。文档化引擎的版本兼容性、更新策略和降级处理。提供性能调优指南，包括并行处理、内存限制和资源清理。包含故障排除指南，涵盖引擎启动失败、执行超时和输出异常的解决方案。说明安全考虑和沙箱隔离机制。",
+      "progress_status": "completed",
+      "dependent_files": "app/src/shared/ffmpeg.js,app/src/tools/pdf-convert/core/build.js,app/src/tools/archive/core/engine.mjs,app/src/tools/videodl/core/downloader.mjs,app/src/tools/ocr/core/preprocess.js",
+      "gmt_create": "2026-10-10T09:02:19Z",
+      "gmt_modified": "2026-10-10T09:02:19Z",
+      "order": 11,
+      "kk_dependent_files": [
+        "app/src/shared/ffmpeg.js",
+        "app/src/tools/pdf-convert/core/build.js",
+        "app/src/tools/archive/core/engine.mjs",
+        "app/src/tools/videodl/core/downloader.mjs",
+        "app/src/tools/ocr/core/preprocess.js"
+      ]
+    },
+    {
+      "id": "076d9f0e-adeb-4b2d-9b97-7ef4c5bed07f",
+      "repo_id": "f9cd102c-a01c-faa8-7008-3882f901b045",
+      "name": "安全设计",
+      "description": "security-design",
+      "prompt": "为安全设计创建全面的技术文档。详细解释 IPC 白名单机制的实现原理，说明如何通过预加载脚本建立安全边界。文档化文件权限控制、网络安全考虑和隐私保护机制。解释敏感数据的加密存储、传输安全和访问控制。说明 XSS 防护、CSRF 防护和输入验证策略。提供安全配置指南，包括环境变量管理、证书验证和代理设置。包含安全审计清单、漏洞扫描和渗透测试建议。说明安全事件响应、日志记录和监控告警机制。",
+      "progress_status": "completed",
+      "dependent_files": "app/preload.js,app/src/shell/shell.js,app/src/shared/settings.js",
+      "gmt_create": "2026-10-10T09:02:19Z",
+      "gmt_modified": "2026-10-10T09:02:19Z",
+      "order": 12,
+      "kk_dependent_files": [
+        "app/preload.js",
+        "app/src/shell/shell.js",
+        "app/src/shared/settings.js"
+      ]
+    },
+    {
+      "id": "c8c48134-65a9-42ee-a317-ea2a2063beb0",
+      "repo_id": "f9cd102c-a01c-faa8-7008-3882f901b045",
+      "name": "测试与质量保证",
+      "description": "testing-quality",
+      "prompt": "为测试与质量保证创建全面的文档。详细介绍测试框架的选择、测试策略和测试组织结构。解释单元测试、集成测试和端到端测试的实施方法，包括自动化测试流程和持续集成配置。文档化测试覆盖率要求、性能基准测试和兼容性测试方案。说明 UI 自动化测试的实现，包括界面交互模拟、截图对比和功能验证。提供测试编写指南，包括测试用例设计、Mock 数据准备和断言最佳实践。包含质量门禁、代码审查和发布前检查清单。",
+      "progress_status": "completed",
+      "dependent_files": "app/tests/engine.test.mjs,app/tests/taskqueue.test.mjs,app/tests/archive.test.mjs,app/tests/imghide.test.mjs,app/tests/ui-test.js",
+      "gmt_create": "2026-10-10T09:02:19Z",
+      "gmt_modified": "2026-10-10T09:02:19Z",
+      "order": 13,
+      "kk_dependent_files": [
+        "app/tests/engine.test.mjs",
+        "app/tests/taskqueue.test.mjs",
+        "app/tests/archive.test.mjs",
+        "app/tests/imghide.test.mjs",
+        "app/tests/ui-test.js"
+      ]
+    },
+    {
+      "id": "8784d55f-8380-4cea-bf62-d4e47eb6ae5a",
+      "repo_id": "f9cd102c-a01c-faa8-7008-3882f901b045",
+      "name": "构建与部署",
+      "description": "build-deployment",
+      "prompt": "为构建与部署创建详细的操作文档。深入介绍开发环境的搭建步骤，包括 Node.js 版本要求、依赖安装和本地调试配置。详细说明构建流程，包括代码编译、资源打包和图标生成。解释打包配置选项、签名设置和分发渠道准备。文档化版本管理策略、更新机制和回滚方案。提供部署指南，包括安装包制作、自动更新服务器配置和用户升级流程。包含故障排除指南，涵盖构建失败、依赖冲突和部署异常的处理方法。",
+      "progress_status": "completed",
+      "dependent_files": "app/tools/pack.js,app/tools/make-icon.js,app/package.json",
+      "gmt_create": "2026-10-10T09:02:19Z",
+      "gmt_modified": "2026-10-10T09:02:19Z",
+      "order": 14,
+      "kk_dependent_files": [
+        "app/tools/pack.js",
+        "app/tools/make-icon.js",
+        "app/package.json"
+      ]
+    },
+    {
+      "id": "1cdf8463-b5ad-4fff-8524-abd83881e170",
+      "repo_id": "f9cd102c-a01c-faa8-7008-3882f901b045",
+      "name": "故障排除",
+      "description": "troubleshooting",
+      "prompt": "为故障排除创建全面的诊断指南。整理常见问题及其解决方案，包括应用启动失败、功能异常、性能问题和兼容性问题。详细说明日志收集和分析方法，包括日志位置、日志级别和关键错误信息解读。提供调试技巧和工具使用方法，包括 Electron DevTools 使用、IPC 消息调试和性能分析。解释错误恢复机制、数据备份和灾难恢复策略。包含性能优化建议，包括内存泄漏检测、CPU 使用率优化和磁盘 I/O 改进。提供社区支持渠道、问题报告模板和贡献指南。",
+      "progress_status": "completed",
+      "dependent_files": "app/main.js,app/preload.js,app/src/shared/settings.js",
+      "gmt_create": "2026-10-10T09:02:19Z",
+      "gmt_modified": "2026-10-10T09:02:19Z",
+      "order": 15,
+      "kk_dependent_files": [
+        "app/main.js",
+        "app/preload.js",
+        "app/src/shared/settings.js"
+      ]
+    }
+  ],
+  "wiki_items": [
+    {
+      "id": "3b0be518-299e-4fb2-a005-dac6614fb658",
+      "catalog_id": "3b0be518-299e-4fb2-a005-dac6614fb658",
+      "title": "项目概述",
+      "description": "project-overview",
+      "extend": "{}",
+      "progress_status": "completed",
+      "repo_id": "f9cd102c-a01c-faa8-7008-3882f901b045",
+      "reference_count": 0,
+      "gmt_create": "2026-10-10T09:02:19Z",
+      "gmt_modified": "2026-10-10T09:02:19Z"
+    },
+    {
+      "id": "5406a610-cc60-40b4-8351-6163fd0c8a45",
+      "catalog_id": "5406a610-cc60-40b4-8351-6163fd0c8a45",
+      "title": "工具注册机制",
+      "description": "tool-registration",
+      "extend": "{}",
+      "progress_status": "completed",
+      "repo_id": "f9cd102c-a01c-faa8-7008-3882f901b045",
+      "reference_count": 0,
+      "gmt_create": "2026-10-10T09:02:19Z",
+      "gmt_modified": "2026-10-10T09:02:19Z"
+    },
+    {
+      "id": "5d1cd129-e78a-42d6-8d07-bfec04928c16",
+      "catalog_id": "5d1cd129-e78a-42d6-8d07-bfec04928c16",
+      "title": "PDF 转换工具",
+      "description": "pdf-convert-tool",
+      "extend": "{}",
+      "progress_status": "completed",
+      "repo_id": "f9cd102c-a01c-faa8-7008-3882f901b045",
+      "reference_count": 0,
+      "gmt_create": "2026-10-10T09:02:19Z",
+      "gmt_modified": "2026-10-10T09:02:19Z"
+    },
+    {
+      "id": "8b412c51-1570-4379-a19d-c5d1f4ac529d",
+      "catalog_id": "8b412c51-1570-4379-a19d-c5d1f4ac529d",
+      "title": "工具箱框架",
+      "description": "toolbox-framework",
+      "extend": "{}",
+      "progress_status": "completed",
+      "repo_id": "f9cd102c-a01c-faa8-7008-3882f901b045",
+      "reference_count": 0,
+      "gmt_create": "2026-10-10T09:02:19Z",
+      "gmt_modified": "2026-10-10T09:02:19Z"
+    },
+    {
+      "id": "8c8918c4-b4e4-4be2-8419-bbd1c1b2f852",
+      "catalog_id": "8c8918c4-b4e4-4be2-8419-bbd1c1b2f852",
+      "title": "Electron 双进程模型",
+      "description": "electron-process-model",
+      "extend": "{}",
+      "progress_status": "completed",
+      "repo_id": "f9cd102c-a01c-faa8-7008-3882f901b045",
+      "reference_count": 0,
+      "gmt_create": "2026-10-10T09:02:19Z",
+      "gmt_modified": "2026-10-10T09:02:19Z"
+    },
+    {
+      "id": "a56a7329-2af2-4246-9edc-400c486aea19",
+      "catalog_id": "a56a7329-2af2-4246-9edc-400c486aea19",
+      "title": "图片编解码模块",
+      "description": "imageio-module",
+      "extend": "{}",
+      "progress_status": "completed",
+      "repo_id": "f9cd102c-a01c-faa8-7008-3882f901b045",
+      "reference_count": 0,
+      "gmt_create": "2026-10-10T09:02:19Z",
+      "gmt_modified": "2026-10-10T09:02:19Z"
+    },
+    {
+      "id": "b354a828-941e-4a22-bf64-95bcc5af6037",
+      "catalog_id": "b354a828-941e-4a22-bf64-95bcc5af6037",
+      "title": "视频下载工具",
+      "description": "video-download",
+      "extend": "{}",
+      "progress_status": "completed",
+      "repo_id": "f9cd102c-a01c-faa8-7008-3882f901b045",
+      "reference_count": 0,
+      "gmt_create": "2026-10-10T09:02:19Z",
+      "gmt_modified": "2026-10-10T09:02:19Z"
+    },
+    {
+      "id": "c38b928b-3986-429b-b72c-b5e8ea6fcdf6",
+      "catalog_id": "c38b928b-3986-429b-b72c-b5e8ea6fcdf6",
+      "title": "FFmpeg 集成",
+      "description": "ffmpeg-integration",
+      "extend": "{}",
+      "progress_status": "completed",
+      "repo_id": "f9cd102c-a01c-faa8-7008-3882f901b045",
+      "reference_count": 0,
+      "gmt_create": "2026-10-10T09:02:19Z",
+      "gmt_modified": "2026-10-10T09:02:19Z"
+    },
+    {
+      "id": "d46ed682-dc7c-4464-8e4b-5d8296c48b90",
+      "catalog_id": "d46ed682-dc7c-4464-8e4b-5d8296c48b90",
+      "title": "图片混淆（核心功能）",
+      "description": "image-obfuscate",
+      "extend": "{}",
+      "progress_status": "completed",
+      "repo_id": "f9cd102c-a01c-faa8-7008-3882f901b045",
+      "reference_count": 0,
+      "gmt_create": "2026-10-10T09:02:19Z",
+      "gmt_modified": "2026-10-10T09:02:19Z"
+    },
+    {
+      "id": "eb6e3422-594a-4f98-bb7c-61864a91d040",
+      "catalog_id": "eb6e3422-594a-4f98-bb7c-61864a91d040",
+      "title": "扫描件预处理模块",
+      "description": "ocr-preprocessing",
+      "extend": "{}",
+      "progress_status": "completed",
+      "repo_id": "f9cd102c-a01c-faa8-7008-3882f901b045",
+      "reference_count": 0,
+      "gmt_create": "2026-10-10T09:02:19Z",
+      "gmt_modified": "2026-10-10T09:02:19Z"
+    },
+    {
+      "id": "10abb6da-4360-48cf-8263-0f347f0791da",
+      "catalog_id": "10abb6da-4360-48cf-8263-0f347f0791da",
+      "title": "FFmpeg 封装模块",
+      "description": "ffmpeg-wrapper",
+      "extend": "{}",
+      "progress_status": "completed",
+      "repo_id": "f9cd102c-a01c-faa8-7008-3882f901b045",
+      "reference_count": 0,
+      "gmt_create": "2026-10-10T09:02:19Z",
+      "gmt_modified": "2026-10-10T09:02:19Z"
+    },
+    {
+      "id": "3299e14c-a7e4-4034-a102-953d47d63f45",
+      "catalog_id": "3299e14c-a7e4-4034-a102-953d47d63f45",
+      "title": "图片压缩优化",
+      "description": "image-compress",
+      "extend": "{}",
+      "progress_status": "completed",
+      "repo_id": "f9cd102c-a01c-faa8-7008-3882f901b045",
+      "reference_count": 0,
+      "gmt_create": "2026-10-10T09:02:19Z",
+      "gmt_modified": "2026-10-10T09:02:19Z"
+    },
+    {
+      "id": "3ea4cce1-f8b7-4666-aada-54374e5bc1f5",
+      "catalog_id": "3ea4cce1-f8b7-4666-aada-54374e5bc1f5",
+      "title": "安全边界设计",
+      "description": "security-boundary",
+      "extend": "{}",
+      "progress_status": "completed",
+      "repo_id": "f9cd102c-a01c-faa8-7008-3882f901b045",
+      "reference_count": 0,
+      "gmt_create": "2026-10-10T09:02:19Z",
+      "gmt_modified": "2026-10-10T09:02:19Z"
+    },
+    {
+      "id": "825fab74-90b0-4700-8ef5-099337c71b80",
+      "catalog_id": "825fab74-90b0-4700-8ef5-099337c71b80",
+      "title": "工具注册机制",
+      "description": "tool-registry",
+      "extend": "{}",
+      "progress_status": "completed",
+      "repo_id": "f9cd102c-a01c-faa8-7008-3882f901b045",
+      "reference_count": 0,
+      "gmt_create": "2026-10-10T09:02:19Z",
+      "gmt_modified": "2026-10-10T09:02:19Z"
+    },
+    {
+      "id": "8c12760b-014d-4b04-a591-885596cfd17a",
+      "catalog_id": "8c12760b-014d-4b04-a591-885596cfd17a",
+      "title": "PDF 编辑工具",
+      "description": "pdf-edit-tool",
+      "extend": "{}",
+      "progress_status": "completed",
+      "repo_id": "f9cd102c-a01c-faa8-7008-3882f901b045",
+      "reference_count": 0,
+      "gmt_create": "2026-10-10T09:02:19Z",
+      "gmt_modified": "2026-10-10T09:02:19Z"
+    },
+    {
+      "id": "932ca1ef-316e-4a70-be82-61d7fedd857b",
+      "catalog_id": "932ca1ef-316e-4a70-be82-61d7fedd857b",
+      "title": "架构设计",
+      "description": "architecture-design",
+      "extend": "{}",
+      "progress_status": "completed",
+      "repo_id": "f9cd102c-a01c-faa8-7008-3882f901b045",
+      "reference_count": 0,
+      "gmt_create": "2026-10-10T09:02:19Z",
+      "gmt_modified": "2026-10-10T09:02:19Z"
+    },
+    {
+      "id": "99023695-68c4-48fd-b28c-d710b55b03e0",
+      "catalog_id": "99023695-68c4-48fd-b28c-d710b55b03e0",
+      "title": "7-Zip 集成",
+      "description": "7zip-integration",
+      "extend": "{}",
+      "progress_status": "completed",
+      "repo_id": "f9cd102c-a01c-faa8-7008-3882f901b045",
+      "reference_count": 0,
+      "gmt_create": "2026-10-10T09:02:19Z",
+      "gmt_modified": "2026-10-10T09:02:19Z"
+    },
+    {
+      "id": "b98b0148-5d27-455e-ae38-b83b749eb819",
+      "catalog_id": "b98b0148-5d27-455e-ae38-b83b749eb819",
+      "title": "OCR 结果转换模块",
+      "description": "ocr-conversion",
+      "extend": "{}",
+      "progress_status": "completed",
+      "repo_id": "f9cd102c-a01c-faa8-7008-3882f901b045",
+      "reference_count": 0,
+      "gmt_create": "2026-10-10T09:02:19Z",
+      "gmt_modified": "2026-10-10T09:02:19Z"
+    },
+    {
+      "id": "d0352020-2598-422f-bbca-2ab19ce30565",
+      "catalog_id": "d0352020-2598-422f-bbca-2ab19ce30565",
+      "title": "工具生命周期管理",
+      "description": "lifecycle-management",
+      "extend": "{}",
+      "progress_status": "completed",
+      "repo_id": "f9cd102c-a01c-faa8-7008-3882f901b045",
+      "reference_count": 0,
+      "gmt_create": "2026-10-10T09:02:19Z",
+      "gmt_modified": "2026-10-10T09:02:19Z"
+    },
+    {
+      "id": "fc52dc2f-4ca4-4604-83c4-9c2599aba6c1",
+      "catalog_id": "fc52dc2f-4ca4-4604-83c4-9c2599aba6c1",
+      "title": "视频播放器",
+      "description": "video-player",
+      "extend": "{}",
+      "progress_status": "completed",
+      "repo_id": "f9cd102c-a01c-faa8-7008-3882f901b045",
+      "reference_count": 0,
+      "gmt_create": "2026-10-10T09:02:19Z",
+      "gmt_modified": "2026-10-10T09:02:19Z"
+    },
+    {
+      "id": "23a1a5af-be1c-4f1c-a102-d1390bcca70b",
+      "catalog_id": "23a1a5af-be1c-4f1c-a102-d1390bcca70b",
+      "title": "导航排序系统",
+      "description": "navigation-sorting",
+      "extend": "{}",
+      "progress_status": "completed",
+      "repo_id": "f9cd102c-a01c-faa8-7008-3882f901b045",
+      "reference_count": 0,
+      "gmt_create": "2026-10-10T09:02:19Z",
+      "gmt_modified": "2026-10-10T09:02:19Z"
+    },
+    {
+      "id": "5b28cb1e-26d3-46f7-8580-a9f4de9da7ac",
+      "catalog_id": "5b28cb1e-26d3-46f7-8580-a9f4de9da7ac",
+      "title": "HEIC 格式支持模块",
+      "description": "heic-support",
+      "extend": "{}",
+      "progress_status": "completed",
+      "repo_id": "f9cd102c-a01c-faa8-7008-3882f901b045",
+      "reference_count": 0,
+      "gmt_create": "2026-10-10T09:02:19Z",
+      "gmt_modified": "2026-10-10T09:02:19Z"
+    },
+    {
+      "id": "66ba0f6a-503b-4456-a206-74d7ec3ae627",
+      "catalog_id": "66ba0f6a-503b-4456-a206-74d7ec3ae627",
+      "title": "文档格式转换工具",
+      "description": "doc-convert-tool",
+      "extend": "{}",
+      "progress_status": "completed",
+      "repo_id": "f9cd102c-a01c-faa8-7008-3882f901b045",
+      "reference_count": 0,
+      "gmt_create": "2026-10-10T09:02:19Z",
+      "gmt_modified": "2026-10-10T09:02:19Z"
+    },
+    {
+      "id": "7ca05951-3be2-4afc-8237-c040aa2862d2",
+      "catalog_id": "7ca05951-3be2-4afc-8237-c040aa2862d2",
+      "title": "可搜索文档生成模块",
+      "description": "ocr-searchable-documents",
+      "extend": "{}",
+      "progress_status": "completed",
+      "repo_id": "f9cd102c-a01c-faa8-7008-3882f901b045",
+      "reference_count": 0,
+      "gmt_create": "2026-10-10T09:02:19Z",
+      "gmt_modified": "2026-10-10T09:02:19Z"
+    },
+    {
+      "id": "7d75d25b-b729-4ea8-8999-4712a1ed4029",
+      "catalog_id": "7d75d25b-b729-4ea8-8999-4712a1ed4029",
+      "title": "视频格式转换",
+      "description": "video-convert",
+      "extend": "{}",
+      "progress_status": "completed",
+      "repo_id": "f9cd102c-a01c-faa8-7008-3882f901b045",
+      "reference_count": 0,
+      "gmt_create": "2026-10-10T09:02:19Z",
+      "gmt_modified": "2026-10-10T09:02:19Z"
+    },
+    {
+      "id": "9a08a00f-1945-460c-9b4d-5d9e49b9a99f",
+      "catalog_id": "9a08a00f-1945-460c-9b4d-5d9e49b9a99f",
+      "title": "图片增强修复",
+      "description": "image-enhance",
+      "extend": "{}",
+      "progress_status": "completed",
+      "repo_id": "f9cd102c-a01c-faa8-7008-3882f901b045",
+      "reference_count": 0,
+      "gmt_create": "2026-10-10T09:02:19Z",
+      "gmt_modified": "2026-10-10T09:02:19Z"
+    },
+    {
+      "id": "a242c8ac-4c32-4fca-aafe-90e97748b28c",
+      "catalog_id": "a242c8ac-4c32-4fca-aafe-90e97748b28c",
+      "title": "核心框架",
+      "description": "core-framework",
+      "extend": "{}",
+      "progress_status": "completed",
+      "repo_id": "f9cd102c-a01c-faa8-7008-3882f901b045",
+      "reference_count": 0,
+      "gmt_create": "2026-10-10T09:02:19Z",
+      "gmt_modified": "2026-10-10T09:02:19Z"
+    },
+    {
+      "id": "e22db193-07fa-438d-9f0e-76665a5ec85f",
+      "catalog_id": "e22db193-07fa-438d-9f0e-76665a5ec85f",
+      "title": "yt-dlp 集成",
+      "description": "yt-dlp-integration",
+      "extend": "{}",
+      "progress_status": "completed",
+      "repo_id": "f9cd102c-a01c-faa8-7008-3882f901b045",
+      "reference_count": 0,
+      "gmt_create": "2026-10-10T09:02:19Z",
+      "gmt_modified": "2026-10-10T09:02:19Z"
+    },
+    {
+      "id": "e6d66999-6f60-46d8-9d15-c8431ba12db2",
+      "catalog_id": "e6d66999-6f60-46d8-9d15-c8431ba12db2",
+      "title": "导航排序算法",
+      "description": "nav-sorting-algorithm",
+      "extend": "{}",
+      "progress_status": "completed",
+      "repo_id": "f9cd102c-a01c-faa8-7008-3882f901b045",
+      "reference_count": 0,
+      "gmt_create": "2026-10-10T09:02:19Z",
+      "gmt_modified": "2026-10-10T09:02:19Z"
+    },
+    {
+      "id": "eb45c52e-877a-4301-97df-df71c91b51c6",
+      "catalog_id": "eb45c52e-877a-4301-97df-df71c91b51c6",
+      "title": "插件式工具架构",
+      "description": "plugin-architecture",
+      "extend": "{}",
+      "progress_status": "completed",
+      "repo_id": "f9cd102c-a01c-faa8-7008-3882f901b045",
+      "reference_count": 0,
+      "gmt_create": "2026-10-10T09:02:19Z",
+      "gmt_modified": "2026-10-10T09:02:19Z"
+    },
+    {
+      "id": "47aedc1a-0b1d-401c-9d1b-45442b8c0c5d",
+      "catalog_id": "47aedc1a-0b1d-401c-9d1b-45442b8c0c5d",
+      "title": "拖拽交互接口",
+      "description": "drag-drop-interface",
+      "extend": "{}",
+      "progress_status": "completed",
+      "repo_id": "f9cd102c-a01c-faa8-7008-3882f901b045",
+      "reference_count": 0,
+      "gmt_create": "2026-10-10T09:02:19Z",
+      "gmt_modified": "2026-10-10T09:02:19Z"
+    },
+    {
+      "id": "5822f281-9d95-4d1a-a7fe-ba246af7e081",
+      "catalog_id": "5822f281-9d95-4d1a-a7fe-ba246af7e081",
+      "title": "图片格式转换",
+      "description": "image-convert",
+      "extend": "{}",
+      "progress_status": "completed",
+      "repo_id": "f9cd102c-a01c-faa8-7008-3882f901b045",
+      "reference_count": 0,
+      "gmt_create": "2026-10-10T09:02:19Z",
+      "gmt_modified": "2026-10-10T09:02:19Z"
+    },
+    {
+      "id": "664c43f2-9568-49e2-9b23-0183a1485f20",
+      "catalog_id": "664c43f2-9568-49e2-9b23-0183a1485f20",
+      "title": "IPC 通信机制",
+      "description": "ipc-communication",
+      "extend": "{}",
+      "progress_status": "completed",
+      "repo_id": "f9cd102c-a01c-faa8-7008-3882f901b045",
+      "reference_count": 0,
+      "gmt_create": "2026-10-10T09:02:19Z",
+      "gmt_modified": "2026-10-10T09:02:19Z"
+    },
+    {
+      "id": "76c28252-d829-4798-9837-682a43afaeeb",
+      "catalog_id": "76c28252-d829-4798-9837-682a43afaeeb",
+      "title": "视频压缩工具",
+      "description": "video-compress",
+      "extend": "{}",
+      "progress_status": "completed",
+      "repo_id": "f9cd102c-a01c-faa8-7008-3882f901b045",
+      "reference_count": 0,
+      "gmt_create": "2026-10-10T09:02:19Z",
+      "gmt_modified": "2026-10-10T09:02:19Z"
+    },
+    {
+      "id": "7ef586a7-7aca-4a28-907f-20949cd2cd6b",
+      "catalog_id": "7ef586a7-7aca-4a28-907f-20949cd2cd6b",
+      "title": "任务中心面板",
+      "description": "task-center",
+      "extend": "{}",
+      "progress_status": "completed",
+      "repo_id": "f9cd102c-a01c-faa8-7008-3882f901b045",
+      "reference_count": 0,
+      "gmt_create": "2026-10-10T09:02:19Z",
+      "gmt_modified": "2026-10-10T09:02:19Z"
+    },
+    {
+      "id": "9e1c5fd9-db7c-43b5-996b-f22954cc8ace",
+      "catalog_id": "9e1c5fd9-db7c-43b5-996b-f22954cc8ace",
+      "title": "OCR 引擎集成",
+      "description": "ocr-engine-integration",
+      "extend": "{}",
+      "progress_status": "completed",
+      "repo_id": "f9cd102c-a01c-faa8-7008-3882f901b045",
+      "reference_count": 0,
+      "gmt_create": "2026-10-10T09:02:19Z",
+      "gmt_modified": "2026-10-10T09:02:19Z"
+    },
+    {
+      "id": "a30b93b1-b69c-4fa8-9331-b37010c523e0",
+      "catalog_id": "a30b93b1-b69c-4fa8-9331-b37010c523e0",
+      "title": "PDF 操作模块",
+      "description": "pdf-operations",
+      "extend": "{}",
+      "progress_status": "completed",
+      "repo_id": "f9cd102c-a01c-faa8-7008-3882f901b045",
+      "reference_count": 0,
+      "gmt_create": "2026-10-10T09:02:19Z",
+      "gmt_modified": "2026-10-10T09:02:19Z"
+    },
+    {
+      "id": "b18f01b5-c63c-462f-8051-8b53dd11b14e",
+      "catalog_id": "b18f01b5-c63c-462f-8051-8b53dd11b14e",
+      "title": "工具开发指南",
+      "description": "tool-development-guide",
+      "extend": "{}",
+      "progress_status": "completed",
+      "repo_id": "f9cd102c-a01c-faa8-7008-3882f901b045",
+      "reference_count": 0,
+      "gmt_create": "2026-10-10T09:02:19Z",
+      "gmt_modified": "2026-10-10T09:02:19Z"
+    },
+    {
+      "id": "d58742bf-665d-4731-bf10-2e2bec92a560",
+      "catalog_id": "d58742bf-665d-4731-bf10-2e2bec92a560",
+      "title": "OCR 文字识别工具",
+      "description": "ocr-tool",
+      "extend": "{}",
+      "progress_status": "completed",
+      "repo_id": "f9cd102c-a01c-faa8-7008-3882f901b045",
+      "reference_count": 0,
+      "gmt_create": "2026-10-10T09:02:19Z",
+      "gmt_modified": "2026-10-10T09:02:19Z"
+    },
+    {
+      "id": "fc552661-27a4-44ba-b674-f4402770abf9",
+      "catalog_id": "fc552661-27a4-44ba-b674-f4402770abf9",
+      "title": "Word 文档集成模块",
+      "description": "ocr-docx-integration",
+      "extend": "{}",
+      "progress_status": "completed",
+      "repo_id": "f9cd102c-a01c-faa8-7008-3882f901b045",
+      "reference_count": 0,
+      "gmt_create": "2026-10-10T09:02:19Z",
+      "gmt_modified": "2026-10-10T09:02:19Z"
+    },
+    {
+      "id": "5dca700b-72d1-4a40-977f-5337fc424377",
+      "catalog_id": "5dca700b-72d1-4a40-977f-5337fc424377",
+      "title": "LibreOffice 集成",
+      "description": "libreoffice-integration",
+      "extend": "{}",
+      "progress_status": "completed",
+      "repo_id": "f9cd102c-a01c-faa8-7008-3882f901b045",
+      "reference_count": 0,
+      "gmt_create": "2026-10-10T09:02:19Z",
+      "gmt_modified": "2026-10-10T09:02:19Z"
+    },
+    {
+      "id": "7f4ae176-31e0-44ac-a981-6b722d0a475b",
+      "catalog_id": "7f4ae176-31e0-44ac-a981-6b722d0a475b",
+      "title": "设置管理模块",
+      "description": "settings-manager",
+      "extend": "{}",
+      "progress_status": "completed",
+      "repo_id": "f9cd102c-a01c-faa8-7008-3882f901b045",
+      "reference_count": 0,
+      "gmt_create": "2026-10-10T09:02:19Z",
+      "gmt_modified": "2026-10-10T09:02:19Z"
+    },
+    {
+      "id": "cfc3e083-01fa-452e-9c3a-ff0dc29ba3af",
+      "catalog_id": "cfc3e083-01fa-452e-9c3a-ff0dc29ba3af",
+      "title": "批量重命名",
+      "description": "batch-rename",
+      "extend": "{}",
+      "progress_status": "completed",
+      "repo_id": "f9cd102c-a01c-faa8-7008-3882f901b045",
+      "reference_count": 0,
+      "gmt_create": "2026-10-10T09:02:19Z",
+      "gmt_modified": "2026-10-10T09:02:19Z"
+    },
+    {
+      "id": "dcd487e8-4a84-49d0-a942-fb34394b1562",
+      "catalog_id": "dcd487e8-4a84-49d0-a942-fb34394b1562",
+      "title": "图片处理工具",
+      "description": "image-tools",
+      "extend": "{}",
+      "progress_status": "completed",
+      "repo_id": "f9cd102c-a01c-faa8-7008-3882f901b045",
+      "reference_count": 0,
+      "gmt_create": "2026-10-10T09:02:19Z",
+      "gmt_modified": "2026-10-10T09:02:19Z"
+    },
+    {
+      "id": "fdfbf4ef-6406-46f1-a2a6-8f7868726aed",
+      "catalog_id": "fdfbf4ef-6406-46f1-a2a6-8f7868726aed",
+      "title": "动图与视频互转",
+      "description": "sticker-video",
+      "extend": "{}",
+      "progress_status": "completed",
+      "repo_id": "f9cd102c-a01c-faa8-7008-3882f901b045",
+      "reference_count": 0,
+      "gmt_create": "2026-10-10T09:02:19Z",
+      "gmt_modified": "2026-10-10T09:02:19Z"
+    },
+    {
+      "id": "fe36d1b9-99a2-4011-a34e-d646ad960bca",
+      "catalog_id": "fe36d1b9-99a2-4011-a34e-d646ad960bca",
+      "title": "系统集成层",
+      "description": "system-integration",
+      "extend": "{}",
+      "progress_status": "completed",
+      "repo_id": "f9cd102c-a01c-faa8-7008-3882f901b045",
+      "reference_count": 0,
+      "gmt_create": "2026-10-10T09:02:19Z",
+      "gmt_modified": "2026-10-10T09:02:19Z"
+    },
+    {
+      "id": "56b32002-8e3d-413a-930a-ae277911eff9",
+      "catalog_id": "56b32002-8e3d-413a-930a-ae277911eff9",
+      "title": "AI 超分引擎",
+      "description": "ai-super-resolution",
+      "extend": "{}",
+      "progress_status": "completed",
+      "repo_id": "f9cd102c-a01c-faa8-7008-3882f901b045",
+      "reference_count": 0,
+      "gmt_create": "2026-10-10T09:02:19Z",
+      "gmt_modified": "2026-10-10T09:02:19Z"
+    },
+    {
+      "id": "83ce4014-1cd0-46e3-a5e2-7f44252ab98e",
+      "catalog_id": "83ce4014-1cd0-46e3-a5e2-7f44252ab98e",
+      "title": "任务队列模块",
+      "description": "task-queue",
+      "extend": "{}",
+      "progress_status": "completed",
+      "repo_id": "f9cd102c-a01c-faa8-7008-3882f901b045",
+      "reference_count": 0,
+      "gmt_create": "2026-10-10T09:02:19Z",
+      "gmt_modified": "2026-10-10T09:02:19Z"
+    },
+    {
+      "id": "8c0a1118-f6a7-45d9-8f43-3e2032845eb0",
+      "catalog_id": "8c0a1118-f6a7-45d9-8f43-3e2032845eb0",
+      "title": "视频处理工具",
+      "description": "video-tools",
+      "extend": "{}",
+      "progress_status": "completed",
+      "repo_id": "f9cd102c-a01c-faa8-7008-3882f901b045",
+      "reference_count": 0,
+      "gmt_create": "2026-10-10T09:02:19Z",
+      "gmt_modified": "2026-10-10T09:02:19Z"
+    },
+    {
+      "id": "a98928e8-cb0f-4e1c-9a3b-47bb13a07959",
+      "catalog_id": "a98928e8-cb0f-4e1c-9a3b-47bb13a07959",
+      "title": "水印添加",
+      "description": "watermark",
+      "extend": "{}",
+      "progress_status": "completed",
+      "repo_id": "f9cd102c-a01c-faa8-7008-3882f901b045",
+      "reference_count": 0,
+      "gmt_create": "2026-10-10T09:02:19Z",
+      "gmt_modified": "2026-10-10T09:02:19Z"
+    },
+    {
+      "id": "46966565-ac16-4347-a268-73c15b65a96f",
+      "catalog_id": "46966565-ac16-4347-a268-73c15b65a96f",
+      "title": "HTML 转义工具",
+      "description": "html-escape",
+      "extend": "{}",
+      "progress_status": "completed",
+      "repo_id": "f9cd102c-a01c-faa8-7008-3882f901b045",
+      "reference_count": 0,
+      "gmt_create": "2026-10-10T09:02:19Z",
+      "gmt_modified": "2026-10-10T09:02:19Z"
+    },
+    {
+      "id": "91306f0b-9fb8-42be-91ac-518be6c7606c",
+      "catalog_id": "91306f0b-9fb8-42be-91ac-518be6c7606c",
+      "title": "音频处理工具",
+      "description": "audio-tools",
+      "extend": "{}",
+      "progress_status": "completed",
+      "repo_id": "f9cd102c-a01c-faa8-7008-3882f901b045",
+      "reference_count": 0,
+      "gmt_create": "2026-10-10T09:02:19Z",
+      "gmt_modified": "2026-10-10T09:02:19Z"
+    },
+    {
+      "id": "a75321bd-ca05-402e-87eb-d4d2c0519fed",
+      "catalog_id": "a75321bd-ca05-402e-87eb-d4d2c0519fed",
+      "title": "长图拼接",
+      "description": "image-stitch",
+      "extend": "{}",
+      "progress_status": "completed",
+      "repo_id": "f9cd102c-a01c-faa8-7008-3882f901b045",
+      "reference_count": 0,
+      "gmt_create": "2026-10-10T09:02:19Z",
+      "gmt_modified": "2026-10-10T09:02:19Z"
+    },
+    {
+      "id": "67c3129a-d2ef-4e04-a5b0-506bd0aafc4e",
+      "catalog_id": "67c3129a-d2ef-4e04-a5b0-506bd0aafc4e",
+      "title": "文档处理工具",
+      "description": "document-tools",
+      "extend": "{}",
+      "progress_status": "completed",
+      "repo_id": "f9cd102c-a01c-faa8-7008-3882f901b045",
+      "reference_count": 0,
+      "gmt_create": "2026-10-10T09:02:19Z",
+      "gmt_modified": "2026-10-10T09:02:19Z"
+    },
+    {
+      "id": "7d9d34eb-5300-49d8-88bb-2757743f64bf",
+      "catalog_id": "7d9d34eb-5300-49d8-88bb-2757743f64bf",
+      "title": "九宫格切图",
+      "description": "grid-slice",
+      "extend": "{}",
+      "progress_status": "completed",
+      "repo_id": "f9cd102c-a01c-faa8-7008-3882f901b045",
+      "reference_count": 0,
+      "gmt_create": "2026-10-10T09:02:19Z",
+      "gmt_modified": "2026-10-10T09:02:19Z"
+    },
+    {
+      "id": "f84fd4f2-0f33-4cd7-bc5e-1b149549e371",
+      "catalog_id": "f84fd4f2-0f33-4cd7-bc5e-1b149549e371",
+      "title": "唯一路径生成器",
+      "description": "unique-path",
+      "extend": "{}",
+      "progress_status": "completed",
+      "repo_id": "f9cd102c-a01c-faa8-7008-3882f901b045",
+      "reference_count": 0,
+      "gmt_create": "2026-10-10T09:02:19Z",
+      "gmt_modified": "2026-10-10T09:02:19Z"
+    },
+    {
+      "id": "7694f7fa-dded-4567-91da-d0712bad2919",
+      "catalog_id": "7694f7fa-dded-4567-91da-d0712bad2919",
+      "title": "压缩解压工具",
+      "description": "archive-tool",
+      "extend": "{}",
+      "progress_status": "completed",
+      "repo_id": "f9cd102c-a01c-faa8-7008-3882f901b045",
+      "reference_count": 0,
+      "gmt_create": "2026-10-10T09:02:19Z",
+      "gmt_modified": "2026-10-10T09:02:19Z"
+    },
+    {
+      "id": "e80bca66-c148-4a3a-9ece-aab301d050cc",
+      "catalog_id": "e80bca66-c148-4a3a-9ece-aab301d050cc",
+      "title": "文件藏图",
+      "description": "imghide",
+      "extend": "{}",
+      "progress_status": "completed",
+      "repo_id": "f9cd102c-a01c-faa8-7008-3882f901b045",
+      "reference_count": 0,
+      "gmt_create": "2026-10-10T09:02:19Z",
+      "gmt_modified": "2026-10-10T09:02:19Z"
+    },
+    {
+      "id": "e59c7510-ce74-4b9e-b876-477e053b5d08",
+      "catalog_id": "e59c7510-ce74-4b9e-b876-477e053b5d08",
+      "title": "系统工具",
+      "description": "system-tool",
+      "extend": "{}",
+      "progress_status": "completed",
+      "repo_id": "f9cd102c-a01c-faa8-7008-3882f901b045",
+      "reference_count": 0,
+      "gmt_create": "2026-10-10T09:02:19Z",
+      "gmt_modified": "2026-10-10T09:02:19Z"
+    },
+    {
+      "id": "f435c2f5-4d6d-4133-9508-ea6079066f0b",
+      "catalog_id": "f435c2f5-4d6d-4133-9508-ea6079066f0b",
+      "title": "共享模块",
+      "description": "shared-modules",
+      "extend": "{}",
+      "progress_status": "completed",
+      "repo_id": "f9cd102c-a01c-faa8-7008-3882f901b045",
+      "reference_count": 0,
+      "gmt_create": "2026-10-10T09:02:19Z",
+      "gmt_modified": "2026-10-10T09:02:19Z"
+    },
+    {
+      "id": "92f2a93e-3ac0-4082-ad95-37563fea985b",
+      "catalog_id": "92f2a93e-3ac0-4082-ad95-37563fea985b",
+      "title": "外部引擎集成",
+      "description": "external-engines",
+      "extend": "{}",
+      "progress_status": "completed",
+      "repo_id": "f9cd102c-a01c-faa8-7008-3882f901b045",
+      "reference_count": 0,
+      "gmt_create": "2026-10-10T09:02:19Z",
+      "gmt_modified": "2026-10-10T09:02:19Z"
+    },
+    {
+      "id": "076d9f0e-adeb-4b2d-9b97-7ef4c5bed07f",
+      "catalog_id": "076d9f0e-adeb-4b2d-9b97-7ef4c5bed07f",
+      "title": "安全设计",
+      "description": "security-design",
+      "extend": "{}",
+      "progress_status": "completed",
+      "repo_id": "f9cd102c-a01c-faa8-7008-3882f901b045",
+      "reference_count": 0,
+      "gmt_create": "2026-10-10T09:02:19Z",
+      "gmt_modified": "2026-10-10T09:02:19Z"
+    },
+    {
+      "id": "c8c48134-65a9-42ee-a317-ea2a2063beb0",
+      "catalog_id": "c8c48134-65a9-42ee-a317-ea2a2063beb0",
+      "title": "测试与质量保证",
+      "description": "testing-quality",
+      "extend": "{}",
+      "progress_status": "completed",
+      "repo_id": "f9cd102c-a01c-faa8-7008-3882f901b045",
+      "reference_count": 0,
+      "gmt_create": "2026-10-10T09:02:19Z",
+      "gmt_modified": "2026-10-10T09:02:19Z"
+    },
+    {
+      "id": "8784d55f-8380-4cea-bf62-d4e47eb6ae5a",
+      "catalog_id": "8784d55f-8380-4cea-bf62-d4e47eb6ae5a",
+      "title": "构建与部署",
+      "description": "build-deployment",
+      "extend": "{}",
+      "progress_status": "completed",
+      "repo_id": "f9cd102c-a01c-faa8-7008-3882f901b045",
+      "reference_count": 0,
+      "gmt_create": "2026-10-10T09:02:19Z",
+      "gmt_modified": "2026-10-10T09:02:19Z"
+    },
+    {
+      "id": "1cdf8463-b5ad-4fff-8524-abd83881e170",
+      "catalog_id": "1cdf8463-b5ad-4fff-8524-abd83881e170",
+      "title": "故障排除",
+      "description": "troubleshooting",
+      "extend": "{}",
+      "progress_status": "completed",
+      "repo_id": "f9cd102c-a01c-faa8-7008-3882f901b045",
+      "reference_count": 0,
+      "gmt_create": "2026-10-10T09:02:19Z",
+      "gmt_modified": "2026-10-10T09:02:19Z"
+    }
+  ],
+  "knowledge_relations": [
+    {
+      "id": 1,
+      "source_id": "eb45c52e-877a-4301-97df-df71c91b51c6",
+      "target_id": "5406a610-cc60-40b4-8351-6163fd0c8a45",
+      "source_type": "WIKI_ITEM",
+      "target_type": "WIKI_ITEM",
+      "relationship_type": "PARENT_CHILD",
+      "gmt_create": "2026-10-10T09:02:19Z",
+      "gmt_modified": "2026-10-10T09:02:19Z"
+    },
+    {
+      "id": 2,
+      "source_id": "67c3129a-d2ef-4e04-a5b0-506bd0aafc4e",
+      "target_id": "5d1cd129-e78a-42d6-8d07-bfec04928c16",
+      "source_type": "WIKI_ITEM",
+      "target_type": "WIKI_ITEM",
+      "relationship_type": "PARENT_CHILD",
+      "gmt_create": "2026-10-10T09:02:19Z",
+      "gmt_modified": "2026-10-10T09:02:19Z"
+    },
+    {
+      "id": 3,
+      "source_id": "a242c8ac-4c32-4fca-aafe-90e97748b28c",
+      "target_id": "8b412c51-1570-4379-a19d-c5d1f4ac529d",
+      "source_type": "WIKI_ITEM",
+      "target_type": "WIKI_ITEM",
+      "relationship_type": "PARENT_CHILD",
+      "gmt_create": "2026-10-10T09:02:19Z",
+      "gmt_modified": "2026-10-10T09:02:19Z"
+    },
+    {
+      "id": 4,
+      "source_id": "932ca1ef-316e-4a70-be82-61d7fedd857b",
+      "target_id": "8c8918c4-b4e4-4be2-8419-bbd1c1b2f852",
+      "source_type": "WIKI_ITEM",
+      "target_type": "WIKI_ITEM",
+      "relationship_type": "PARENT_CHILD",
+      "gmt_create": "2026-10-10T09:02:19Z",
+      "gmt_modified": "2026-10-10T09:02:19Z"
+    },
+    {
+      "id": 5,
+      "source_id": "f435c2f5-4d6d-4133-9508-ea6079066f0b",
+      "target_id": "a56a7329-2af2-4246-9edc-400c486aea19",
+      "source_type": "WIKI_ITEM",
+      "target_type": "WIKI_ITEM",
+      "relationship_type": "PARENT_CHILD",
+      "gmt_create": "2026-10-10T09:02:19Z",
+      "gmt_modified": "2026-10-10T09:02:19Z"
+    },
+    {
+      "id": 6,
+      "source_id": "8c0a1118-f6a7-45d9-8f43-3e2032845eb0",
+      "target_id": "b354a828-941e-4a22-bf64-95bcc5af6037",
+      "source_type": "WIKI_ITEM",
+      "target_type": "WIKI_ITEM",
+      "relationship_type": "PARENT_CHILD",
+      "gmt_create": "2026-10-10T09:02:19Z",
+      "gmt_modified": "2026-10-10T09:02:19Z"
+    },
+    {
+      "id": 7,
+      "source_id": "92f2a93e-3ac0-4082-ad95-37563fea985b",
+      "target_id": "c38b928b-3986-429b-b72c-b5e8ea6fcdf6",
+      "source_type": "WIKI_ITEM",
+      "target_type": "WIKI_ITEM",
+      "relationship_type": "PARENT_CHILD",
+      "gmt_create": "2026-10-10T09:02:19Z",
+      "gmt_modified": "2026-10-10T09:02:19Z"
+    },
+    {
+      "id": 8,
+      "source_id": "dcd487e8-4a84-49d0-a942-fb34394b1562",
+      "target_id": "d46ed682-dc7c-4464-8e4b-5d8296c48b90",
+      "source_type": "WIKI_ITEM",
+      "target_type": "WIKI_ITEM",
+      "relationship_type": "PARENT_CHILD",
+      "gmt_create": "2026-10-10T09:02:19Z",
+      "gmt_modified": "2026-10-10T09:02:19Z"
+    },
+    {
+      "id": 9,
+      "source_id": "d58742bf-665d-4731-bf10-2e2bec92a560",
+      "target_id": "eb6e3422-594a-4f98-bb7c-61864a91d040",
+      "source_type": "WIKI_ITEM",
+      "target_type": "WIKI_ITEM",
+      "relationship_type": "PARENT_CHILD",
+      "gmt_create": "2026-10-10T09:02:19Z",
+      "gmt_modified": "2026-10-10T09:02:19Z"
+    },
+    {
+      "id": 10,
+      "source_id": "f435c2f5-4d6d-4133-9508-ea6079066f0b",
+      "target_id": "10abb6da-4360-48cf-8263-0f347f0791da",
+      "source_type": "WIKI_ITEM",
+      "target_type": "WIKI_ITEM",
+      "relationship_type": "PARENT_CHILD",
+      "gmt_create": "2026-10-10T09:02:19Z",
+      "gmt_modified": "2026-10-10T09:02:19Z"
+    },
+    {
+      "id": 11,
+      "source_id": "dcd487e8-4a84-49d0-a942-fb34394b1562",
+      "target_id": "3299e14c-a7e4-4034-a102-953d47d63f45",
+      "source_type": "WIKI_ITEM",
+      "target_type": "WIKI_ITEM",
+      "relationship_type": "PARENT_CHILD",
+      "gmt_create": "2026-10-10T09:02:19Z",
+      "gmt_modified": "2026-10-10T09:02:19Z"
+    },
+    {
+      "id": 12,
+      "source_id": "932ca1ef-316e-4a70-be82-61d7fedd857b",
+      "target_id": "3ea4cce1-f8b7-4666-aada-54374e5bc1f5",
+      "source_type": "WIKI_ITEM",
+      "target_type": "WIKI_ITEM",
+      "relationship_type": "PARENT_CHILD",
+      "gmt_create": "2026-10-10T09:02:19Z",
+      "gmt_modified": "2026-10-10T09:02:19Z"
+    },
+    {
+      "id": 13,
+      "source_id": "a242c8ac-4c32-4fca-aafe-90e97748b28c",
+      "target_id": "825fab74-90b0-4700-8ef5-099337c71b80",
+      "source_type": "WIKI_ITEM",
+      "target_type": "WIKI_ITEM",
+      "relationship_type": "PARENT_CHILD",
+      "gmt_create": "2026-10-10T09:02:19Z",
+      "gmt_modified": "2026-10-10T09:02:19Z"
+    },
+    {
+      "id": 14,
+      "source_id": "67c3129a-d2ef-4e04-a5b0-506bd0aafc4e",
+      "target_id": "8c12760b-014d-4b04-a591-885596cfd17a",
+      "source_type": "WIKI_ITEM",
+      "target_type": "WIKI_ITEM",
+      "relationship_type": "PARENT_CHILD",
+      "gmt_create": "2026-10-10T09:02:19Z",
+      "gmt_modified": "2026-10-10T09:02:19Z"
+    },
+    {
+      "id": 15,
+      "source_id": "92f2a93e-3ac0-4082-ad95-37563fea985b",
+      "target_id": "99023695-68c4-48fd-b28c-d710b55b03e0",
+      "source_type": "WIKI_ITEM",
+      "target_type": "WIKI_ITEM",
+      "relationship_type": "PARENT_CHILD",
+      "gmt_create": "2026-10-10T09:02:19Z",
+      "gmt_modified": "2026-10-10T09:02:19Z"
+    },
+    {
+      "id": 16,
+      "source_id": "d58742bf-665d-4731-bf10-2e2bec92a560",
+      "target_id": "b98b0148-5d27-455e-ae38-b83b749eb819",
+      "source_type": "WIKI_ITEM",
+      "target_type": "WIKI_ITEM",
+      "relationship_type": "PARENT_CHILD",
+      "gmt_create": "2026-10-10T09:02:19Z",
+      "gmt_modified": "2026-10-10T09:02:19Z"
+    },
+    {
+      "id": 17,
+      "source_id": "eb45c52e-877a-4301-97df-df71c91b51c6",
+      "target_id": "d0352020-2598-422f-bbca-2ab19ce30565",
+      "source_type": "WIKI_ITEM",
+      "target_type": "WIKI_ITEM",
+      "relationship_type": "PARENT_CHILD",
+      "gmt_create": "2026-10-10T09:02:19Z",
+      "gmt_modified": "2026-10-10T09:02:19Z"
+    },
+    {
+      "id": 18,
+      "source_id": "8c0a1118-f6a7-45d9-8f43-3e2032845eb0",
+      "target_id": "fc52dc2f-4ca4-4604-83c4-9c2599aba6c1",
+      "source_type": "WIKI_ITEM",
+      "target_type": "WIKI_ITEM",
+      "relationship_type": "PARENT_CHILD",
+      "gmt_create": "2026-10-10T09:02:19Z",
+      "gmt_modified": "2026-10-10T09:02:19Z"
+    },
+    {
+      "id": 19,
+      "source_id": "a242c8ac-4c32-4fca-aafe-90e97748b28c",
+      "target_id": "23a1a5af-be1c-4f1c-a102-d1390bcca70b",
+      "source_type": "WIKI_ITEM",
+      "target_type": "WIKI_ITEM",
+      "relationship_type": "PARENT_CHILD",
+      "gmt_create": "2026-10-10T09:02:19Z",
+      "gmt_modified": "2026-10-10T09:02:19Z"
+    },
+    {
+      "id": 20,
+      "source_id": "f435c2f5-4d6d-4133-9508-ea6079066f0b",
+      "target_id": "5b28cb1e-26d3-46f7-8580-a9f4de9da7ac",
+      "source_type": "WIKI_ITEM",
+      "target_type": "WIKI_ITEM",
+      "relationship_type": "PARENT_CHILD",
+      "gmt_create": "2026-10-10T09:02:19Z",
+      "gmt_modified": "2026-10-10T09:02:19Z"
+    },
+    {
+      "id": 21,
+      "source_id": "67c3129a-d2ef-4e04-a5b0-506bd0aafc4e",
+      "target_id": "66ba0f6a-503b-4456-a206-74d7ec3ae627",
+      "source_type": "WIKI_ITEM",
+      "target_type": "WIKI_ITEM",
+      "relationship_type": "PARENT_CHILD",
+      "gmt_create": "2026-10-10T09:02:19Z",
+      "gmt_modified": "2026-10-10T09:02:19Z"
+    },
+    {
+      "id": 22,
+      "source_id": "d58742bf-665d-4731-bf10-2e2bec92a560",
+      "target_id": "7ca05951-3be2-4afc-8237-c040aa2862d2",
+      "source_type": "WIKI_ITEM",
+      "target_type": "WIKI_ITEM",
+      "relationship_type": "PARENT_CHILD",
+      "gmt_create": "2026-10-10T09:02:19Z",
+      "gmt_modified": "2026-10-10T09:02:19Z"
+    },
+    {
+      "id": 23,
+      "source_id": "8c0a1118-f6a7-45d9-8f43-3e2032845eb0",
+      "target_id": "7d75d25b-b729-4ea8-8999-4712a1ed4029",
+      "source_type": "WIKI_ITEM",
+      "target_type": "WIKI_ITEM",
+      "relationship_type": "PARENT_CHILD",
+      "gmt_create": "2026-10-10T09:02:19Z",
+      "gmt_modified": "2026-10-10T09:02:19Z"
+    },
+    {
+      "id": 24,
+      "source_id": "dcd487e8-4a84-49d0-a942-fb34394b1562",
+      "target_id": "9a08a00f-1945-460c-9b4d-5d9e49b9a99f",
+      "source_type": "WIKI_ITEM",
+      "target_type": "WIKI_ITEM",
+      "relationship_type": "PARENT_CHILD",
+      "gmt_create": "2026-10-10T09:02:19Z",
+      "gmt_modified": "2026-10-10T09:02:19Z"
+    },
+    {
+      "id": 25,
+      "source_id": "92f2a93e-3ac0-4082-ad95-37563fea985b",
+      "target_id": "e22db193-07fa-438d-9f0e-76665a5ec85f",
+      "source_type": "WIKI_ITEM",
+      "target_type": "WIKI_ITEM",
+      "relationship_type": "PARENT_CHILD",
+      "gmt_create": "2026-10-10T09:02:19Z",
+      "gmt_modified": "2026-10-10T09:02:19Z"
+    },
+    {
+      "id": 26,
+      "source_id": "eb45c52e-877a-4301-97df-df71c91b51c6",
+      "target_id": "e6d66999-6f60-46d8-9d15-c8431ba12db2",
+      "source_type": "WIKI_ITEM",
+      "target_type": "WIKI_ITEM",
+      "relationship_type": "PARENT_CHILD",
+      "gmt_create": "2026-10-10T09:02:19Z",
+      "gmt_modified": "2026-10-10T09:02:19Z"
+    },
+    {
+      "id": 27,
+      "source_id": "932ca1ef-316e-4a70-be82-61d7fedd857b",
+      "target_id": "eb45c52e-877a-4301-97df-df71c91b51c6",
+      "source_type": "WIKI_ITEM",
+      "target_type": "WIKI_ITEM",
+      "relationship_type": "PARENT_CHILD",
+      "gmt_create": "2026-10-10T09:02:19Z",
+      "gmt_modified": "2026-10-10T09:02:19Z"
+    },
+    {
+      "id": 28,
+      "source_id": "eb45c52e-877a-4301-97df-df71c91b51c6",
+      "target_id": "47aedc1a-0b1d-401c-9d1b-45442b8c0c5d",
+      "source_type": "WIKI_ITEM",
+      "target_type": "WIKI_ITEM",
+      "relationship_type": "PARENT_CHILD",
+      "gmt_create": "2026-10-10T09:02:19Z",
+      "gmt_modified": "2026-10-10T09:02:19Z"
+    },
+    {
+      "id": 29,
+      "source_id": "dcd487e8-4a84-49d0-a942-fb34394b1562",
+      "target_id": "5822f281-9d95-4d1a-a7fe-ba246af7e081",
+      "source_type": "WIKI_ITEM",
+      "target_type": "WIKI_ITEM",
+      "relationship_type": "PARENT_CHILD",
+      "gmt_create": "2026-10-10T09:02:19Z",
+      "gmt_modified": "2026-10-10T09:02:19Z"
+    },
+    {
+      "id": 30,
+      "source_id": "932ca1ef-316e-4a70-be82-61d7fedd857b",
+      "target_id": "664c43f2-9568-49e2-9b23-0183a1485f20",
+      "source_type": "WIKI_ITEM",
+      "target_type": "WIKI_ITEM",
+      "relationship_type": "PARENT_CHILD",
+      "gmt_create": "2026-10-10T09:02:19Z",
+      "gmt_modified": "2026-10-10T09:02:19Z"
+    },
+    {
+      "id": 31,
+      "source_id": "8c0a1118-f6a7-45d9-8f43-3e2032845eb0",
+      "target_id": "76c28252-d829-4798-9837-682a43afaeeb",
+      "source_type": "WIKI_ITEM",
+      "target_type": "WIKI_ITEM",
+      "relationship_type": "PARENT_CHILD",
+      "gmt_create": "2026-10-10T09:02:19Z",
+      "gmt_modified": "2026-10-10T09:02:19Z"
+    },
+    {
+      "id": 32,
+      "source_id": "a242c8ac-4c32-4fca-aafe-90e97748b28c",
+      "target_id": "7ef586a7-7aca-4a28-907f-20949cd2cd6b",
+      "source_type": "WIKI_ITEM",
+      "target_type": "WIKI_ITEM",
+      "relationship_type": "PARENT_CHILD",
+      "gmt_create": "2026-10-10T09:02:19Z",
+      "gmt_modified": "2026-10-10T09:02:19Z"
+    },
+    {
+      "id": 33,
+      "source_id": "92f2a93e-3ac0-4082-ad95-37563fea985b",
+      "target_id": "9e1c5fd9-db7c-43b5-996b-f22954cc8ace",
+      "source_type": "WIKI_ITEM",
+      "target_type": "WIKI_ITEM",
+      "relationship_type": "PARENT_CHILD",
+      "gmt_create": "2026-10-10T09:02:19Z",
+      "gmt_modified": "2026-10-10T09:02:19Z"
+    },
+    {
+      "id": 34,
+      "source_id": "f435c2f5-4d6d-4133-9508-ea6079066f0b",
+      "target_id": "a30b93b1-b69c-4fa8-9331-b37010c523e0",
+      "source_type": "WIKI_ITEM",
+      "target_type": "WIKI_ITEM",
+      "relationship_type": "PARENT_CHILD",
+      "gmt_create": "2026-10-10T09:02:19Z",
+      "gmt_modified": "2026-10-10T09:02:19Z"
+    },
+    {
+      "id": 35,
+      "source_id": "67c3129a-d2ef-4e04-a5b0-506bd0aafc4e",
+      "target_id": "d58742bf-665d-4731-bf10-2e2bec92a560",
+      "source_type": "WIKI_ITEM",
+      "target_type": "WIKI_ITEM",
+      "relationship_type": "PARENT_CHILD",
+      "gmt_create": "2026-10-10T09:02:19Z",
+      "gmt_modified": "2026-10-10T09:02:19Z"
+    },
+    {
+      "id": 36,
+      "source_id": "d58742bf-665d-4731-bf10-2e2bec92a560",
+      "target_id": "fc552661-27a4-44ba-b674-f4402770abf9",
+      "source_type": "WIKI_ITEM",
+      "target_type": "WIKI_ITEM",
+      "relationship_type": "PARENT_CHILD",
+      "gmt_create": "2026-10-10T09:02:19Z",
+      "gmt_modified": "2026-10-10T09:02:19Z"
+    },
+    {
+      "id": 37,
+      "source_id": "92f2a93e-3ac0-4082-ad95-37563fea985b",
+      "target_id": "5dca700b-72d1-4a40-977f-5337fc424377",
+      "source_type": "WIKI_ITEM",
+      "target_type": "WIKI_ITEM",
+      "relationship_type": "PARENT_CHILD",
+      "gmt_create": "2026-10-10T09:02:19Z",
+      "gmt_modified": "2026-10-10T09:02:19Z"
+    },
+    {
+      "id": 38,
+      "source_id": "f435c2f5-4d6d-4133-9508-ea6079066f0b",
+      "target_id": "7f4ae176-31e0-44ac-a981-6b722d0a475b",
+      "source_type": "WIKI_ITEM",
+      "target_type": "WIKI_ITEM",
+      "relationship_type": "PARENT_CHILD",
+      "gmt_create": "2026-10-10T09:02:19Z",
+      "gmt_modified": "2026-10-10T09:02:19Z"
+    },
+    {
+      "id": 39,
+      "source_id": "dcd487e8-4a84-49d0-a942-fb34394b1562",
+      "target_id": "cfc3e083-01fa-452e-9c3a-ff0dc29ba3af",
+      "source_type": "WIKI_ITEM",
+      "target_type": "WIKI_ITEM",
+      "relationship_type": "PARENT_CHILD",
+      "gmt_create": "2026-10-10T09:02:19Z",
+      "gmt_modified": "2026-10-10T09:02:19Z"
+    },
+    {
+      "id": 40,
+      "source_id": "8c0a1118-f6a7-45d9-8f43-3e2032845eb0",
+      "target_id": "fdfbf4ef-6406-46f1-a2a6-8f7868726aed",
+      "source_type": "WIKI_ITEM",
+      "target_type": "WIKI_ITEM",
+      "relationship_type": "PARENT_CHILD",
+      "gmt_create": "2026-10-10T09:02:19Z",
+      "gmt_modified": "2026-10-10T09:02:19Z"
+    },
+    {
+      "id": 41,
+      "source_id": "932ca1ef-316e-4a70-be82-61d7fedd857b",
+      "target_id": "fe36d1b9-99a2-4011-a34e-d646ad960bca",
+      "source_type": "WIKI_ITEM",
+      "target_type": "WIKI_ITEM",
+      "relationship_type": "PARENT_CHILD",
+      "gmt_create": "2026-10-10T09:02:19Z",
+      "gmt_modified": "2026-10-10T09:02:19Z"
+    },
+    {
+      "id": 42,
+      "source_id": "92f2a93e-3ac0-4082-ad95-37563fea985b",
+      "target_id": "56b32002-8e3d-413a-930a-ae277911eff9",
+      "source_type": "WIKI_ITEM",
+      "target_type": "WIKI_ITEM",
+      "relationship_type": "PARENT_CHILD",
+      "gmt_create": "2026-10-10T09:02:19Z",
+      "gmt_modified": "2026-10-10T09:02:19Z"
+    },
+    {
+      "id": 43,
+      "source_id": "f435c2f5-4d6d-4133-9508-ea6079066f0b",
+      "target_id": "83ce4014-1cd0-46e3-a5e2-7f44252ab98e",
+      "source_type": "WIKI_ITEM",
+      "target_type": "WIKI_ITEM",
+      "relationship_type": "PARENT_CHILD",
+      "gmt_create": "2026-10-10T09:02:19Z",
+      "gmt_modified": "2026-10-10T09:02:19Z"
+    },
+    {
+      "id": 44,
+      "source_id": "dcd487e8-4a84-49d0-a942-fb34394b1562",
+      "target_id": "a98928e8-cb0f-4e1c-9a3b-47bb13a07959",
+      "source_type": "WIKI_ITEM",
+      "target_type": "WIKI_ITEM",
+      "relationship_type": "PARENT_CHILD",
+      "gmt_create": "2026-10-10T09:02:19Z",
+      "gmt_modified": "2026-10-10T09:02:19Z"
+    },
+    {
+      "id": 45,
+      "source_id": "f435c2f5-4d6d-4133-9508-ea6079066f0b",
+      "target_id": "46966565-ac16-4347-a268-73c15b65a96f",
+      "source_type": "WIKI_ITEM",
+      "target_type": "WIKI_ITEM",
+      "relationship_type": "PARENT_CHILD",
+      "gmt_create": "2026-10-10T09:02:19Z",
+      "gmt_modified": "2026-10-10T09:02:19Z"
+    },
+    {
+      "id": 46,
+      "source_id": "dcd487e8-4a84-49d0-a942-fb34394b1562",
+      "target_id": "a75321bd-ca05-402e-87eb-d4d2c0519fed",
+      "source_type": "WIKI_ITEM",
+      "target_type": "WIKI_ITEM",
+      "relationship_type": "PARENT_CHILD",
+      "gmt_create": "2026-10-10T09:02:19Z",
+      "gmt_modified": "2026-10-10T09:02:19Z"
+    },
+    {
+      "id": 47,
+      "source_id": "dcd487e8-4a84-49d0-a942-fb34394b1562",
+      "target_id": "7d9d34eb-5300-49d8-88bb-2757743f64bf",
+      "source_type": "WIKI_ITEM",
+      "target_type": "WIKI_ITEM",
+      "relationship_type": "PARENT_CHILD",
+      "gmt_create": "2026-10-10T09:02:19Z",
+      "gmt_modified": "2026-10-10T09:02:19Z"
+    },
+    {
+      "id": 48,
+      "source_id": "f435c2f5-4d6d-4133-9508-ea6079066f0b",
+      "target_id": "f84fd4f2-0f33-4cd7-bc5e-1b149549e371",
+      "source_type": "WIKI_ITEM",
+      "target_type": "WIKI_ITEM",
+      "relationship_type": "PARENT_CHILD",
+      "gmt_create": "2026-10-10T09:02:19Z",
+      "gmt_modified": "2026-10-10T09:02:19Z"
+    },
+    {
+      "id": 49,
+      "source_id": "dcd487e8-4a84-49d0-a942-fb34394b1562",
+      "target_id": "e80bca66-c148-4a3a-9ece-aab301d050cc",
+      "source_type": "WIKI_ITEM",
+      "target_type": "WIKI_ITEM",
+      "relationship_type": "PARENT_CHILD",
+      "gmt_create": "2026-10-10T09:02:19Z",
+      "gmt_modified": "2026-10-10T09:02:19Z"
+    }
+  ]
+}

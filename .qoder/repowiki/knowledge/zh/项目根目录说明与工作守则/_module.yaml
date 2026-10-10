@@ -1,0 +1,52 @@
+schema_version: 1
+module_path: root
+title: 项目根目录说明与工作守则
+scope:
+    - README.md
+    - AGENTS.md
+    - .gitignore
+source_files: []
+depends_on: []
+related_to: []
+kk_module_id: 6faabd1d-ddb4-4bf3-b3c2-1c479e8a1831
+kk_cards:
+    architecture_design:
+        id: b73db965-ca52-4631-be74-0586b4198ce9
+        title: 项目根目录说明与工作守则
+    coding_conventions:
+        id: 11862abc-9358-41d7-9842-a028f3e2bb7b
+        title: 项目根目录说明与工作守则
+    overview:
+        id: 19c43f77-a014-48f5-ab6c-5e8b84150b67
+        title: 项目根目录说明与工作守则
+    tech_stack:
+        id: 707dbef5-f334-4633-bf4b-40afa991a5a4
+        title: 项目根目录说明与工作守则
+    unique_setup_and_commands:
+        id: e17e306c-6e71-4749-89dc-ed6eeaf142aa
+        title: 项目根目录说明与工作守则
+    build_system:
+        id: c4bdb763-911a-43e3-89b2-df58931dddc2
+        title: Electron 桌面应用构建与打包体系（npm scripts + pack.js）
+    configuration_system:
+        id: fb8cd838-5cc1-42f7-a10a-d62075a92c9c
+        title: Electron 桌面端设置与配置系统（settings.js / settings-schema.mjs）
+    dependency_management:
+        id: 23a8b668-5170-46cd-b7db-b02ef9c0ef59
+        title: Electron 桌面应用依赖管理（npm + package-lock.json）
+    error_handling:
+        id: 3b54804b-47aa-44b5-9c4f-2e6456d6ced4
+        title: 错误处理：面向用户的中文 Error 与工具层统一包装
+    frontend_style:
+        id: 612d7ec7-6cb6-4a10-970c-94bfdfe3c123
+        title: 基于 CSS 自定义属性的玻璃拟态主题系统
+    logging_system:
+        id: f46025e7-c32a-4d5d-89d6-f30873442316
+        title: 基于 console 的轻量日志输出（无专用日志框架）
+kk_repo_cards:
+    - build_system
+    - configuration_system
+    - dependency_management
+    - error_handling
+    - frontend_style
+    - logging_system
