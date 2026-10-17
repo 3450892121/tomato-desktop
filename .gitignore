@@ -31,3 +31,7 @@ desktop.ini
 .env
 .env.*
 *.local
+
+# 编辑器 / AI 工具的本地工作目录（计划文档、生成的知识库等，不入库）
+.trae
+.qoder/
