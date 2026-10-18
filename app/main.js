@@ -987,6 +987,71 @@ ipcMain.handle('app:info', async () => ({
   packaged: app.isPackaged
 }));
 
+// —— 「Agent 接入」工具：从界面双击等价地跑随包的一键脚本（见 spec/modules/agent-mcp.md） ——
+// 只允许下面这张固定表里的动作，界面不能传任意脚本名/参数，避免变成任意命令执行。
+const AGENT_ACTIONS = {
+  verify: { script: 'verify-agent-mcp.ps1', args: [] },
+  'setup:dsh': { script: 'setup-dsh-mcp.ps1', args: [] },
+  'remove:dsh': { script: 'uninstall-dsh-mcp.ps1', args: [] },
+  'setup:qoder': { script: 'setup-qoder-mcp.ps1', args: [] },
+  'remove:qoder': { script: 'uninstall-qoder-mcp.ps1', args: [] },
+  'setup:trae': { script: 'setup-agent-mcp.ps1', args: ['-Client', 'Trae'] },
+  'remove:trae': { script: 'uninstall-agent-mcp.ps1', args: ['-Client', 'Trae'] },
+  'setup:workbuddy': { script: 'setup-agent-mcp.ps1', args: ['-Client', 'WorkBuddy'] },
+  'remove:workbuddy': { script: 'uninstall-agent-mcp.ps1', args: ['-Client', 'WorkBuddy'] },
+  'setup:zcode': { script: 'setup-agent-mcp.ps1', args: ['-Client', 'ZCode'] },
+  'remove:zcode': { script: 'uninstall-agent-mcp.ps1', args: ['-Client', 'ZCode'] }
+};
+
+function agentScriptDir() {
+  // 打包版：一键脚本在 exe 同目录；开发树：在 app/tools/
+  return app.isPackaged ? PORTABLE_DIR : path.join(__dirname, 'tools');
+}
+
+ipcMain.handle('agent:run', async (_event, action) => {
+  const spec = AGENT_ACTIONS[action];
+  if (!spec) return { ok: false, message: `未知动作：${action}` };
+  const scriptPath = path.join(agentScriptDir(), spec.script);
+  if (!fsSync.existsSync(scriptPath)) {
+    return { ok: false, message: `找不到脚本：${scriptPath}（软件目录不完整？）` };
+  }
+  const quote = (s) => `'${String(s).replace(/'/g, "''")}'`;
+  const argLine = spec.args.map(quote).join(' ');
+  // 用 -Command 先切 UTF-8 输出，避免 PowerShell 5.1 把中文按 GBK 输出成乱码
+  const command = `[Console]::OutputEncoding = New-Object System.Text.UTF8Encoding($false); `
+    + `$OutputEncoding = [Console]::OutputEncoding; & ${quote(scriptPath)} ${argLine}`;
+  return await new Promise((resolve) => {
+    const child = spawn('powershell.exe', ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-Command', command], {
+      cwd: PORTABLE_DIR,
+      windowsHide: true
+    });
+    let stdout = '';
+    let stderr = '';
+    let timedOut = false;
+    const timer = setTimeout(() => {
+      timedOut = true;
+      try { spawnSync('taskkill', ['/pid', String(child.pid), '/T', '/F'], { windowsHide: true, stdio: 'ignore' }); } catch { /* 忽略 */ }
+    }, 180 * 1000);
+    child.stdout.on('data', (d) => { stdout += d.toString('utf8'); if (stdout.length > 200000) stdout = stdout.slice(-100000); });
+    child.stderr.on('data', (d) => { stderr += d.toString('utf8'); if (stderr.length > 200000) stderr = stderr.slice(-100000); });
+    child.on('error', (err) => {
+      clearTimeout(timer);
+      resolve({ ok: false, message: String((err && err.message) || err) });
+    });
+    child.on('close', (code) => {
+      clearTimeout(timer);
+      const output = [stdout.trim(), stderr.trim()].filter(Boolean).join('\n');
+      resolve({
+        ok: !timedOut && code === 0,
+        code,
+        timedOut,
+        output,
+        message: timedOut ? '执行超时（3 分钟），已中止' : (code === 0 ? '完成' : `脚本退出码 ${code}`)
+      });
+    });
+  });
+});
+
 // —— PDF 转格式 工具：文件对话框与 LibreOffice 加装包（见 spec/modules/pdf-convert.md） ——
 // （open-pdfs / open-documents 对话框已并入 OPEN_FILE_DIALOGS 规格表）
 

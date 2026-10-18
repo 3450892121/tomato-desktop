@@ -2,8 +2,10 @@
 
 本项目遵循语义化版本（x.y.z）：修 bug → z+1；加功能 → y+1；重要改动 → x+1。
 
-## 未发布（当前开发线）Qoder / Trae / WorkBuddy / ZCode 一键接入 + Agent 接入体检
+## v2.16.0（2026-10-18）Agent 一键接入扩到 5 个客户端 + 软件内「Agent 接入」页
 
+- **升级提示**：免安装版文件夹名带版本号；升级后旧配置指向已删除的旧目录，需在新版「系统 → Agent 接入」重新点一次对应客户端的「接入」再重启客户端。
+- **软件内接入页（新）**：左侧「系统 → Agent 接入」。不用再翻软件目录找 .cmd：页面上直接点「接入 / 移除」；「一键体检」会真的启动一遍 MCP，列出工具数（正常 41）并指出卡在哪一步。主进程只接受固定动作白名单，渲染进程不能传任意脚本/参数；脚本输出按 UTF-8 显示（中文不乱码），3 分钟超时。
 - **Trae / WorkBuddy / ZCode 一键接入（新）**：
   - `一键接入Trae.cmd`：写 `%APPDATA%\Trae CN\User\mcp.json`（国际版 `%APPDATA%\Trae\User\mcp.json`）的 `mcpServers.tomato-toolbox`，条目 `{command,args,cwd,env}`（Trae schema 没有 `type` 字段，故不写）；Skill 装到 `~/.trae-cn/skills`；
   - `一键接入WorkBuddy.cmd`：写 `~/.workbuddy/mcp.json`，条目 `{type:"stdio",command,args,cwd,env}`；**首次必须在界面点一次「信任」**（「专家·技能·连接器 → 连接器 → 自定义连接器 → MCP 服务管理」），否则对话里看不到工具；Skill 装到 `~/.workbuddy/skills`；

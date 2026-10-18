@@ -3,8 +3,10 @@
 This is a curated English summary of recent releases. The complete, authoritative history is in
 [`CHANGELOG.md`](CHANGELOG.md) (Chinese).
 
-## Unreleased — Qoder / Trae / WorkBuddy / ZCode one-click setup + agent setup check
+## v2.16.0 — 2026-10-18 — five-client agent setup + in-app Agent Setup page
 
+- **Upgrade note**: the portable folder name contains the version; after upgrading, old configs point at the deleted folder. Re-run Connect once in the new version, then restart the client.
+- Added an in-app **System → Agent Setup** page: connect / remove buttons equivalent to the `.cmd` scripts, plus a **Check setup** button that really starts MCP and shows the tool count and any failing step. The main process only accepts a fixed action whitelist (no arbitrary script paths/args); output is UTF-8 and the child process times out after 3 minutes.
 - Added Trae / WorkBuddy / ZCode setup + removal scripts: `一键接入Trae.cmd`, `一键接入WorkBuddy.cmd`, `一键接入ZCode.cmd` and the matching `一键移除…接入.cmd`, backed by `setup-agent-mcp.ps1` / `uninstall-agent-mcp.ps1`.
   - Trae writes `%APPDATA%\Trae CN\User\mcp.json` (or `Trae\User\mcp.json`) with `{command,args,cwd,env}` (Trae's schema has no `type` field).
   - WorkBuddy writes `~/.workbuddy/mcp.json` with `{type:"stdio",command,args,cwd,env}`; a **one-time Trust click** in "MCP 服务管理" is required before the chat can see the tools.

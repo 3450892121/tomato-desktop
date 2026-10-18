@@ -3,6 +3,8 @@
 让支持 MCP 的 agent（DSH / Claude Desktop / Qoder / Trae 等）直接调用本软件的本地能力。
 不需要开 GUI；GUI 仍然是给人用的入口，两边共用同一批 core 模块与加装包。
 
+> 软件里也有入口：左侧「系统 → Agent 接入」，点「接入 / 一键体检」即可，等价于下面的双击脚本。
+
 ## 小白一键接入（DSH，推荐）
 
 **不需要改 JSON、不需要敲命令、不需要装 Node。**
@@ -163,7 +165,7 @@ stdio 传输：客户端把 MCP server 当子进程启动，通过 stdin/stdout 
 
 ## 当前状态
 
-- 第一~四批全部接入：共 41 个 MCP 工具，覆盖 21 个 GUI 工具（视频播放器、软件卸载按需求不暴露）。
+- 第一~四批全部接入：共 41 个 MCP 工具，覆盖 21 个 GUI 工具（视频播放器、软件卸载、Agent 接入本身不暴露）。
 - MCP 冒烟测试：**21 项**，含真实 ffmpeg / OCR / ASR / LibreOffice / pdfjs 渲染 / Canvas 像素管线 / 授权后真实下载 / 路径白名单 / 审计日志 / 只读模式。
 - 现有 `npm test` 保持全绿。
 - **打包产物已实测**：`node tests/pack-mcp-smoke.mjs` 9/9（产物内 41 个工具、addons 路径、pdfjs legacy、@napi-rs/canvas、heic-decode、OCR 全部可用）。

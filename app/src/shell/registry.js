@@ -24,6 +24,7 @@ import audioEdit from '../tools/audio-edit/index.js';
 import transcribe from '../tools/transcribe/index.js';
 import archive from '../tools/archive/index.js';
 import uninstall from '../tools/uninstall/index.js';
+import agentSetup from '../tools/agent-setup/index.js';
 
 /**
  * 左侧导航分组（按此顺序显示；工具声明里的 group 对应这里的 id）。
@@ -63,5 +64,6 @@ export const TOOLS = [
   audioEdit,
   transcribe,
   archive,
-  uninstall
+  uninstall,
+  agentSetup
 ];

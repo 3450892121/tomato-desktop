@@ -26,7 +26,7 @@
 - [第三方声明](../THIRD-PARTY-NOTICES.md) — 依赖许可与分发义务
 
 ### 版本
-- [v2.15.0 更新说明](zh/releases/v2.15.0.md) — 本次更新
+- [v2.16.0 更新说明](zh/releases/v2.16.0.md) — 本次更新
 - [完整更新日志](../CHANGELOG.md) — 中文，全部历史
 
 ### 随包手册
@@ -59,7 +59,7 @@
 - [Third-party notices](../THIRD-PARTY-NOTICES.md)
 
 ### Releases
-- [v2.15.0 release notes](en/releases/v2.15.0.md)
+- [v2.16.0 release notes](en/releases/v2.16.0.md)
 - [Full changelog (Chinese)](../CHANGELOG.md) · [English summary](../CHANGELOG.en.md)
 
 ### Shipped manuals (Chinese)

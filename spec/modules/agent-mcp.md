@@ -22,6 +22,7 @@
   - ZCode 写 `~/.zcode/cli/config.json` 的 `mcp.servers.tomato-toolbox`，条目 `{type:"stdio",command,args,cwd,env,timeoutMs}`；MCP 服务器页开关需打开；Skill 到 `~/.zcode/skills`；
   - 三者各自有 `一键移除…接入.cmd`（共用 `uninstall-agent-mcp.ps1`），配置与 Skill 一起移除并留备份。
 - 接入体检：`一键体检Agent接入.cmd` / `verify-agent-mcp.ps1` 只读检查 DSH / Qoder / Trae / WorkBuddy / ZCode / Claude Desktop 的配置、路径与 Skill，并对已接入的**真的启动 MCP、要求返回工具列表**；异常时退出码 1、写明卡在哪一步。`-NoProbe` 跳过启动，`-Json` 输出机器可读结果。
+- GUI 入口：左侧「系统 → Agent 接入」（`src/tools/agent-setup/`）。页面上每个「接入 / 移除」按钮与同名双击脚本等价，「一键体检」调 `verify-agent-mcp.ps1` 并把原始输出显示在页面里。主进程 `agent:run` 只接受固定动作白名单（动作 → 脚本/参数），渲染进程不能传任意脚本路径或参数；子进程用 UTF-8 输出、3 分钟超时。
 - 接入/移除脚本的硬约束：写前备份且**备份不覆盖**（同秒多次运行会加序号）；写后读回校验，失败用备份回滚；坏 JSON / 结构不对时**一个字节都不改**；重复接入幂等；移除可重复执行且不误删其它 MCP / providers。
 - 支持范围：一键脚本覆盖 DSH / Qoder / Trae / WorkBuddy / ZCode；Claude Desktop 仅体检 + 手动配置。新增客户端必须先从其源码/配置 schema 核实字段，禁止照搬；需要用户在客户端里额外确认的（WorkBuddy「信任」、ZCode 开关），脚本必须明确提示，不能假装已接通。
 
@@ -67,7 +68,7 @@ Agent ──MCP(stdio)────┘
 - `node tests/mcp.test.mjs`：**21 项**，含真实 ffmpeg / OCR / ASR / LibreOffice / pdfjs 渲染 / Canvas 像素管线 / 授权后真实下载 / 路径白名单 / 审计日志 / 只读模式 / 禁止覆盖。
 - `node tests/pack-mcp-smoke.mjs`：9 项，在打包产物上验证 41 个工具、addons 路径、pdfjs legacy、@napi-rs/canvas、heic-decode、OCR、路径白名单与审计日志。
 - `npm test`：现有纯逻辑测试 + MCP 测试全绿。
-- `--smoke-test`：GUI 23 个工具仍正常。
+- `--smoke-test`：GUI 24 个工具仍正常。
 
 ## 非目标
 - 不做远程 MCP、不做云端 OCR/ASR、不做账号体系。

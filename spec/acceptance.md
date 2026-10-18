@@ -308,9 +308,10 @@
 - **小白一键接入（Qoder）**：双击 `一键接入Qoder.cmd` 自动写 `~/.qoder-cn/settings.json` 的 `mcpServers.tomato-toolbox`（先备份；保留其它 MCP 与 providers）、安装 Skill 到 `~/.qoder-cn/skills/tomato-toolbox`、用软件 exe 以 Node 模式启动 MCP；不需要改 JSON/装 Node；Qoder 里状态 `ready`、41 个工具，新对话能实际调用；`一键移除Qoder接入.cmd` 可撤回且不破坏其它配置。
 - **小白一键接入（Trae / WorkBuddy / ZCode）**：`一键接入Trae.cmd` / `一键接入WorkBuddy.cmd` / `一键接入ZCode.cmd` 分别写 Trae 的 `mcp.json`、WorkBuddy 的 `mcp.json`、ZCode 的 `cli\config.json` 的 `mcp.servers`（都先备份、保留其它 MCP/配置），并安装 Skill；字段按各自源码 schema 实现（Trae 无 `type`；ZCode 带 `timeoutMs`）。WorkBuddy 首次必须在界面点「信任」、ZCode 必须打开 MCP 开关，脚本需明确提示。各自 `一键移除…接入.cmd` 可撤回。
 - **接入体检**：`一键体检Agent接入.cmd` / `verify-agent-mcp.ps1` 只读检查 DSH / Qoder / Trae / WorkBuddy / ZCode / Claude Desktop 的配置、路径与 Skill，并对已接入的真的启动 MCP 要工具列表；异常退出码 1 并写明卡在哪一步；`-NoProbe` 跳过启动、`-Json` 输出机器可读结果。
+- **GUI 接入页**：左侧「系统 → Agent 接入」；「接入 / 移除」与双击脚本等价（主进程动作白名单，不接受任意脚本路径），「一键体检」显示脚本原始输出；`--smoke-test` 导航工具数 24。
 - **脚本安全性**：备份不覆盖；写后读回校验、失败回滚；坏 JSON / 结构不对时文件字节不变；重复接入幂等；移除可重复执行；Skill 安装/移除都有备份。
 - **测试**：`tests/agent-mcp-scripts.test.mjs` 16 项（夹具目录，不碰真实配置）；真机 DSH/Qoder/Trae CN/WorkBuddy/ZCode 接入、移除、重接入端到端；ZCode 另配自定义供应商（火山方舟 OpenAI 兼容）后，新对话实际调用 `libreoffice_status` 成功。
 - **明确不是强制的**：大多数工具调用即执行、没有人工确认弹窗；只有视频下载有闸门；审计是事后记录，不是沙箱。
 - **产物安全**：批量重命名默认 `dry_run=true`；不向 agent 暴露原始 ffmpeg/7z 参数。
 - **打包态**：产物内 `resources/app/mcp`、`node_modules/pdfjs-dist/legacy`、`@napi-rs/canvas`、`heic-decode`、`addons/*` 路径正确；MCP 在产物上能跑工具列表、混淆、压缩、PDF 渲染、HEIC、OCR。
-- 证据：`tests/mcp.test.mjs` **21 项**（含路径拒绝/审计/只读/禁止覆盖）、`tests/pack-mcp-smoke.mjs` 9 项、`tests/agent-mcp-scripts.test.mjs` **11 项**、`--videodl-ui-test` 新增 4 项授权断言、`npm test` 全绿、`--smoke-test` 23 工具；Qoder 端到端（`query_mcp` 状态 ready + 41 工具 + 新对话调用 `mcp__tomato_toolbox__ocr_recognize` 成功；移除后重启回答「没有」；重接入后重启报 41 工具）；DSH 真机移除后逐字节恢复（SHA256 一致）；`一键体检Agent接入.cmd` 在本机实测 DSH 与 Qoder 均「正常 / 41 工具」，未接入客户端报「未接入」；配置与工具清单见 `docs/Agent接入说明.md`、`app/mcp/README.md`。
+- 证据：`tests/mcp.test.mjs` **21 项**（含路径拒绝/审计/只读/禁止覆盖）、`tests/pack-mcp-smoke.mjs` 9 项、`tests/agent-mcp-scripts.test.mjs` **16 项**、`--videodl-ui-test` 新增 4 项授权断言、`npm test` 全绿、`--smoke-test` 24 工具（含「系统 → Agent 接入」页）；五个客户端都做过「接入 → 对话里实际调用工具 → 移除 → 重接入」；DSH 真机移除后逐字节恢复（SHA256 一致）；`一键体检` 在本机实测 DSH / Qoder CN / Trae CN / WorkBuddy / ZCode 均「正常 / 41 工具」；GUI 的「一键体检」按钮实测同样返回 5 个正常。配置与工具清单见 `docs/Agent接入说明.md`、`app/mcp/README.md`。

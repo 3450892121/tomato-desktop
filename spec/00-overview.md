@@ -17,6 +17,7 @@
 > 更新记录：v1.16（2026-10-18）小白一键接入 DSH：`一键接入DSH.cmd` 自动写 `cordis.patch.yml`、装 Skill、用软件 exe 以 Node 模式启动 MCP；不需要改 JSON/装 Node。`一键移除DSH接入.cmd` 可撤回。原内容全部保留。
 > 更新记录：v1.17（2026-10-18）接入体检与脚本加固：新增 `一键体检Agent接入.cmd` / `verify-agent-mcp.ps1`（检查 DSH/Qoder/Trae/WorkBuddy/ZCode/Claude 配置并真的启动 MCP 数工具）；接入/移除脚本加写后读回校验、失败回滚、备份不覆盖；DSH 移除改为连 Skill 一起移除（备份在 `skill-backups/`）。原内容全部保留。
 > 更新记录：v1.18（2026-10-18）Trae / WorkBuddy / ZCode 一键接入：三对双击脚本（接入/移除），共用 `setup-agent-mcp.ps1` / `uninstall-agent-mcp.ps1`；字段按各自安装包 schema 核实（Trae 无 type、ZCode 嵌套 mcp.servers 带 timeoutMs）；WorkBuddy 首次需界面点「信任」、ZCode 需打开 MCP 开关。原内容全部保留。
+> 更新记录：v1.19（2026-10-18）软件内「Agent 接入」页：左侧「系统 → Agent 接入」，接入/移除等价一键脚本，另有一键体检（真的启动 MCP 数工具）；主进程动作白名单，渲染进程不能传任意脚本/参数；GUI 工具总数 24（MCP 仍 41，Agent 页不暴露）。原内容全部保留。
 
 ## 项目定位
 把安卓 App「番茄图片混淆」（`番茄图片混淆.apk`）的图片混淆/解混淆能力完整搬到 Windows 电脑上，做成**解压即用的免安装绿色软件**：纯离线、与手机版互相兼容。

@@ -7,10 +7,10 @@
 **A portable Windows toolbox you can unzip and run.** Images, video, audio, PDFs, Office documents, and archives live in one window. No installer, no registry writes — settings stay inside the app folder.
 
 - **Made for non-technical users**: every tool explains itself, defaults are sensible, and outputs never overwrite the originals.
-- **Mostly offline**: only Video Download needs the network; the other 22 tools work offline.
+- **Mostly offline**: only Video Download needs the network; the other 23 tools work offline.
 - **Interoperable with the Android app**: Image Obfuscate / Deobfuscate works both ways with the "番茄图片混淆" Android app.
-- **Agent-ready**: a local MCP server exposes 41 tools. **MCP is general-purpose** (DSH / Claude Desktop / Qoder / Trae, etc.); DSH and Qoder both have double-click setup (`一键接入DSH.cmd` / `一键接入Qoder.cmd`) with no JSON editing and no Node.js install.
-- **This release**: one-click MCP setup now covers Qoder (`一键接入Qoder.cmd`); the DSH entry remains available.
+- **Agent-ready**: a local MCP server exposes 41 tools. DSH / Qoder / Trae / WorkBuddy / ZCode can all be connected in one click — **open the app → System → Agent Setup**, or use the matching `.cmd` scripts. No JSON editing, no Node.js.
+- **This release**: new "Agent Setup" page; one-click setup for Trae / WorkBuddy / ZCode; setup scripts verify and roll back; new "Check setup" action.
 
 > **Two names, one app**: the window title says "番茄工具箱"; the executable is `番茄图片混淆桌面版.exe`. It started as a desktop companion for the Android app and grew into a toolbox.
 
@@ -18,7 +18,7 @@
 
 | Item | Details |
 |---|---|
-| Version | **v2.15.0** |
+| Version | **v2.16.0** |
 | OS | Windows 10 / 11, 64-bit |
 | Install | **Portable**: unzip and run; delete the folder to uninstall |
 | Size | ~810 MB zip, ~1.6 GB extracted |
@@ -28,8 +28,8 @@
 ## 1. Download and run
 
 1. Open [Releases](https://github.com/3450892121/tomato-desktop/releases/latest) and download
-   `tomato-desktop-v2.15.0-win64.zip` (~810 MB).
-   Direct link: <https://github.com/3450892121/tomato-desktop/releases/download/v2.15.0/tomato-desktop-v2.15.0-win64.zip>
+   `tomato-desktop-v2.16.0-win64.zip` (~810 MB).
+   Direct link: <https://github.com/3450892121/tomato-desktop/releases/download/v2.16.0/tomato-desktop-v2.16.0-win64.zip>
 2. Extract it anywhere — Desktop, Documents, or a USB drive; non-ASCII paths are fine.
 3. Double-click `番茄图片混淆桌面版.exe`.
 
@@ -41,7 +41,7 @@ Settings and caches live in `userdata/` inside the app folder. **No registry, no
 
 ## 2. What's inside
 
-**23 tools** in six groups (click a group header to expand/collapse):
+**24 tools** in six groups (click a group header to expand/collapse):
 
 | Group | Tools |
 |---|---|
@@ -50,7 +50,7 @@ Settings and caches live in `userdata/` inside the app folder. **No registry, no
 | Audio | Audio Convert · Audio Edit · Speech-to-Text |
 | Document | PDF Convert · Document Convert · PDF Edit · OCR |
 | Archive | Compress / Extract |
-| System | Software Uninstall |
+| System | Software Uninstall · Agent Setup |
 
 See [Tools](docs/en/tools.md) for details; acceptance criteria live in [`spec/acceptance.md`](spec/acceptance.md) (Chinese).
 
@@ -64,7 +64,9 @@ Good first tasks:
 
 ## 3. Agent access (MCP)
 
-The app ships a local MCP server with **41 tools** covering **21 GUI tools** (Video Player and Software Uninstall are intentionally not exposed).
+The app ships a local MCP server with **41 tools** covering **21 GUI tools** (Video Player, Software Uninstall and Agent Setup itself are intentionally not exposed).
+
+**Easiest way: open the app → System → Agent Setup → click "Connect" for your client** (then fully quit/reopen that client). The double-click scripts below are equivalent.
 
 **One-click setup (DSH / Qoder / Trae / WorkBuddy / ZCode):**
 
@@ -101,7 +103,7 @@ For Claude Desktop and manual setups:
 
 ## 4. What's new
 
-- **Trae / WorkBuddy / ZCode one-click setup**: six new double-click scripts (setup + remove). Trae writes `%APPDATA%\Trae CN\User\mcp.json`; WorkBuddy writes `~/.workbuddy/mcp.json` and needs a one-time **Trust** click; ZCode writes `~/.zcode/cli/config.json` under `mcp.servers`. Every field was verified against the client's own installed schema.
+- **v2.16.0 in-app Agent Setup**: open System → Agent Setup; connect / remove / check with one click (equivalent to the .cmd scripts). Also one-click setup for Trae / WorkBuddy / ZCode.`n- **Trae / WorkBuddy / ZCode one-click setup**: six new double-click scripts (setup + remove). Trae writes `%APPDATA%\Trae CN\User\mcp.json`; WorkBuddy writes `~/.workbuddy/mcp.json` and needs a one-time **Trust** click; ZCode writes `~/.zcode/cli/config.json` under `mcp.servers`. Every field was verified against the client's own installed schema.
 - **Agent setup check + more thorough removal**: new `一键体检Agent接入.cmd` / `verify-agent-mcp.ps1` checks DSH / Qoder / Trae / WorkBuddy / ZCode configs and really starts MCP to count tools; setup scripts now verify what they wrote and roll back on failure, and backups no longer overwrite each other; DSH removal now removes the Skill too (backed up under `skill-backups/`).
 - **Qoder one-click setup**: double-click `一键接入Qoder.cmd`; it writes `~/.qoder-cn/settings.json` (with a backup; other MCP servers and providers are preserved), installs the Skill, and starts MCP via the app executable. No JSON, no Node.js; `一键移除Qoder接入.cmd` removes it. Fully quit/reopen Qoder and start a new conversation to use all 41 tools.
 - **v2.15.0 DSH one-click setup**: double-click `一键接入DSH.cmd`; it writes the config, installs the Skill, and starts MCP via the app executable. No JSON, no Node.js; `一键移除DSH接入.cmd` removes it.
@@ -126,7 +128,7 @@ Check Windows SmartScreen first (**More info** → **Run anyway**). Some antivir
 No. Unzip and run. To remove it, delete the folder.
 
 **Does it need the internet?**
-Only Video Download. The other 22 tools work offline.
+Only Video Download. The other 23 tools work offline.
 
 **Where are outputs? Will originals be overwritten?**
 By default outputs sit next to the input with a suffix such as `-obfuscated` or `-compressed`. **Originals are never overwritten**; duplicate names get a numeric suffix. You can choose another output folder.

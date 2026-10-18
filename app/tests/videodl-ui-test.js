@@ -224,8 +224,12 @@ async function runVideodlUiTest(win) {
 
     // —— 5) 引擎卡片：检查更新 + 自动检查开关（联网失败也如实显示） ——
     await click('[data-action="check-engine"]');
-    await wait(1500);
-    const afterCheck = JSON.parse(await pageState());
+    // 海外 API 走代理时可能要几秒；轮询等结果，别用固定 1.5s 卡网络快慢
+    let afterCheck = JSON.parse(await pageState());
+    for (let i = 0; i < 20 && !/已是最新|发现新版本|检查失败/.test(afterCheck.engineHint); i++) {
+      await wait(500);
+      afterCheck = JSON.parse(await pageState());
+    }
     check('检查更新有反馈', /已是最新|发现新版本|检查失败/.test(afterCheck.engineHint), `hint=${afterCheck.engineHint.slice(0, 80)}`);
     await click('[data-role="autocheck"]');
     await wait(400);

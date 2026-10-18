@@ -13,9 +13,11 @@
 
 配套 Skill：`skills/tomato-toolbox/`，教 Agent 何时用、按什么顺序用、什么不能做、做完怎么验证。
 
-## 2. 一键接入（支持 DSH / Qoder；MCP 通用）
+## 2. 一键接入（DSH / Qoder / Trae / WorkBuddy / ZCode；MCP 通用）
 
 **不需要改 JSON、不需要敲命令、不需要装 Node。**
+
+> **软件里也能点**：打开软件 → 左侧「系统 → Agent 接入」→ 点对应助手的「接入」；另有「一键体检」直接验证工具能不能列出来。
 
 ### DSH
 

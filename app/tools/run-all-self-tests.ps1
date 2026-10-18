@@ -1,4 +1,4 @@
-# 开发树全量自检（按 AGENTS.md「构建与测试命令」逐项跑）
+﻿# 开发树全量自检（按 AGENTS.md「构建与测试命令」逐项跑）
 # 用法：cd app
 #   powershell -ExecutionPolicy Bypass -File tools/run-all-self-tests.ps1
 # 结果：控制台表格 + %TEMP%\tomato-run-all.json
@@ -108,8 +108,8 @@ foreach ($t in $tests) {
   }
   $stdout = ''
   $stderr = ''
-  if (Test-Path $outFile) { $stdout = Get-Content $outFile -Raw -ErrorAction SilentlyContinue }
-  if (Test-Path $errFile) { $stderr = Get-Content $errFile -Raw -ErrorAction SilentlyContinue }
+  if (Test-Path $outFile) { $stdout = [System.IO.File]::ReadAllText($outFile, (New-Object System.Text.UTF8Encoding($false))) }
+  if (Test-Path $errFile) { $stderr = [System.IO.File]::ReadAllText($errFile, (New-Object System.Text.UTF8Encoding($false))) }
   $ms = [int]((Get-Date) - $start).TotalMilliseconds
 
   $ok = $false
@@ -130,7 +130,7 @@ foreach ($t in $tests) {
     # pdf-test 的控制台 JSON 没有 pass/ok；以落盘结果的 ok 为准
     $pdfJson = Join-Path $env:TEMP 'tomato-pdf-test.json'
     if (Test-Path $pdfJson) {
-      $obj = Get-Content $pdfJson -Raw | ConvertFrom-Json
+      $obj = [System.IO.File]::ReadAllText($pdfJson) | ConvertFrom-Json
       $ok = ($obj.ok -eq $true)
       $detail = "tomato-pdf-test.json ok=$($obj.ok)"
     } else {

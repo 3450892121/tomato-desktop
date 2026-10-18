@@ -2,7 +2,7 @@
 
 [Documentation](../README.md) · [Getting started](getting-started.md) · [FAQ](faq.md) · [中文](../zh/tools.md)
 
-**23 tools** in six groups. Click a group header to expand/collapse; long-press to reorder.
+**24 tools** in six groups. Click a group header to expand/collapse; long-press to reorder.
 
 ## Image
 

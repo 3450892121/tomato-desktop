@@ -14,6 +14,9 @@ contextBridge.exposeInMainWorld('desktop', {
   // 应用信息（版本号，界面用来确认打开的是哪个版本）
   appInfo: () => ipcRenderer.invoke('app:info'),
 
+  // 「Agent 接入」工具：跑随包的一键脚本（动作白名单在主进程，界面只能传动作名）
+  agentRun: (action) => ipcRenderer.invoke('agent:run', action),
+
   // 文件对话框
   openImages: () => ipcRenderer.invoke('dialog:open-images'),
   openFolder: () => ipcRenderer.invoke('dialog:open-folder'),

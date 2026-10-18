@@ -7,10 +7,10 @@
 **一个不用安装、双击就能用的 Windows 文件处理工具箱。** 图片、视频、音频、PDF、Office 文档、压缩包这些日常杂活，都收在同一个窗口里；解压即用，配置只写在软件自己的文件夹里，不碰系统。
 
 - **给不懂技术的人用**：每个工具页都写了怎么操作，参数有合理默认值，输出不覆盖原文件。
-- **基本不用联网**：除了「视频下载」（它本来就是下载网络视频），其余 22 个工具断网照常工作。
+- **基本不用联网**：除了「视频下载」（它本来就是下载网络视频），其余 23 个工具断网照常工作。
 - **和手机版互通**：「图片混淆」和安卓 App「番茄图片混淆」互相能解开。
-- **也能给 AI 用**：内置本地 MCP server，**MCP 通用**（DSH / Claude Desktop / Qoder / Trae 等），41 个工具；DSH 与 Qoder 都提供双击一键接入（`一键接入DSH.cmd` / `一键接入Qoder.cmd`），不用改 JSON、不用装 Node。
-- **本次更新**：MCP 一键接入新增 Qoder（`一键接入Qoder.cmd`）；DSH 入口继续可用。
+- **也能给 AI 用**：内置本地 MCP server，**MCP 通用**（DSH / Claude Desktop / Qoder / Trae 等），41 个工具；DSH / Qoder / Trae / WorkBuddy / ZCode 都能一键接入，**软件里「系统 → Agent 接入」点一下就行**，不用改 JSON、不用装 Node。
+- **本次更新**：新增「Agent 接入」页面；Trae / WorkBuddy / ZCode 也支持一键接入；接入脚本写后校验、失败回滚；新增「一键体检」。
 
 > **两个名字是同一个软件**：界面左上角写的是「番茄工具箱」，解压后双击的 exe 叫 `番茄图片混淆桌面版.exe`。最早是给手机版做电脑版，后来工具越加越多，界面名就改成了工具箱。
 
@@ -18,7 +18,7 @@
 
 | 项目 | 说明 |
 |---|---|
-| 版本 | **v2.15.0** |
+| 版本 | **v2.16.0** |
 | 系统 | Windows 10 / 11，64 位 |
 | 安装 | **免安装**：解压就能用，删掉文件夹就是卸载 |
 | 体积 | 压缩包约 810 MB，解压后约 1.6 GB |
@@ -28,8 +28,8 @@
 ## 一、下载和打开
 
 1. 打开 [Releases](https://github.com/3450892121/tomato-desktop/releases/latest)，下载
-   `tomato-desktop-v2.15.0-win64.zip`（约 810 MB）。
-   直链：<https://github.com/3450892121/tomato-desktop/releases/download/v2.15.0/tomato-desktop-v2.15.0-win64.zip>
+   `tomato-desktop-v2.16.0-win64.zip`（约 810 MB）。
+   直链：<https://github.com/3450892121/tomato-desktop/releases/download/v2.16.0/tomato-desktop-v2.16.0-win64.zip>
 2. 解压到任意文件夹——桌面、文档、U 盘都行，路径里有中文也没关系。
 3. 双击 `番茄图片混淆桌面版.exe`。
 
@@ -41,7 +41,7 @@
 
 ## 二、里面有哪些工具
 
-一共 **23 个**，按六组放在左侧导航（点分组标题可展开 / 收起）：
+一共 **24 个**，按六组放在左侧导航（点分组标题可展开 / 收起）：
 
 | 分组 | 工具 |
 |---|---|
@@ -50,7 +50,7 @@
 | 音频 | 音频格式转换 · 音频剪辑 · 语音转文字 |
 | 文档 | PDF 转格式 · 文档格式转换 · PDF 编辑整理 · 文字识别 |
 | 压缩 | 压缩与解压 |
-| 系统 | 软件卸载 |
+| 系统 | 软件卸载 · Agent 接入 |
 
 每个工具的详细说明见 [工具清单](docs/zh/tools.md)；逐条验收与测试口径见 [`spec/acceptance.md`](spec/acceptance.md)。
 
@@ -64,7 +64,9 @@
 
 ## 三、给 AI 助手用（MCP）
 
-软件内置一个本地 MCP server：41 个工具，覆盖 21 个 GUI 工具（视频播放器、软件卸载不暴露）。
+软件内置一个本地 MCP server：41 个工具，覆盖 21 个 GUI 工具（视频播放器、软件卸载、Agent 接入本身不暴露）。
+
+**最简单的接入方式：打开软件 → 左侧「系统 → Agent 接入」→ 点对应 AI 助手的「接入」**（装完按页面提示完全退出重开客户端）。下面是不打开软件时的双击脚本方式，二者等价。
 
 **一键接入（DSH / Qoder / Trae / WorkBuddy / ZCode 都有）：**
 
@@ -101,7 +103,7 @@
 
 ## 四、本次更新
 
-- **Trae / WorkBuddy / ZCode 一键接入**：新增 6 个双击脚本（接入/移除各一）。Trae 写 `%APPDATA%\Trae CN\User\mcp.json`；WorkBuddy 写 `~/.workbuddy/mcp.json` 且首次要在界面点一次「信任」；ZCode 写 `~/.zcode/cli/config.json` 的 `mcp.servers`。三家字段都从各自安装包 schema 核实。
+- **v2.16.0 软件内「Agent 接入」页**：打开「系统 → Agent 接入」，点「接入 / 移除 / 一键体检」即可（等价于双击脚本）；同时新增 Trae / WorkBuddy / ZCode 一键接入。`n- **Trae / WorkBuddy / ZCode 一键接入**：新增 6 个双击脚本（接入/移除各一）。Trae 写 `%APPDATA%\Trae CN\User\mcp.json`；WorkBuddy 写 `~/.workbuddy/mcp.json` 且首次要在界面点一次「信任」；ZCode 写 `~/.zcode/cli/config.json` 的 `mcp.servers`。三家字段都从各自安装包 schema 核实。
 - **Agent 接入体检 + 移除更彻底**：新增 `一键体检Agent接入.cmd` / `verify-agent-mcp.ps1`，检查 DSH / Qoder / Trae / WorkBuddy / ZCode 的配置并真的启动 MCP 数工具；接入脚本写完后会读回校验、失败自动回滚，备份不再互相覆盖；DSH 移除现在会把 Skill 一起移走（备份在 `skill-backups/`）。
 - **Qoder 一键接入**：双击 `一键接入Qoder.cmd`，自动写 `~/.qoder-cn/settings.json`（先备份；其它 MCP 与 providers 保留）、安装 Skill、用软件 exe 启动 MCP；不需要改 JSON、不需要装 Node；`一键移除Qoder接入.cmd` 可撤回。Qoder 里完全退出重开并新开对话即可用 41 个工具。
 - **v2.15.0 MCP 一键接入（DSH）**：双击 `一键接入DSH.cmd`，自动写配置、装 Skill、用软件 exe 启动 MCP；不需要改 JSON、不需要装 Node；`一键移除DSH接入.cmd` 可撤回。
@@ -126,7 +128,7 @@ A：先看是不是 Windows SmartScreen 拦了（「更多信息」→「仍要�
 A：不需要安装。解压就能用；不要了直接删掉整个文件夹。
 
 **Q：需要联网吗？**
-A：除「视频下载」外都不需要。断网时其余 22 个工具照常工作。
+A：除「视频下载」外都不需要。断网时其余 23 个工具照常工作。
 
 **Q：处理完的文件存在哪？会不会覆盖原图？**
 A：默认存在原文件旁边，文件名加「-混淆」「-压缩」这类后缀，**不覆盖原文件**；重名自动加序号。也可以自己选目录。

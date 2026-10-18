@@ -7,7 +7,7 @@
 Open [Releases](https://github.com/3450892121/tomato-desktop/releases/latest) and download:
 
 ```text
-tomato-desktop-v2.15.0-win64.zip   (~820 MB)
+tomato-desktop-v2.16.0-win64.zip   (~820 MB)
 ```
 
 Do not download the source archive only; it does not contain the add-ons required for all features.

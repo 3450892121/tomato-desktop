@@ -25,7 +25,7 @@
 混淆 / 解混淆必须使用**同一个模式 + 同一个密钥**。尺寸规则：`b`（方块）模式会补到 32 的倍数，其它模式保持原尺寸。
 
 **需要联网吗？**
-除「视频下载」外都不需要。断网时其余 22 个工具照常工作。
+除「视频下载」外都不需要。断网时其余 23 个工具照常工作。
 
 **提示缺少加装包？**
 Release 成品包已带齐 ffmpeg、LibreOffice、Real-ESRGAN、FunASR、OCR、7-Zip、yt-dlp、HiBit。若你拿到的是精简版（部分分发因许可不带 HiBit），恢复「软件卸载」见 [`加装包说明.txt`](../加装包说明.txt)。
@@ -54,6 +54,9 @@ Release 成品包已带齐 ffmpeg、LibreOffice、Real-ESRGAN、FunASR、OCR、7
 - **Trae**：确认双击了 `一键接入Trae.cmd`，完全退出重开，并且是**新任务/新对话**；工具名前缀是 `mcp_tomato-toolbox_`。
 - **WorkBuddy**：第一次要去「专家·技能·连接器 → 连接器 → 自定义连接器 → MCP 服务管理」找到 `tomato-toolbox` 点一次「**信任**」，否则对话里看不到工具。
 - **ZCode**：按 `Ctrl+K` 搜「MCP 服务器」，确认 `tomato-toolbox` 开关是打开的；如果顶部提示「当前没有可用模型」，先配好 ZCode 自己的模型（和工具箱无关）。
+
+**软件里从哪接入 Agent？**
+打开软件 → 左侧「系统 → Agent 接入」→ 点对应助手的「接入」，再点「一键体检」验证。不用去软件目录找 .cmd。
 
 **接完不确定有没有生效？**
 双击 `一键体检Agent接入.cmd`。它会检查 DSH / Qoder / Trae / WorkBuddy / ZCode 的配置和 Skill，并真的启动一遍 MCP 数工具；最后给出「正常 / 异常 / 未接入」和卡在哪。它不会改任何配置。

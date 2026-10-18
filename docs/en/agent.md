@@ -13,9 +13,11 @@ The app ships a **local MCP server** so MCP-capable agents (DSH, Claude Desktop,
 
 The Skill lives in `skills/tomato-toolbox/` and teaches the agent when to use tools, in what order, what not to do, and how to verify results.
 
-## 2. One-click setup (DSH / Qoder; MCP is general-purpose)
+## 2. One-click setup (DSH / Qoder / Trae / WorkBuddy / ZCode; MCP is general-purpose)
 
 **No JSON editing, no commands, no Node.js installation.**
+
+> **Or do it inside the app**: open System → Agent Setup, click "Connect" for your client; "Check setup" verifies the tool list.
 
 ### DSH
 
