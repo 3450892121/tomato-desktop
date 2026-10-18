@@ -311,6 +311,16 @@ for (const f of ['一键接入DSH.cmd', 'setup-dsh-mcp.ps1', '一键移除DSH接
 }
 fs.mkdirSync(path.join(outDir, 'userdata'), { recursive: true });
 
+// 项目许可与第三方声明：随包分发（Electron 自带的 LICENSE 先另存，避免被项目 MIT 覆盖）
+const projectLicense = path.join(repoRoot, 'LICENSE');
+const thirdParty = path.join(repoRoot, 'THIRD-PARTY-NOTICES.md');
+const electronLicense = path.join(outDir, 'LICENSE');
+if (fs.existsSync(electronLicense)) {
+  fs.copyFileSync(electronLicense, path.join(outDir, 'LICENSE.electron.txt'));
+}
+if (fs.existsSync(projectLicense)) fs.copyFileSync(projectLicense, path.join(outDir, 'LICENSE'));
+if (fs.existsSync(thirdParty)) fs.copyFileSync(thirdParty, path.join(outDir, 'THIRD-PARTY-NOTICES.md'));
+
 // —— 5b) 可选加装包（LibreOffice）：存在就一起打包，保证「解压即用全部功能」 ——
 // 说明：加装包不进 git（体积约 1.5GB），放在 app/addons/libreoffice/（见 spec/modules/pdf-convert.md）。
 //       没有它时 PDF→Word 与高保真 Office→PDF 会提示需加装，其余功能不受影响。
