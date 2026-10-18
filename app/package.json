@@ -8,7 +8,7 @@
   "license": "UNLICENSED",
   "scripts": {
     "start": "electron .",
-    "test": "node tests/engine.test.mjs && node tests/taskqueue.test.mjs && node tests/archive.test.mjs && node tests/imghide.test.mjs && node tests/navorder.test.mjs && node tests/uninstall.test.mjs && node tests/settingsschema.test.mjs && node tests/uniquepath.test.mjs && node tests/videodl.test.mjs && node tests/docconvert.test.mjs",
+    "test": "node tests/engine.test.mjs && node tests/taskqueue.test.mjs && node tests/archive.test.mjs && node tests/imghide.test.mjs && node tests/navorder.test.mjs && node tests/uninstall.test.mjs && node tests/settingsschema.test.mjs && node tests/uniquepath.test.mjs && node tests/videodl.test.mjs && node tests/docconvert.test.mjs && node tests/mcp.test.mjs",
     "icon": "node tools/make-icon.js",
     "pack": "node tools/pack.js"
   },
@@ -16,6 +16,7 @@
     "electron": "^44.4.2"
   },
   "dependencies": {
+    "@napi-rs/canvas": "^1.0.9",
     "@cantoo/fontkit": "^2.0.12",
     "@cantoo/pdf-lib": "^2.11.1",
     "docx-preview": "^0.4.0",

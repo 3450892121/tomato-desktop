@@ -2041,6 +2041,15 @@ app.on('will-quit', () => {
     try { heicWorker.terminate(); } catch { /* 已退出 */ }
     heicWorker = null;
   }
+  // 「本次运行免确认」不跨重启：退出时把 Agent 下载授权清掉，下次打开重新问。
+  try {
+    fsSync.mkdirSync(USER_DATA_DIR, { recursive: true });
+    fsSync.writeFileSync(
+      path.join(USER_DATA_DIR, 'videodl-agent-approvals.json'),
+      JSON.stringify({ sessionUntil: 0, onceUntil: 0, updatedAt: Date.now() }, null, 2),
+      'utf8'
+    );
+  } catch { /* 退出时写失败不影响使用 */ }
 });
 
 // —— 视频播放器（工具：player；见 spec/modules/player.md） ——
@@ -2626,4 +2635,31 @@ ipcMain.handle('videodl:engine-update', async () => {
       if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send('videodl:engine-progress', { received, total });
     }
   });
+});
+
+// —— 视频下载 · Agent 授权闸门（GUI 写、MCP 只读） ——
+// 为什么单独存文件：MCP server 是独立进程，不能走 Electron IPC；它读同一个 userdata 文件即可。
+// 安全边界：没有任何 MCP 工具能改这个文件——只有用户在本页面点开关/「允许一次」才会写。
+let videodlApprovalPromise = null;
+function loadVideodlApproval() {
+  if (!videodlApprovalPromise) videodlApprovalPromise = import('./src/tools/videodl/core/agent-approval.mjs');
+  return videodlApprovalPromise;
+}
+
+ipcMain.handle('videodl:agent-status', async () => {
+  const lib = await loadVideodlApproval();
+  return { ok: true, ...lib.approvalStatus(USER_DATA_DIR) };
+});
+
+ipcMain.handle('videodl:agent-grant', async (_event, mode) => {
+  const lib = await loadVideodlApproval();
+  if (mode === 'once') await lib.grantOnce(USER_DATA_DIR);
+  else await lib.grantSession(USER_DATA_DIR);
+  return { ok: true, ...lib.approvalStatus(USER_DATA_DIR) };
+});
+
+ipcMain.handle('videodl:agent-revoke', async () => {
+  const lib = await loadVideodlApproval();
+  await lib.revokeAll(USER_DATA_DIR);
+  return { ok: true, ...lib.approvalStatus(USER_DATA_DIR) };
 });

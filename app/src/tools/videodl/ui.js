@@ -34,6 +34,18 @@ const MARKUP = `
       </div>
     </section>
 
+    <section class="card vdl-agent-card">
+      <div class="vdl-agent-head">
+        <h3 class="vdl-subtitle">AI 助手下载</h3>
+        <span class="vdl-agent-badge" data-role="agent-badge">每次询问</span>
+      </div>
+      <label class="vdl-agent-toggle">
+        <input type="checkbox" data-role="agent-allow" /> 允许 AI 助手直接下载（本次运行有效）
+      </label>
+      <p class="vdl-hint" data-role="agent-hint">关闭时，AI 每次下载前都需要你在软件里点「允许一次」。</p>
+      <button class="btn btn-ghost btn-sm" data-action="agent-once">允许一次</button>
+    </section>
+
     <section class="card vdl-engine-card">
       <div class="vdl-engine-head">
         <h3 class="vdl-subtitle">下载引擎</h3>
@@ -69,7 +81,11 @@ export function mount(container, ctx) {
     engineHint: container.querySelector('[data-role="engine-hint"]'),
     checkEngine: container.querySelector('[data-action="check-engine"]'),
     updateEngine: container.querySelector('[data-action="update-engine"]'),
-    autocheck: container.querySelector('[data-role="autocheck"]')
+    autocheck: container.querySelector('[data-role="autocheck"]'),
+    agentAllow: container.querySelector('[data-role="agent-allow"]'),
+    agentBadge: container.querySelector('[data-role="agent-badge"]'),
+    agentHint: container.querySelector('[data-role="agent-hint"]'),
+    agentOnce: container.querySelector('[data-action="agent-once"]')
   };
   state = { ctx, els, dir: '', jobs: [], status: null, unsub: [], engineBusy: false };
 
@@ -83,6 +99,8 @@ export function mount(container, ctx) {
     if (!state) return;
     state.ctx.settings.updateSettings({ videodlAutoCheck: els.autocheck.checked });
   });
+  els.agentAllow.addEventListener('change', () => toggleAgentAllow());
+  els.agentOnce.addEventListener('click', () => grantAgentOnce());
 
   // 订阅主进程推送：任务列表变化 + 引擎更新下载进度（unmount 时退订）
   state.unsub.push(window.desktop.videodlOnChanged((list) => {
@@ -98,6 +116,7 @@ export function mount(container, ctx) {
   ctx.setInfo({});
   refreshStatus();
   refreshList();
+  refreshAgentStatus();
 }
 
 export function activate() {
@@ -144,9 +163,54 @@ async function refreshStatus({ silent } = {}) {
   }
 }
 
+async function refreshAgentStatus() {
+  if (!state) return;
+  const st = await window.desktop.videodlAgentStatus().catch(() => null);
+  if (!state) return;
+  applyAgentStatus(st || {});
+}
+
+function applyAgentStatus(st) {
+  if (!state) return;
+  const session = !!(st && st.session);
+  const once = !!(st && st.once);
+  state.els.agentAllow.checked = session;
+  state.els.agentBadge.textContent = session ? '本次运行已允许' : (once ? '已允许一次' : '每次询问');
+  state.els.agentBadge.className = `vdl-agent-badge${session ? ' is-ok' : (once ? ' is-new' : '')}`;
+  state.els.agentHint.textContent = session
+    ? '已允许：在本次运行期间，AI 可以直接下载视频（关掉软件就恢复询问）。'
+    : (once
+      ? '已允许一次：AI 下一次下载会直接开始（5 分钟内有效）。'
+      : '关闭时，AI 每次下载前都需要你在软件里点「允许一次」。');
+}
+
+async function toggleAgentAllow() {
+  if (!state) return;
+  const on = state.els.agentAllow.checked;
+  const request = on ? window.desktop.videodlAgentGrant('session') : window.desktop.videodlAgentRevoke();
+  const st = await request.catch(() => null);
+  if (!state) return;
+  if (!st || st.ok === false) {
+    state.els.agentAllow.checked = !on;
+    state.els.agentHint.textContent = '授权状态保存失败，请稍后重试。';
+    return;
+  }
+  applyAgentStatus(st);
+}
+
+async function grantAgentOnce() {
+  if (!state) return;
+  const st = await window.desktop.videodlAgentGrant('once').catch(() => null);
+  if (!state) return;
+  if (!st || st.ok === false) {
+    state.els.agentHint.textContent = '授权状态保存失败，请稍后重试。';
+    return;
+  }
+  applyAgentStatus(st);
+}
+
 function renderEngine(st) {
-  const { els } = state;
-  if (!st.engine) {
+  const { els } = state;  if (!st.engine) {
     els.engineBadge.textContent = '未就绪';
     els.engineBadge.className = 'vdl-engine-badge is-bad';
     els.engineLine.textContent = '未检测到下载引擎（addons/ytdlp/yt-dlp.exe）。'

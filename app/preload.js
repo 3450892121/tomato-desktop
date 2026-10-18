@@ -161,6 +161,10 @@ contextBridge.exposeInMainWorld('desktop', {
     ipcRenderer.on('videodl:engine-progress', handler);
     return () => ipcRenderer.removeListener('videodl:engine-progress', handler);
   },
+  // AI 助手下载授权（GUI 写、MCP 只读；见 src/tools/videodl/core/agent-approval.mjs）
+  videodlAgentStatus: () => ipcRenderer.invoke('videodl:agent-status'),
+  videodlAgentGrant: (mode) => ipcRenderer.invoke('videodl:agent-grant', mode),
+  videodlAgentRevoke: () => ipcRenderer.invoke('videodl:agent-revoke'),
 
   // PDF 工具：专用文件对话框与 LibreOffice 加装包
   openPdfs: () => ipcRenderer.invoke('dialog:open-pdfs'),
