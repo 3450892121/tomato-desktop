@@ -1,245 +1,192 @@
-# 番茄图片混淆 桌面版
+# 番茄工具箱 桌面版
 
-把安卓 App「番茄图片混淆」（`番茄图片混淆.apk`）的图片混淆 / 解混淆能力完整搬到 Windows 电脑上：
-**免安装绿色版、纯离线、与手机版互相兼容**，给身边人用的傻瓜化工具。
+[中文](README.md) · [English](README.en.md) · [文档中心](docs/README.md) · [更新日志](CHANGELOG.md) · [Releases](https://github.com/3450892121/tomato-desktop/releases)
 
-软件按「工具箱」形态搭建：左侧按「图片 / 视频 / 音频 / 文档 / 压缩 / 系统」分组列出全部工具——
-- 图片：图片混淆、图片压缩、图片变清晰、图片格式转换、批量重命名、加水印、长图拼接、九宫格切图、文件藏图
-- 视频：视频下载、视频播放器、视频格式转换、视频压缩、动图与视频互转
-- 音频：音频格式转换、音频剪辑、语音转文字
-- 文档：PDF 转格式、文档格式转换、PDF 编辑整理、文字识别
-- 压缩：压缩与解压
-- 系统：软件卸载
+![番茄工具箱主界面：左边是工具分类，右边是「图片混淆」](docs/images/main.png)
 
-右侧是当前工具界面；新功能按同一套模板低成本接入（见 `docs/新增工具指南.md`）。
+**一个不用安装、双击就能用的 Windows 文件处理工具箱。** 图片、视频、音频、PDF、Office 文档、压缩包这些日常杂活，都收在同一个窗口里；解压即用，配置只写在软件自己的文件夹里，不碰系统。
 
-> 离线说明：除「视频下载」外全部工具纯离线可用。「视频下载」按用户需求立项，**天生需要联网**（下载网络视频）；
-> 它不影响其余工具的离线性（断网时只是这个工具用不了）。
+- **给不懂技术的人用**：每个工具页都写了怎么操作，参数有合理默认值，输出不覆盖原文件。
+- **基本不用联网**：除了「视频下载」（它本来就是下载网络视频），其余 22 个工具断网照常工作。
+- **和手机版互通**：「图片混淆」和安卓 App「番茄图片混淆」互相能解开。
+- **也能给 AI 用**：内置本地 MCP server，41 个工具；DSH 用户双击 `一键接入DSH.cmd` 即可，不用改 JSON、不用装 Node。
 
----
+> **两个名字是同一个软件**：界面左上角写的是「番茄工具箱」，解压后双击的 exe 叫 `番茄图片混淆桌面版.exe`。最早是给手机版做电脑版，后来工具越加越多，界面名就改成了工具箱。
 
-## 当前状态（v2.15.0）
+## 软件信息
 
-| 项 | 状态 |
+| 项目 | 说明 |
 |---|---|
-| **文档格式转换（新，v2.13.0）**：老版 Word/Excel/PPT（doc/xls/ppt/pps）与写字板 RTF → docx/xlsx/pptx/PDF，**含教务系统导出的「假 .xls」（Excel 2003 XML）**——手机打不开的老文档转完就能开；智能模式自动配对目标 | ✅ 可用（引擎为随包 LibreOffice，与「PDF 转格式」共用调用机制；自检含「假 .xls」/真 BIFF .xls/RTF/坏文件夹具的真实 IPC 转换与内容读回，`--doc-test`/`--doc-ui-test` 全绿） |
-| **老格式输入补齐（v2.13.0）**：图片格式转换新增 TIFF/PCX/TGA/PSD/DDS/JPEG2000 输入（随包 ffmpeg 解码）；视频转换新增 asf/3g2/f4v/mts/m2ts；音频转换新增 shn/voc/mka | ✅ 可用（解码器逐一验证在位；`--media-test` oldimage 段全绿） |
-| **Agent 入口（新，v2.14.0；v2.14.1 安全加固；v2.15.0 小白一键接入）**：本地 MCP server，41 个工具覆盖 21 个 GUI 工具（视频播放器、软件卸载不暴露）；视频下载默认每次授权，授权由 GUI 写、MCP 只读；路径白名单、审计日志、只读模式、禁止覆盖；DSH 用户双击 `一键接入DSH.cmd` 即可，不用改 JSON/装 Node | ✅ 可用（`tests/mcp.test.mjs` 21 项 + `tests/pack-mcp-smoke.mjs` 9 项；`npm test` 全绿；配置见 `docs/Agent接入说明.md`） |
-| **视频下载（新，v2.12.0）**：粘贴链接下载网络视频——抖音 / 小红书 / B站 / YouTube / 央视频 / yt-dlp 支持的站点 / MP4·M3U8·MPD 直链；引擎可自更新 | ✅ 可用（引擎为随包 yt-dlp，`addons/ytdlp/`；来源 `github.com/Lyee0011/leetools`（MIT）引擎移植 + 界面重画，未移植其 HTTP 服务层；对上游三项加固：**可取消**、**历史落盘**、**引擎自更新校验不过即拒绝**；自检含真实下载、取消清理、历史重启可读、缺包降级） |
-| **导航长按拖动排序（新，v2.11.0）**：左侧**长按约 400ms** 即拿起拖动——拖分组标题移动整个分组（主项目）、拖组内工具在本组内移动（子项目）；快速点击行为不变（切工具 / 展开收起照旧） | ✅ 可用（DOM 序 + 落盘双断言；长按未满就移动 ≥4px＝放弃按压不进入拖拽；拖完 500ms 内的误触 click 被拦下；「↺ 恢复默认顺序」只在排过序时显示；界面测试含拖分组 / 拖工具 / 防误触 / 清空全流程） |
-| **产物瘦身 + 交付质量（v2.11.1）**：产物 2548→1487.5 MB（zip 1050→771.2 MB，删运行期用不到的多语言字典/翻译/DirectML/sourcemap 等）；「添加图片」不再为一张缩略图把整图摊开两次（拖文件夹不再冻结界面）；修掉产物上中文字体读不到（中文水印/页码曾静默降级）；自检假绿加固 | ✅ 可用（最终产物 25 项自检 25/25；LibreOffice 三条转换与裁剪前**逐字节一致**；OCR 在产物上首次通过 `--ocr-poc`；升级路径实测：完整版 LO 旧配置 + 裁剪版 LO 转换逐字节一致） |
-| **软件卸载（新）**：一键启动随包内置的卸载工具（管理员权限），把软件连同残留一起清掉 | ✅ 可用（官方原版 HiBit 便携版随包，`addons/hibit/`；Windows 标准 RunAs 提权 + 系统 UAC 把关，不静默提权、不代替用户点；自检含哈希一致、清单权限、空跑无进程与缺失降级） |
-| **文件藏图**：把任意文件藏进一张图片（可随机生成封面 + 水印 + 可选密码），也能从别人发来的图夹图里取出文件 | ✅ 可用（**两种容器都支持**：默认「动态混淆（极速）」= 图片尾部追加，网站/APP 打开即解、不弹密码框、多大文件都能开；「图夹 PRO（防查）」= V6 容器 + 可选密码。自检里用官方实现当裁判：我们打的图官方能解、官方打的图我们能解，两套格式都逐字节一致） |
-| **视频播放器**：软件内直接播视频，MP4/WebM 直接播，MKV/FLV/TS 无损换封装，AVI/WMV 等老编码自动重编码 | ✅ 可用（8 种格式端到端实测：7 种夹具真实播放 + 界面全流程 `pass:true`；播放走 Range 分块，不动原文件，缓存用完即清） |
-| **压缩与解压（新）**：ZIP/7Z/TAR/GZIP + BZIP2/XZ/ZSTANDARD/BROTLI 双向、RAR 等仅解压 | ✅ 可用（13 种格式真实往返逐字节一致；密码 AES-256、分卷、免解压预览、zip-slip 防护） |
-| **跨工具任务队列 + 任务中心（新）** | ✅ 可用（顶栏「任务」按钮 + 未完成徽标；切走工具页任务照跑完，界面测试含 LRU 回收后仍跑完的核心断言） |
-| **PDF 编辑整理（新）**：压缩瘦身 / 文字水印 / 页码 / 旋转 / 重排 / 加密 / 解密 | ✅ 可用（七类操作均读回校验；压缩实测 1,052,712B → 170,874B 约 −84%） |
-| **文字识别（新）**：扫描件 → 可搜索 PDF（Ctrl+F 可搜、可复制）/ 纯文本 / Word；预处理与压缩 | ✅ 可用（OCR 引擎闸门 3/3 召回 100%、零网络请求；多页可搜索 PDF 关键词命中 3/3） |
-| **设置导入导出（新）** | ✅ 可用（换电脑一键带走；只合并已知键，野文件拒绝且不破坏现有配置） |
-| **苹果风磨砂玻璃 + 选中一眼可见（新）** | ✅ 可用（侧栏/顶栏/卡片/弹窗/抽屉磨砂玻璃 + 背景光晕与底噪；选中项染色块 + 描边 + 弹簧放大；切工具不再重建侧栏、不再闪） |
-| **深色模式**：浅色 / 深色 / 跟随系统 | ✅ 可用（顶栏一键切换；只覆盖主题变量，23 个工具零改动适配；`--theme-test` 通过） |
-| **视频压缩（新）**：画质档 / 目标体积（两遍编码） | ✅ 可用（实测 3.48MB → 1.05MB；目标 1.5MB 得 1.44MB 达标） |
-| **音频剪辑（新）**：波形选区截取 / 拼接 / 淡入淡出 / 音量标准化 | ✅ 可用（纯截取 3.03s/75ms；21 段拼接 95.96s→95.63s 可完整解码） |
-| **图片批量四件套**：批量重命名 / 加水印 / 长图拼接 / 九宫格切图 | ✅ 可用（像素级校验；批量重命名 v2.9.0 起支持按修改时间排序、命名冲突三策略（跳过/替换/自动编号）、执行前确认与日志导出） |
-| **保活页 LRU 回收** | ✅ 可用（只保「动过」的页：点开看看不占额度、切走即释放；动过的页最多 5 个，超出回收最久没用过的，当前页不回收） |
-| **工具页状态保持 + 组件库动效** | ✅ 可用（切走再切回列表/输入/预览/顶栏提示全部保留） |
-| **侧栏分组默认折叠** | ✅ 可用（打开时只显示分类标题，点标题平滑展开/收起并记住选择） |
-| **音频格式转换**：21 种输出格式；视频提取声音 | ✅ 可用（自检 21/21 格式真实转码 + 回读校验） |
-| **语音转文字**：音频/视频 → 文字（中英日韩粤），.txt / .srt | ✅ 可用（纯离线纯 CPU，FunASR 加装包随包） |
-| **AI 放大（超分，图片变清晰）** | ✅ 可用（Real-ESRGAN 加装包随包；需 Vulkan 显卡） |
-| 六大模式混淆 / 解混淆 | ✅ 可用（逐像素可逆，自动测试 55/55 通过） |
-| 单张 / 批量 / 拖拽 / 剪贴板 / 保存 | ✅ 可用（界面自动测试 `pass: true`） |
-| 设置面板、内置帮助、使用说明 | ✅ 可用 |
-| **PDF 转格式**：PDF↔图片、图片→PDF、合并/拆分/提取页、Word/Excel→PDF | ✅ 可用（自检 + 界面测试均通过） |
-| PDF → Word / 高保真 Office→PDF（LibreOffice 加装包） | ✅ 已实测，**随主包附带、开箱即用** |
-| **图片压缩**：画质/尺寸/目标大小、批量 | ✅ 可用（实测 18 KB → 7 KB / -61%） |
-| **图片变清晰**：6 档预设 + 自定义、原图对比预览 | ✅ 可用（锐度指标 52.6 → 81.2，+54%） |
-| **图片格式转换**：PNG/JPG/WebP/BMP/ICO/TIFF/GIF/AVIF，输入另支持 HEIC/HEIF/HIF 手机拍照格式与 TIFF/PCX/TGA/PSD/DDS/JPEG2000 老格式 | ✅ 可用（BMP/ICO 自研编码器，产物经解码校验；HEIC 走内置 libheif 引擎、老格式走随包 ffmpeg 解码，纯离线） |
-| **视频格式转换**：MP4/WebM/MKV/MOV/AVI | ✅ 可用（真实转码 + 逐个解码校验，进度可取消） |
-| **动图与视频互转**：GIF/WebP 动图/APNG ↔ 视频 | ✅ 可用（含聊天表情预设与目标大小自动降档） |
-| ffmpeg / Real-ESRGAN / FunASR / OCR / 7-Zip / HiBit 加装包 | ✅ **全部随主包附带**（见 `addons/` 各目录的许可与来源） |
-| 版本号可见（左上角徽章 / 窗口标题 / 帮助「关于」） | ✅ 可用（随包显示当前版本） |
-| 免安装打包（含图标 / 版本信息 / 压缩包） | ✅ 已产出（最新 v2.15.0：文件夹约 1.6 GB + zip 约 819 MB；打包含产物瘦身约 1005MB） |
-| 与手机版互相兼容（真机样本实测） | ⏳ **待用手机样本锁定**（工具已就绪，见 `docs/兼容性变体说明.md`） |
+| 版本 | **v2.15.0** |
+| 系统 | Windows 10 / 11，64 位 |
+| 安装 | **免安装**：解压就能用，删掉文件夹就是卸载 |
+| 体积 | 压缩包约 820 MB，解压后约 1.6 GB |
+| 联网 | 只有「视频下载」需要联网，其余断网可用 |
+| 许可 | MIT（见 [`LICENSE`](LICENSE)），第三方声明见 [`THIRD-PARTY-NOTICES.md`](THIRD-PARTY-NOTICES.md) |
 
----
+## 一、下载和打开
 
-## 快速开始
+1. 打开 [Releases](https://github.com/3450892121/tomato-desktop/releases/latest)，下载
+   `tomato-desktop-v2.15.0-win64.zip`（约 820 MB）。
+2. 解压到任意文件夹——桌面、文档、U 盘都行，路径里有中文也没关系。
+3. 双击 `番茄图片混淆桌面版.exe`。
 
-### 直接使用（给使用者）
-双击免安装文件夹里的 `番茄图片混淆桌面版.exe` 即可，无需安装。详见 `docs/使用说明.txt`。
-**随包已内含全部加装包（LibreOffice、ffmpeg、Real-ESRGAN、FunASR、OCR、7-Zip、HiBit、yt-dlp）——解压后全部功能（含 PDF→Word、视频格式转换、AI 放大、语音转文字、文字识别、压缩解压、视频下载）立即可用，无需任何额外安装。**
+第一次打开时，Windows 可能弹出蓝色提示「Windows 已保护你的电脑」——点「更多信息」→「仍要运行」即可。软件没有买数字签名，这个提示属于正常现象。
 
-### 给 AI 助手用（MCP）
-软件同时提供一个本地 MCP server，支持 MCP 的 agent（DSH / Claude Desktop / Qoder / Trae 等）可以直接调用 41 个工具，覆盖 21 个 GUI 工具（视频播放器、软件卸载不暴露）。
+配置、缓存都写在软件文件夹的 `userdata/`，**不写注册表、不装系统目录**；换电脑把整个文件夹拷走就是同一套东西。
 
-**小白用户不需要改 JSON/敲命令：** 双击软件目录里的 `一键接入DSH.cmd`，完全退出并重启 DeepSeek Harness 即可；脚本会自动写配置、装 Skill、用软件自己的 exe 启动 MCP（不需要装 Node）。撤掉用 `一键移除DSH接入.cmd`。
+> 不会用？压缩包里自带 `使用说明.txt`，软件里点「帮助」也能看。更短的入门见 [快速开始](docs/zh/getting-started.md)。
 
-手动配置、工具清单、视频下载授权说明见 [`docs/Agent接入说明.md`](docs/Agent接入说明.md) 与 [`app/mcp/README.md`](app/mcp/README.md)。
-视频下载默认每次都要用户在软件里授权；GUI 写授权、MCP 只读，agent 改不了开关。
-配套 Skill（流程指导）在 [`skills/tomato-toolbox/SKILL.md`](skills/tomato-toolbox/SKILL.md)；打包版在软件目录 `skills/tomato-toolbox/`。
+## 二、里面有哪些工具
 
-### 开发调试（给维护者）
-```powershell
-# 1) 准备 Node（仓库内便携版，不污染系统）
-$env:PATH = "<仓库路径>\.tools\node;" + $env:PATH
+一共 **23 个**，按六组放在左侧导航（点分组标题可展开 / 收起）：
 
-# 2) 安装依赖（走国内镜像）
+| 分组 | 工具 |
+|---|---|
+| 图片 | 图片混淆 · 图片压缩 · 图片变清晰 · 图片格式转换 · 批量重命名 · 加水印 · 长图拼接 · 九宫格切图 · 文件藏图 |
+| 视频 | 视频下载 · 视频播放器 · 视频格式转换 · 视频压缩 · 动图与视频互转 |
+| 音频 | 音频格式转换 · 音频剪辑 · 语音转文字 |
+| 文档 | PDF 转格式 · 文档格式转换 · PDF 编辑整理 · 文字识别 |
+| 压缩 | 压缩与解压 |
+| 系统 | 软件卸载 |
+
+每个工具的详细说明见 [工具清单](docs/zh/tools.md)；逐条验收与测试口径见 [`spec/acceptance.md`](spec/acceptance.md)。
+
+第一次用建议先试：
+
+- **图片混淆 / 解混淆**：把图片打乱成看不懂的样子，对方用同款软件或手机 App 还原；支持单张、批量、拖拽、剪贴板。
+- **图片压缩 / 格式转换**：照片压小、转 JPG / PNG / WebP；手机拍的 HEIC 也能转。
+- **文件藏图**：把任意文件藏进一张图片，图片照样能正常打开。
+- **PDF 与老文档**：PDF 转图片、图片转 PDF、合并拆分、水印页码、加密解密；老版 Word / Excel / PPT 和「假 .xls」也能转新格式。
+- **压缩与解压**：ZIP / 7Z / TAR 等十几种格式，支持密码、分卷、免解压预览。
+
+## 三、给 AI 助手用（MCP）
+
+软件内置一个本地 MCP server：41 个工具，覆盖 21 个 GUI 工具（视频播放器、软件卸载不暴露）。
+
+**DSH 用户（推荐，不需要改 JSON / 装 Node）：**
+
+1. 双击软件目录里的 `一键接入DSH.cmd`；
+2. 完全退出 DeepSeek Harness（不是关窗口，是退出程序）再打开；
+3. 直接说：「用番茄工具箱把这个文件夹的图片压到 500KB 以内」。
+
+脚本会自动写 DSH 配置、安装 Skill、用软件自己的 exe 启动 MCP；想撤掉双击 `一键移除DSH接入.cmd`。
+
+其它客户端（Claude Desktop / Qoder / Trae 等）的配置、工具清单、安全边界见：
+
+- [Agent 接入说明（中文，详细）](docs/Agent接入说明.md)
+- [Agent 文档（中文）](docs/zh/agent.md) · [Agent docs (English)](docs/en/agent.md)
+- [MCP server README](app/mcp/README.md)
+- [Skill 包](skills/tomato-toolbox/SKILL.md)
+
+> **安全边界**：视频下载默认每次要你在软件里授权；大多数其它工具是「调用即执行」，没有确认弹窗。MCP 有路径白名单、审计日志、只读模式、禁止覆盖，但它**不是沙箱**。详见 [安全说明](docs/zh/security.md)。
+
+## 四、本次更新（v2.15.0）
+
+- **小白一键接入 DSH**：双击 `一键接入DSH.cmd`，自动写配置、装 Skill、用软件 exe 启动 MCP；不需要改 JSON、不需要装 Node；`一键移除DSH接入.cmd` 可撤回。
+- **文档重构**：主 README + 子文档、中文 / English 双语、v2.15.0 更新说明。
+- **v2.14.1 安全加固**（同批）：路径白名单、审计日志 `userdata/mcp-audit.jsonl`、只读模式、禁止覆盖。
+- **v2.14.0 Agent 入口**：本地 MCP server、41 个工具、视频下载授权闸门、Skill 包。
+
+完整更新见 [CHANGELOG.md](CHANGELOG.md) / [CHANGELOG.en.md](CHANGELOG.en.md)，本版说明见 [v2.15.0 release notes](docs/zh/releases/v2.15.0.md)。
+
+## 五、浅色和深色
+
+顶栏右上角可以一键切换「浅色 / 深色 / 跟随系统」，选择会记住。
+
+![深色主题](docs/images/dark.png)
+
+## 六、常见问题
+
+**Q：双击没反应，或者被杀毒软件拦了？**
+A：先看是不是 Windows SmartScreen 拦了（「更多信息」→「仍要运行」）。少数杀毒软件会对没有数字签名的绿色软件误报，加信任即可。除「视频下载」外不联网，可以断网验证。
+
+**Q：需要安装吗？怎么卸载？**
+A：不需要安装。解压就能用；不要了直接删掉整个文件夹。
+
+**Q：需要联网吗？**
+A：除「视频下载」外都不需要。断网时其余 22 个工具照常工作。
+
+**Q：处理完的文件存在哪？会不会覆盖原图？**
+A：默认存在原文件旁边，文件名加「-混淆」「-压缩」这类后缀，**不覆盖原文件**；重名自动加序号。也可以自己选目录。
+
+**Q：换电脑怎么带走？**
+A：把整个软件文件夹拷走即可。设置可以在「设置」里导出成一个文件，到新电脑再导入。
+
+**Q：提示缺少加装包怎么办？**
+A：Release 成品包已带齐 ffmpeg、LibreOffice、Real-ESRGAN、FunASR、OCR 模型、7-Zip、yt-dlp、HiBit。若你拿到的是精简版（部分分发因许可不带 HiBit），「软件卸载」按 [`docs/加装包说明.txt`](docs/加装包说明.txt) 放回 HiBit 便携版即可。
+
+**Q：AI 里找不到番茄工具箱的工具？**
+A：先确认完全退出并重启了 DSH；再确认 `~/.dsh/profiles/*/cordis.patch.yml` 里有 `mcp-tomato-toolbox`。详见 [Agent 接入说明](docs/Agent接入说明.md)。
+
+**Q：视频下载为什么一直要授权？**
+A：这是有意的安全闸门。到「视频下载」页点「允许一次」，或打开「允许 AI 助手直接下载（本次运行有效）」；关掉软件就失效。
+
+更多见 [FAQ](docs/zh/faq.md)。
+
+## 七、给开发者
+
+前置：Windows 10 / 11 64 位、Node.js 22+（自带 npm）。
+
+```bash
 cd app
-$env:ELECTRON_MIRROR = "https://registry.npmmirror.com/-/binary/electron/"
+npm install          # 装依赖（含 Electron）
+npm start            # 打开软件窗口
+npm test             # 纯逻辑单测（不需要网络，也不需要加装包）
+npm run pack         # 打成免安装版，产物在 app/release/
+```
+
+中国大陆网络慢就用镜像：
+
+```bash
 npm install --registry=https://registry.npmmirror.com
-
-# 3) 启动
-npm start
+# PowerShell：
+$env:ELECTRON_MIRROR = "https://registry.npmmirror.com/-/binary/electron/"
 ```
 
-### 测试与自检（交付前必须全绿）
-```powershell
+加装包（ffmpeg、LibreOffice、Real-ESRGAN、FunASR、OCR、7-Zip、yt-dlp、HiBit）体积约 1.5 GB、许可各异，**不进仓库**；打包时由 `app/tools/pack.js` 从 `app/addons/<名字>/` 取用。详见 [构建与测试](docs/zh/build.md)、[`docs/加装包说明.txt`](docs/加装包说明.txt)、[`THIRD-PARTY-NOTICES.md`](THIRD-PARTY-NOTICES.md)。
+
+### 目录结构
+
+```
+app/
+├─ main.js / preload.js      主进程与安全桥
+├─ mcp/                     本地 MCP server（41 个工具）
+├─ src/shell/               工具箱框架：注册表、导航、工具页保活、任务队列、主题
+├─ src/tools/<工具名>/      一个工具一个目录：index.js + ui.js + core/ + styles.css
+├─ src/shared/              跨工具复用：图片读写、ffmpeg、HEIC、设置
+├─ tests/                   纯逻辑单测 + 自检 / 界面自动测试
+├─ tools/pack.js            打包脚本
+└─ addons/                  加装包（不入库）
+docs/                        文档（中英双语 + 详细中文手册）
+spec/                        模块规格与验收标准
+skills/tomato-toolbox/       Agent Skill
+```
+
+### 怎么验证改动
+
+```bash
 cd app
-npm test                                                    # 纯逻辑单测（分项与总数以本地运行输出为准；覆盖算法、任务队列、压缩与解压、文件藏图、导航排序、软件卸载、设置校验、输出文件名分配、视频下载、文档格式转换等）
-.\node_modules\electron\dist\electron.exe . --smoke-test     # 冒烟自检（元素/按钮）
-.\node_modules\electron\dist\electron.exe . --self-test      # 端到端（编解码 + 算法 + 性能）
-.\node_modules\electron\dist\electron.exe . --ui-test        # 图片混淆 界面自动测试（含截图与像素级校验）
-.\node_modules\electron\dist\electron.exe . --pdf-test       # PDF 工具自检（渲染/往返/合并拆分/内置降级）
-.\node_modules\electron\dist\electron.exe . --pdf-ui-test    # PDF 工具界面自动测试（五个方向 + 截图）
-.\node_modules\electron\dist\electron.exe . --media-test     # 媒体工具自检（压缩/变清晰/转换 + 视频↔动图真实转码）
-.\node_modules\electron\dist\electron.exe . --media-ui-test  # 媒体工具界面自动测试（5 个新工具逐个走查 + 截图）
-.\node_modules\electron\dist\electron.exe . --audio-test     # 音频工具自检（21 种输出格式真实转码 + 回读校验 + 视频提取 + 标签保留）
-.\node_modules\electron\dist\electron.exe . --audio-ui-test  # 音频工具界面自动测试（选格式、两轮转码、清空 + 截图）
-.\node_modules\electron\dist\electron.exe . --asr-test       # 语音转文字自检（SAPI 合成中文语音 → 真实识别 + 字幕/视频/错误处理校验）
-.\node_modules\electron\dist\electron.exe . --asr-ui-test    # 语音转文字界面自动测试（添加→两轮识别→清空 + 截图）
-.\node_modules\electron\dist\electron.exe . --theme-test     # 外观主题自检（三态循环、深浅色值、落盘、深色下工具页扫描）
-.\node_modules\electron\dist\electron.exe . --ocr-poc        # OCR 引擎闸门（中文召回/耗时/零网络请求三项判据）
-.\node_modules\electron\dist\electron.exe . --av-test        # A 批：视频压缩 + 音频剪辑（逻辑 + 真实 ffmpeg 转码 + 界面走查）
-.\node_modules\electron\dist\electron.exe . --imgbatch-test  # B 批：批量重命名/加水印/长图拼接/九宫格切图（含像素校验）
-.\node_modules\electron\dist\electron.exe . --settingsio-test # 设置导入导出（结构合法性、白名单、野文件拒绝）
-.\node_modules\electron\dist\electron.exe . --pdf-ocr-test   # C 批：PDF 编辑整理 + 文字识别（七类操作读回 + 可搜索 PDF 关键词命中）
-.\node_modules\electron\dist\electron.exe . --queue-ui-test  # 任务中心（含「切走工具页后任务继续跑完」核心断言）
-.\node_modules\electron\dist\electron.exe . --archive-test   # 压缩与解压自检（13 种格式真实往返 + 密码 + 分卷 + 大文件 + 安全）
-.\node_modules\electron\dist\electron.exe . --archive-ui-test # 压缩与解压界面自动测试（压缩→预览→解压→密码→重复解压提示）
-.\node_modules\electron\dist\electron.exe . --player-test     # 视频播放器自检（协议 Range + 7 种格式端到端播放 + 缓存命中 + 无效文件）
-.\node_modules\electron\dist\electron.exe . --player-ui-test  # 视频播放器界面自动测试（直接播/换封装/重编码 + 控制条/全屏/快捷键 + 缓存清理）
-.\node_modules\electron\dist\electron.exe . --imghide-test     # 文件藏图自检（PNG/GIF 往返 + 密码 + 双向互通裁判 + 容错与路径穿越）
-.\node_modules\electron\dist\electron.exe . --imghide-ui-test  # 文件藏图界面自动测试（选表图→打包→解包→内容比对→密码往返→清空）
-.\node_modules\electron\dist\electron.exe . --uninstall-test   # 软件卸载自检（加装包哈希/清单权限 + 提权命令构造 + 界面走查 + 空跑无进程 + 缺失降级）
-.\node_modules\electron\dist\electron.exe . --videodl-test     # 视频下载自检（引擎指纹/解析 + 本地真实下载 + 成品校验 + 取消清理 + 历史落盘 + 缺包降级 + 联网检查）
-.\node_modules\electron\dist\electron.exe . --videodl-ui-test  # 视频下载界面自动测试（改目录→贴链接→下载→完成→取消→清空 + 引擎卡片走查 + 截图）
-.\node_modules\electron\dist\electron.exe . --doc-test         # 文档格式转换自检（四类夹具经真实 IPC 转换 + SheetJS/jszip 内容读回）
-.\node_modules\electron\dist\electron.exe . --doc-ui-test      # 文档格式转换界面自动测试（添加→智能转换→产物读回→清空 + 截图）
-```
-> 界面类测试结果同时写入 `%TEMP%\tomato-*.json`（如 `tomato-pdf-test.json`、`tomato-av-test.json`、`tomato-pdf-ocr-test.json`、`tomato-queue-ui-test.json`、`tomato-archive-test.json` 等），截图在 `%TEMP%\tomato-uitest`。
-> 媒体类自检需要 `app/addons/ffmpeg/ffmpeg.exe`；「文字识别」需要 `app/addons/ocr/`（模型 + 中文字体）；「压缩与解压」需要 `app/addons/7zip/`（引擎，约 2.4MB）；「软件卸载」需要 `app/addons/hibit/`（官方便携版，约 15MB）；「视频下载」需要 `app/addons/ytdlp/yt-dlp.exe`（约 16.6MB，`node/node.exe` 可选、仅 YouTube 用）。仓库内均已有、不进 git；缺失时相关检查会如实标注失败，其余功能不受影响（压缩工具的 ZSTANDARD/BROTLI 走 Node 内置引擎，无加装包也可用）。
-> `--videodl-test` 的下载源是**本地小服务器 + ffmpeg 现造的小 MP4**：真实跑通 yt-dlp/ffmpeg 链路但不依赖外网，结果可重复；只有「引擎更新检查」一项联网，无网时如实记 `skipped` 且整体 `verified:false`（不当通过）。
-> `--uninstall-test` 与所有界面测试都**不会真的拉起卸载工具**（测试模式下 `hibit:launch` 只空跑）：既避免无人值守时弹 UAC 卡住，也保证自动化测试绝不执行任何卸载动作。
-
-### 打包免安装版
-```powershell
-cd app
-npm run icon     # 生成图标（src/assets/icon.png 与 build/icon.ico）
-npm run pack     # 产出 release/番茄图片混淆-桌面版-v<版本>-win64/ 与同名 .zip
-```
-> exe 图标与版本信息需要 `app/build/rcedit.exe`（已随开发环境下载，缺失时会跳过并提示，不影响功能）。
-
-### 兼容性样本工具（锁定手机版实现细节）
-```powershell
-# 造样本（自测用）
-electron . --make-samples <目录> --mode <模式> [--key <密钥>]
-# 验样本（拿手机版生成的图反推它用的模式与变体）：verdict 里 meanDiff 接近 0 即为命中
-electron . --verify-samples <目录> --key <密钥>
+.\node_modules\electron\dist\electron.exe . --smoke-test
+.\node_modules\electron\dist\electron.exe . --ui-test
+node tests/mcp.test.mjs
+npm test
 ```
 
----
+结果写在 `%TEMP%\tomato-*.json`，看 `pass:true` / `ok:true`。完整测试矩阵与产物差异见 [构建与测试](docs/zh/build.md) 和 [`spec/acceptance.md`](spec/acceptance.md)。
 
-## 目录结构
+## 八、已知限制
 
-```
-├─ AGENTS.md                 开发守则（动手前必读：命令、规范、红线）
-├─ README.md                 本文件
-├─ CHANGELOG.md              版本与里程碑
-├─ spec/                     目标规格（地图 / 各模块 / 验收标准）
-│  ├─ 00-overview.md         全局地图
-│  ├─ modules/               每个工具与框架模块一个文件（toolkit / engine / imageio / archive / ocr / player / uninstall 等，以目录内实际文件为准）
-│  └─ acceptance.md          验收标准（A1 起逐条，含实测证据）
-├─ docs/                     文档
-│  ├─ 使用说明.txt           面向使用者的说明（随安装包分发）
-│  ├─ 加装包说明.txt         各加装包的用途 / 安装 / 许可（随安装包分发）
-│  ├─ 新增工具指南.md         如何给工具箱加一个新工具
-│  ├─ 兼容性变体说明.md       三处兼容性开关的背景与锁定方法
-│  └─ 压缩格式性能对比.md     压缩工具的技术实现与各格式实测性能对比
-├─ app/                      Electron 应用源码
-│  ├─ main.js / preload.js   主进程与安全桥
-│  ├─ src/shell/             工具箱框架（导航、注册表、工具页容器、theme.css 设计令牌、components.css 组件库）
-│  ├─ src/tools/obfuscate/   图片混淆工具（界面 + 算法 + 样式）
-│  ├─ src/tools/pdf-convert/ PDF 转格式工具（core 核心 / preview 内置降级渲染页）
-│  ├─ src/tools/_template/   新工具模板
-│  ├─ src/shared/            跨工具复用（图片读写、ffmpeg 封装、HEIC 解码、任务队列、设置、转义等）
-│  ├─ tests/                 自动测试（纯逻辑单测 + 各工具自检与界面测试 / 样本工具）
-│  └─ tools/                 构建脚本（图标生成、打包）
-├─ artifacts/                测试证据（截图等，不进 git）
-└─ 番茄图片混淆.apk           参考实现样本（只读）
-```
+- 网站改版会让「视频下载」对某些站点解析失败；软件内提供「更新引擎」入口。
+- 「图片变清晰」的 AI 放大需要 Vulkan 显卡；「语音转文字」是纯 CPU 推理，长音频要等。
+- PDF → Word 对复杂排版会降级；带打开密码的文档要先解密。
+- RAR 只能解压，不能创建。
+- 软件没有数字签名，部分杀毒软件会误报。
+- 与手机版的兼容性仍需手机真机样本锁定，见 [`docs/兼容性变体说明.md`](docs/兼容性变体说明.md)。
 
-> LibreOffice 加装包（可选）：解压到绿色版目录的 `addons/libreoffice/`（见 `spec/modules/pdf-convert.md`）。
+## 许可与声明
 
----
-
-## 特性
-
-- **六种模式**：空间曲线混淆（番茄图）/ 方块混淆 (B) / 像素混淆 (C) / 行像素混淆 (C2) / 兼容PE 行模式 (PE1) / 行+列 (PE2)，规则与手机版一致。
-- **密钥规则与手机版一致**：gilbert 无密钥；B/C/C2 为字符串密钥；PE1/PE2 为 0~1 小数（默认 0.666）。
-- **保存规则与手机版一致**：gilbert 存 JPG（画质 95，体积小但有损）；其余模式存 PNG（无损）；默认存到原图旁边、重名自动加序号、绝不覆盖。
-- **批量**：多文件 / 整文件夹导入，一键对全部图片操作，单张失败不影响整批（含失败汇总）。
-- **易用**：拖拽图片或文件夹进窗口、Ctrl+V 粘贴剪贴板图片、Ctrl+C 复制结果、内置图文帮助。
-- **绿色免安装**：整个文件夹拷走即用；设置与缓存都写在软件目录 `userdata/`，**不写系统 AppData**。
-- **纯离线**（v2.12.0 起有一处例外）：除「视频下载」外，源码没有任何网络调用（fetch / XHR / WebSocket / 外部 URL 零命中），断网可用。「视频下载」天生需要联网（下载网络视频），断网时只是它不可用、不影响其余 22 个工具。
-- **PDF 转格式**（v1.1.0 新增）：PDF→图片（PNG/JPG、批量、选页、清晰度档位）、图片→PDF（JPG 直嵌/适应 A4）、PDF 合并/拆分/提取页；Word/Excel→PDF 无加装包时用内置方式（docx-preview + SheetJS + 打印引擎），PDF→Word 与高保真转换走可选的 LibreOffice 加装包。
-- **音频格式转换**（v1.6.0 新增）：21 种输出格式（MP3/M4A/WAV/FLAC/OGG/Opus/WMA/AMR/ALAC/AIFF/CAF/WavPack/TTA/AC3/EAC3/MP2/Speex/AU/W64/RealAudio）；APE/DSD/Musepack/TAK 可作输入；视频直接拖入自动提取声音；保留标题/歌手标签；复用 ffmpeg 加装包、零新增依赖。
-- **语音转文字**（v1.7.0 新增）：音频/视频识别成文字（中/英/日/韩/粤自动识别），输出纯文本 .txt、字幕 .srt 或两者；视频自动提取音轨；纯离线、纯 CPU（实测约 20 倍实时）；内核 FunASR·SenseVoice（加装包随包，约 246MB，MIT 许可）。
-- **视频播放器**（v2.3.0 新增）：软件内直接播视频，转完不用换软件。MP4/WebM 直接播；MKV/FLV/TS 自动「无损换封装」（画面声音不重编码，秒级）；AVI（MPEG-4）/WMV 等老编码自动重编码成 H.264（有进度、可取消）。播放/暂停、拖动进度、音量与静音、全屏、快捷键（空格 / ←→ / ↑↓ / M / F）齐全；播放走自定义协议 `tomato-media://` 按 Range 分块读取（大文件不占内存、进度可任意拖）；**只读原文件**，临时副本放 `userdata/player-cache/`，换文件与离开工具页即自动清理。
-- **文件藏图**（v2.4.0 新增，v2.5.0 补齐两套容器）：把任意文件（文档 / 图片 / 视频 / 压缩包…）藏进一张普通图片，发给别人还是一张图，对方用本软件或网上的「图夹」网站 / 手机 APP 就能取出来。**打包**：选封面图（可点「随机表图」让软件生成一张）+ 加文件（可多选 / 可拖入）+ 可选水印文字 + 可选密码 → 产出 `名字_图夹.后缀`。**解包**：选 / 拖入图夹图 →（有密码就填）→ 文件解到图片旁的「图名_解出」文件夹，可一键打开。
-  - **算法选择（与官方一致的两套容器）**：① 默认「动态混淆（极速）」——载荷是明文分隔符格式，**直接追加在图片尾部**，表图什么格式都行、原字节零改动、画质不变；官方客户端靠整文件字节扫描定位，**打开即解、不弹密码框**，多大文件都能开（788MB 也只是一次字节扫描）。② 「图夹 PRO（防查）」——`STEGDATA V6` 容器（PNG 塞进 IDAT 解压流 / GIF 尾部扩展块）+ 16 字节指纹，官方网页版会提示「识别到图夹PRO文件」并要你点一次确认；支持密码（PBKDF2-SHA256 + AES-256-GCM，与官方同参数）。
-  - **双向互通**：自检里用官方那份未混淆的 worker 当裁判——官方 `action='decrypt'` 能直接解出我们打的极速图（含中文名，且不会触发密码框判定），官方 `SteganographyCore` 能解我们的 PRO 图与带密码图；官方打的图我们也都解得开（裁判文件放 `.tools/`，不进 git、不随包分发）。
-  - 安全：条目名一律取 basename（防路径穿越）、密码错误不产出垃圾、产物重名自动加序号；体积提示按格式区分（极速只提醒传输不便，PRO 才警告网页版可能打不开）。
-  说明：微信 / QQ 请以「文件」方式发送这张图（直接发图会被平台压缩、数据会丢）；产物体积 ≈ 表图 + 里图。
-- **软件卸载**（v2.8.0 新增）：左侧「系统」分组里的一个启动页——点「打开卸载工具（管理员）」即以管理员身份拉起随包内置的 **HiBit Uninstaller 官方便携版**（`addons/hibit/`，约 15MB，未做任何修改），在里面卸载软件、扫描并清理残留、强制卸载顽固程序。**提权走 Windows 标准 `Start-Process -Verb RunAs`**（系统 UAC 把关，不静默提权、不代替用户勾选、不给对方传任何参数）；加装包缺失时按钮禁用并给出放置说明，点「重新检测」即恢复。**自动化测试一律空跑**，绝不真的启动卸载工具。
-- **压缩与解压**（v2.2.0 新增）：**13 种格式双向**——ZIP / 7Z / TAR / GZIP（主流）与 BZIP2 / XZ / ZSTANDARD / BROTLI 及其 TAR 复合（非主流，满足「≥2 种」）；RAR/RAR5、ISO、CAB、WIM、DEB 等**仅解压**（RAR 专有，免费工具无法创建，界面如实标注）；**密码**（7Z 用 AES-256 并加密文件名、ZIP 支持 AES-256/ZipCrypto，中文密码自动引导改用 7Z）；**分卷**（ZIP/7Z/TAR 切 .001，解压只给首卷）；**免解压预览**（列条目/大小/加密位）；**zip-slip 防护**；**绝不覆盖**（重名自动加序号）；大文件全程流式。引擎为随包 7-Zip 26.03（LGPL 2.1+，约 2.4MB），ZSTANDARD/BROTLI 走 Node 内置 zlib（无加装包也可用）。详见 `docs/压缩格式性能对比.md`。
-- **手机拍照格式输入**（v2.10.0 新增）：「图片格式转换」支持 HEIC/HEIF/HIF——主进程 libheif WASM 引擎纯离线解码（跑在 worker 线程防卡顿），竖拍方向（irot/imir）自动摆正，与 Windows 解码一致；Chromium 内核不解码 HEIC，故解码走主进程。
-- **导航长按拖动排序**（v2.11.0 新增）：左侧长按约 400ms 拿起即可拖——分组标题拖动整组、组内工具组内移动；快速点击行为不变（切工具 / 展开收起照旧），拖完误触 click 自动拦截；顺序落盘记住，「恢复默认顺序」一键清空。
-- **视频下载**（v2.12.0 新增，唯一需要联网的工具）：粘贴链接下载网络视频——抖音（游客通道 + 受限时自动建一次性匿名浏览器会话）/ 小红书（公开页优先，受限时只读本机浏览器登录态、不导出 Cookie 文件）/ B站（yt-dlp + 自带插件，主 CDN 故障自动切备用线路）/ YouTube / 央视频（公开点播，自带完整性校验）/ 其它 yt-dlp 支持的站点 / MP4·M3U8·MPD 直链；常规解析失败还会用临时 Chrome/Edge 识别页面正在播放的公开资源（不接管已开浏览器、不点登录）。单视频模式（误贴合集不会批量下），下载后自动合并音视频、校验画面声音，HLS 若实为 TS 则无损换封装为真 MP4，重名不覆盖；进度/速度/剩余时间实时显示，**可取消**、可重试、记录落盘（重启不丢），完成后可一键在文件夹中定位。引擎为随包 yt-dlp（`addons/ytdlp/`，指纹见 `说明.txt`），**可自更新**：查官方 nightly → 下载 → SHA-256 校验 → 只写 `userdata/videodl-engine/`（不动软件本体），校验不过一律拒绝、更新失败自动退回随包版；每周自动检查一次（可关）。
-
-## 已知限制
-
-- **PE2 模式较慢**：1200 万像素单张约 9 秒（其余模式 0.7~1.0 秒）——该模式需要为每行每列各排序一次，属算法固有开销；后续可做排序优化。
-- **gilbert 模式有损**：保存 JPG 会引入压缩误差，反复「混淆 → 解混淆」会累积画质损失（手机版同样如此）。
-- **方块模式会补边**：尺寸不是 32 的倍数时自动补透明黑边，输出尺寸变大（与手机版一致，属正常现象）。
-- **PDF 相关**（v1.1.0）：
-  - 内置降级的 Word/Excel→PDF 只支持 `.docx` / `.xlsx`，版式较简单；旧版 `.doc/.xls`、PPT 与高保真需求需装 LibreOffice 加装包。
-  - PDF→Word 依赖加装包；即便加装包就位，多栏/复杂表格的还原仍有偏差（PDF 本身不存版面结构，属格式固有限制）。
-  - 清晰度档位 1×/2×/3× ≈ 72/144/216 DPI；超清档在大页面上单页约 4~5 百万像素，批量时耗时更长。
-  - 加密 PDF 本期不支持处理（打开需要密码的 PDF 会给出提示）。
-- **压缩与解压**（v2.2.0）：
-  - **RAR 只能解压不能压缩**——RAR 是专有格式，7-Zip 的 unRAR 代码许可明确禁止用于制作 RAR 压缩器；界面如实标注「仅解压」，不做改后缀伪装。
-  - **ZIP 的密码只能用英文/数字**（7-Zip 限制，中文密码会报错）；中文密码请改用 7Z。
-  - **没有断点续传**——7-Zip 命令行中断不可续跑；改用「分卷 + 失败可重试」应对大文件。
-  - 流式单文件格式（GZIP/BZIP2/XZ/ZSTANDARD/BROTLI）**只能压单个文件**，多文件请选 TAR.xxx / ZIP / 7Z。
-- **文件藏图**（v2.4.0 / v2.5.0）：
-  - **微信 / QQ 必须以「文件」方式发送**（或压成 zip 再发）：直接当图片发，平台会重编码压缩，藏在里面的数据会被压没；贴吧要用「原图」链接。
-  - 产物体积 ≈ 表图 + 隐藏文件，官方建议保持 3MB 以内更好发。
-  - 「极速」格式：表图什么格式都行（数据追加在尾部，不影响打开）、不解压、多大文件都能开，但没有密码；「PRO」格式：只支持 PNG / GIF 表图（JPG/WebP 会自动转 8 位 PNG），超大文件（>50MB）在网页版/手机端可能因内存打不开（界面会如实警告）。
-  - 水印：填了会把表图重编码成 PNG 再写入（GIF 表图因此会变成 PNG 产物）。
-  - 互通按官方现有两套格式实现；对方以后若换新格式，兼容层需要跟进（格式逻辑集中在 `src/tools/imghide/core/format.mjs`）。
-  - 不做联网功能：网络图片解密、URL 转文件、图床 / 复制直链 / 图语（服务器短码）都不在本期范围。
-- **视频播放器**（v2.3.0）：
-  - 能不能「直接播」取决于系统解码器（尤其是 H.265/HEVC 与 4K 片源）：播不了会自动转码兜底，只是长片重编码需要时间（界面有进度，可取消）。
-  - 不支持网络地址播放（本软件全离线），也不做字幕、多音轨切换、倍速与播放列表。
-  - 临时副本约等于源文件大小（重编码档位通常更小），换文件 / 切走工具页即清理；万一被系统占用删不掉，会留给下次进入工具页时清理。
-- **软件卸载**（v2.8.0）：
-  - **必须管理员权限**：官方 exe 清单里就是 `requireAdministrator`，点按钮时系统会弹一次 UAC，点「否」工具不会启动（界面如实提示）。
-  - 随包的是**官方原版便携版**、未做修改；卸载过程与残留清理在它自己的界面里完成，本软件只负责把它拉起来——不代替用户勾选、不自动卸载。
-  - 许可：官网标注「个人与商业使用均免费」，但**未找到明文「再分发」条款**（推断，未经证实）；因此保留原版文件与来源说明，若权利人另有要求，删除 `addons/hibit/` 即整体下线。
-- 拖拽与剪贴板未纳入自动化测试（原因：会覆盖使用者剪贴板），需人工抽测。
-
-## 隐私
-
-不联网、不上传任何图片；没有账号、没有遥测。所有处理都在本机内存中完成，只有点「保存」时才写文件。
-
+- 本项目自有代码：MIT，见 [`LICENSE`](LICENSE)。
+- 第三方组件与移植来源（leetools、SheetJS、pdf.js、ffmpeg、LibreOffice、7-Zip、yt-dlp 等）及分发义务：见 [`THIRD-PARTY-NOTICES.md`](THIRD-PARTY-NOTICES.md)。
+- 图片混淆模式与图夹容器的互通实现为独立编写，不含第三方应用的代码、资源或安装包。
+- 请勿用本软件侵犯他人权益或规避合法的技术措施。软件按「原样」提供，不含任何担保。

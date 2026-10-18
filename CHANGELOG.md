@@ -15,6 +15,7 @@
 - **`一键移除DSH接入.cmd`**：删除受管配置块（先备份），Skill 保留。
 - **打包**：`pack.js` 把两个 `.cmd` + 两个 `.ps1`、`Agent接入说明.md`、`skills/` 一起放进免安装目录。
 - **文档/Skill**：`docs/使用说明.txt`、`docs/Agent接入说明.md`、`app/mcp/README.md`、`skills/tomato-toolbox/SKILL.md` 都把「双击一键接入」放在最前面；手动 JSON 配置降为开发/其它客户端用。
+- **文档重构（v2.15.0）**：主 README + `docs/zh/` / `docs/en/` 子文档（快速开始、工具、Agent、安全、构建、FAQ、Release Notes）；新增 `README.en.md`、`CHANGELOG.en.md`、`CONTRIBUTING.md`、`docs/README.md`；新增 v2.15.0 中英更新说明。
 - **测试**：临时 DSH profile 上实测脚本写入/移除、打包版与开发版 exe 以 Node 模式启动 MCP 均返回 41 个工具；`npm test`、开发树/产物全量自检沿用 v2.14.1 的 29/29。
 - **限制**：一键接入目前只做 DSH；其它客户端仍需按 `Agent接入说明.md` 填 JSON。
 

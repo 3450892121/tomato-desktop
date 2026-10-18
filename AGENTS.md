@@ -5,10 +5,12 @@
 
 ## 仓库结构
 - `AGENTS.md`：本工作守则（动手前必读）。
-- `README.md`：项目说明、快速开始（运行/测试/打包）、目录结构、已知限制。
-- `CHANGELOG.md`：版本与开发里程碑。
+- `README.md` / `README.en.md`：中文 / English 主文档（下载、快速开始、工具、MCP、构建、已知限制）。
+- `CONTRIBUTING.md`：参与贡献（中英双语）。
+- `CHANGELOG.md` / `CHANGELOG.en.md`：完整中文更新日志 / 近期英文摘要。
+- `LICENSE` / `THIRD-PARTY-NOTICES.md`：MIT 许可 / 第三方组件与分发义务。
 - `spec/`：目标规格（`00-overview.md` 全局地图 / `modules/` 各模块 / `acceptance.md` 验收标准）。
-- `docs/`：说明与指南（`使用说明.txt`、`加装包说明.txt` 随包分发；`新增工具指南.md`、`兼容性变体说明.md`、`压缩格式性能对比.md`——压缩工具的实测依据）。
+- `docs/`：文档中心（`README.md` 索引；`zh/` / `en/` 双语子文档：快速开始、工具、Agent、安全、构建、FAQ、Release Notes；`使用说明.txt`、`加装包说明.txt` 随包分发；`新增工具指南.md`、`兼容性变体说明.md`、`压缩格式性能对比.md` 为专项说明）。
 - `artifacts/`：测试证据（截图等，不进 git）。
 - `app/`：Electron 应用源码：
   - `main.js` / `preload.js`：主进程与安全桥（窗口、文件对话框等系统能力）。
