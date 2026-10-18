@@ -40,6 +40,22 @@ node app/mcp/server.mjs
 }
 ```
 
+打包版把路径换成软件目录：
+
+```json
+{
+  "mcpServers": {
+    "tomato-toolbox": {
+      "command": "node",
+      "args": ["C:/.../番茄图片混淆-桌面版-v<版本>-win64/resources/app/mcp/server.mjs"],
+      "env": {
+        "TOMATO_USERDATA_DIR": "C:/.../番茄图片混淆-桌面版-v<版本>-win64/userdata"
+      }
+    }
+  }
+}
+```
+
 - DSH / Claude Desktop / Qoder / Trae 等支持 MCP 的客户端都能用这段配置。
 - `TOMATO_USERDATA_DIR` 指向软件目录的 `userdata`（打包态是 exe 同目录的 `userdata`）。
   它用于让 MCP 读到 GUI 写的「视频下载授权」文件。

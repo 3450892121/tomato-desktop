@@ -41,6 +41,7 @@ Agent ──MCP(stdio)────┘
 
 ## 验收
 - `node tests/mcp.test.mjs`：17 项，含真实 ffmpeg / OCR / ASR / LibreOffice / pdfjs 渲染 / Canvas 像素管线。
+- `node tests/pack-mcp-smoke.mjs`：8 项，在打包产物上验证 41 个工具、addons 路径、pdfjs legacy、@napi-rs/canvas、heic-decode、OCR。
 - `npm test`：现有纯逻辑测试 + MCP 测试全绿。
 - `--smoke-test`：GUI 23 个工具仍正常。
 

@@ -108,4 +108,4 @@ stdio 传输：客户端把 MCP server 当子进程启动，通过 stdin/stdout 
 - 第一~四批全部接入：共 41 个 MCP 工具，覆盖 21 个 GUI 工具（视频播放器、软件卸载按需求不暴露）。
 - MCP 冒烟测试：17 项，含真实 ffmpeg / OCR / ASR / LibreOffice / pdfjs 渲染 / Canvas 像素管线。
 - 现有 `npm test` 保持全绿。
-- 打包脚本已把 `mcp/` 与 `pdfjs-dist/legacy/build` 一并带入产物；产物上还需再做一次 MCP 冒烟（见下）。
+- **打包产物已实测**：`node tests/pack-mcp-smoke.mjs` 8/8（产物内 41 个工具、addons 路径、pdfjs legacy、@napi-rs/canvas、heic-decode、OCR 全部可用）。
