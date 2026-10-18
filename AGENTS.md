@@ -12,6 +12,7 @@
 - `artifacts/`：测试证据（截图等，不进 git）。
 - `app/`：Electron 应用源码：
   - `main.js` / `preload.js`：主进程与安全桥（窗口、文件对话框等系统能力）。
+  - `mcp/`：Agent 入口（本地 MCP server，stdio；工具清单与配置见 `app/mcp/README.md`，规格见 `spec/modules/agent-mcp.md`）。
   - `src/shell/`：工具箱框架（工具注册表、左侧导航、工具页容器、设计令牌、组件库）；**工具页保活 / LRU 回收 / 进度遮罩按页记账的机制与工具侧约定见 `spec/modules/toolkit.md`**。
   - `src/tools/<工具名>/`：各工具自包含目录（声明 + 界面 + 逻辑 + 样式）；工具清单与分组见 `README.md` 与 `src/shell/registry.js`；`_template` 为新工具模板。
   - `src/shared/`：跨工具复用能力（图片读写、ffmpeg 封装、HEIC 解码、文件封装、设置等）；含主进程专用 `unique-target-path.cjs`（输出文件名原子分配，main.js 与单测共用）。

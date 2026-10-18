@@ -71,6 +71,8 @@ fs.mkdirSync(appTarget, { recursive: true });
 fs.copyFileSync(path.join(appRoot, 'main.js'), path.join(appTarget, 'main.js'));
 fs.copyFileSync(path.join(appRoot, 'preload.js'), path.join(appTarget, 'preload.js'));
 copyTree(path.join(appRoot, 'src'), path.join(appTarget, 'src'));
+// MCP server（Agent 入口）：与 GUI 共用 src/ 与 addons/，必须随包带上
+copyTree(path.join(appRoot, 'mcp'), path.join(appTarget, 'mcp'));
 // 附带自检脚本：打包产物可用 `--ui-test` / `--pdf-test` 自检（交付前验收用）
 fs.mkdirSync(path.join(appTarget, 'tests'), { recursive: true });
 fs.copyFileSync(path.join(appRoot, 'tests', 'ui-test.js'), path.join(appTarget, 'tests', 'ui-test.js'));
@@ -155,6 +157,9 @@ const copyIfExists = (relPath) => {
 // pdfjs-dist：主构建 + worker + 中文等 CID 字体所需的 cmaps / 标准字体数据
 copyIfExists(path.join('pdfjs-dist', 'build', 'pdf.mjs'));
 copyIfExists(path.join('pdfjs-dist', 'build', 'pdf.worker.mjs'));
+// MCP 的 PDF 渲染走 legacy 构建（Node 里浏览器构建会踩 Promise.try），也要随包
+copyIfExists(path.join('pdfjs-dist', 'legacy', 'build', 'pdf.mjs'));
+copyIfExists(path.join('pdfjs-dist', 'legacy', 'build', 'pdf.worker.mjs'));
 copyIfExists(path.join('pdfjs-dist', 'cmaps'));
 copyIfExists(path.join('pdfjs-dist', 'standard_fonts'));
 copyIfExists(path.join('pdfjs-dist', 'LICENSE'));

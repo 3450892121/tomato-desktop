@@ -69,6 +69,16 @@
 双击免安装文件夹里的 `番茄图片混淆桌面版.exe` 即可，无需安装。详见 `docs/使用说明.txt`。
 **随包已内含全部加装包（LibreOffice、ffmpeg、Real-ESRGAN、FunASR、OCR、7-Zip、HiBit、yt-dlp）——解压后全部功能（含 PDF→Word、视频格式转换、AI 放大、语音转文字、文字识别、压缩解压、视频下载）立即可用，无需任何额外安装。**
 
+### 给 AI 助手用（MCP）
+软件同时提供一个本地 MCP server，支持 MCP 的 agent（DSH / Claude Desktop / Qoder / Trae 等）可以直接调用 41 个工具，覆盖 21 个 GUI 工具（视频播放器、软件卸载不暴露）。
+
+```powershell
+node app/mcp/server.mjs   # 开发态；客户端通过 stdio 启动它
+```
+
+客户端配置、工具清单、视频下载授权说明见 [`docs/Agent接入说明.md`](docs/Agent接入说明.md) 与 [`app/mcp/README.md`](app/mcp/README.md)。
+视频下载默认每次都要用户在软件里授权；GUI 写授权、MCP 只读，agent 改不了开关。
+
 ### 开发调试（给维护者）
 ```powershell
 # 1) 准备 Node（仓库内便携版，不污染系统）

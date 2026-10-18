@@ -15,8 +15,12 @@ import { checkApproval } from '../../src/tools/videodl/core/agent-approval.mjs';
 function userdataDir() {
   const override = process.env.TOMATO_USERDATA_DIR;
   if (override) return path.resolve(override);
-  // 开发态 = app/userdata；打包态由客户端通过 TOMATO_USERDATA_DIR 指到 exe 同目录的 userdata。
-  return path.join(appRoot(), 'userdata');
+  const dev = path.join(appRoot(), 'userdata');
+  // 打包态：appRoot = <软件目录>/resources/app，userdata 在 <软件目录>/userdata
+  const packaged = path.join(path.dirname(path.dirname(appRoot())), 'userdata');
+  if (fs.existsSync(dev)) return dev;
+  if (fs.existsSync(packaged)) return packaged;
+  return dev;
 }
 
 function findFfmpeg() {

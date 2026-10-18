@@ -34,25 +34,21 @@ stdio 传输：客户端把 MCP server 当子进程启动，通过 stdin/stdout 
 > `TOMATO_USERDATA_DIR` 用于让 MCP 找到 GUI 写的授权文件。
 > 开发态就是 `app/userdata`；打包态应指向 exe 同目录的 `userdata`。
 
-## 已接入工具（26 个）
+## 已接入工具（41 个）
 
-### 第一批（纯 Node）
+### 图片
 | 工具 | 作用 |
 |---|---|
 | `image_obfuscate` | 图片混淆/解混淆（6 模式，逐像素可逆） |
-| `image_hide_files` | 把文件藏进图片（图夹） |
-| `image_unhide_files` | 从图夹图片取出文件 |
-| `archive_create` | 压缩（ZIP/7Z/TAR/GZIP/BZIP2/XZ/ZSTD/BROTLI 等） |
-| `archive_extract` | 解压（RAR 等仅解压） |
-| `archive_list` | 免解压预览压缩包内容 |
-| `pdf_images_to_pdf` | 多张 PNG/JPG → 一份 PDF |
-| `pdf_merge` | 合并 PDF |
-| `pdf_split` | 按每 N 页拆分 PDF |
-| `pdf_extract_pages` | 提取指定页 |
-| `pdf_page_count` | 读取 PDF 页数 |
-| `file_rename_batch` | 批量重命名（默认 `dry_run=true`，先预览） |
+| `image_hide_files` / `image_unhide_files` | 文件藏图（图夹）打包 / 解包 |
+| `image_compress` | 图片压缩（画质/尺寸/目标体积） |
+| `image_enhance` / `ai_upscale` | 变清晰（锐化/降噪/2×）/ AI 超分 4× |
+| `image_convert` | PNG/JPG/WebP/BMP/ICO/TIFF/GIF/AVIF；HEIC/PSD/TIFF 等输入 |
+| `image_watermark` | 文字/图片水印（九宫格 + 平铺） |
+| `image_stitch` | 长图拼接（竖/横、统一尺寸、对齐） |
+| `image_slice` | 九宫格/自定义切图 |
 
-### 第二批（媒体 / 本地 AI / PDF 编辑）
+### 视频 / 音频
 | 工具 | 作用 |
 |---|---|
 | `media_probe` | 读取时长/分辨率/编码/音轨 |
@@ -61,16 +57,33 @@ stdio 传输：客户端把 MCP server 当子进程启动，通过 stdin/stdout 
 | `sticker_convert` | GIF/WebP/APNG ↔ MP4/WebM |
 | `audio_convert` | 21 种音频输出 + 视频提取声音 |
 | `audio_edit` | 截取 / 拼接 / 淡入淡出 / 响度标准化 |
-| `ocr_status` / `ocr_recognize` | 检查 OCR 引擎 / 识别图片文字 |
-| `asr_status` / `asr_transcribe` | 检查语音引擎 / 音频视频转文字 |
+| `asr_status` / `asr_transcribe` | 语音引擎状态 / 音频视频转文字 |
+
+### 文档
+| 工具 | 作用 |
+|---|---|
+| `pdf_images_to_pdf` / `pdf_merge` / `pdf_split` / `pdf_extract_pages` / `pdf_page_count` | PDF 组装与页面操作 |
+| `pdf_to_images` | PDF 每页渲染成图片 |
+| `pdf_compress` | PDF 压缩瘦身（扫描件最有效） |
 | `pdf_edit` | 水印 / 页码 / 旋转 / 重排 / 加密 / 解密 |
+| `pdf_office_to_pdf` / `pdf_to_word` | Office→PDF / PDF→Word |
+| `doc_convert` | doc/xls/ppt/pps/rtf → docx/xlsx/pptx/PDF |
+| `libreoffice_status` | 检查 LibreOffice 加装包 |
+| `ocr_status` / `ocr_recognize` | OCR 引擎状态 / 图片文字识别 |
+| `ocr_searchable_pdf` | 扫描版 PDF → 可搜索 PDF |
+| `ocr_to_docx` | 图片/扫描 PDF → 可编辑 Word |
+
+### 文件 / 压缩
+| 工具 | 作用 |
+|---|---|
+| `file_rename_batch` | 批量重命名（默认 `dry_run=true`） |
+| `archive_create` / `archive_extract` / `archive_list` | 压缩 / 解压 / 免解压预览 |
 
 ### 受限
 | 工具 | 作用 |
 |---|---|
 | `video_download` | 下载网络视频（**必须先由用户在 GUI 授权**） |
-| `video_download_status` | 查询下载任务 |
-| `video_download_cancel` | 取消下载任务 |
+| `video_download_status` / `video_download_cancel` | 查询 / 取消下载任务 |
 
 ## 视频下载的授权闸门
 
@@ -92,8 +105,7 @@ stdio 传输：客户端把 MCP server 当子进程启动，通过 stdin/stdout 
 
 ## 当前状态
 
-- 第一批（纯 Node）：已实现并通过 MCP 冒烟测试。
-- 第二批（ffmpeg / OCR / ASR / PDF 编辑）：已实现并通过 MCP 冒烟测试。
-- 第三批（Canvas 类：图片压缩/增强/水印/拼接/切图/格式转换）：待做。
-- 第四批（文档格式转换 + 打包进产物）：待做。
-- PDF 压缩瘦身暂未接入：它依赖 pdfjs 渲染 + Canvas，放在第三批。
+- 第一~四批全部接入：共 41 个 MCP 工具，覆盖 21 个 GUI 工具（视频播放器、软件卸载按需求不暴露）。
+- MCP 冒烟测试：17 项，含真实 ffmpeg / OCR / ASR / LibreOffice / pdfjs 渲染 / Canvas 像素管线。
+- 现有 `npm test` 保持全绿。
+- 打包脚本已把 `mcp/` 与 `pdfjs-dist/legacy/build` 一并带入产物；产物上还需再做一次 MCP 冒烟（见下）。

@@ -9,8 +9,10 @@ import media from './media.mjs';
 import ocr from './ocr.mjs';
 import asr from './asr.mjs';
 import pdfEdit from './pdf-edit.mjs';
+import image from './image.mjs';
+import office from './office.mjs';
 
-const groups = [obfuscate, imghide, archive, pdf, pdfEdit, rename, media, ocr, asr, videodl];
+const groups = [obfuscate, imghide, archive, pdf, pdfEdit, rename, media, ocr, asr, image, office, videodl];
 
 /** 扁平化后的工具列表（每个元素：{name, description, inputSchema, handler}） */
 export const tools = groups.flatMap((g) => (Array.isArray(g) ? g : [g]));

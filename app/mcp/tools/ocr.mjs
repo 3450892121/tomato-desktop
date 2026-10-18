@@ -4,7 +4,11 @@
 import fs from 'node:fs';
 import fsp from 'node:fs/promises';
 import path from 'node:path';
-import { appRoot, assertFile } from '../lib/paths.mjs';
+import { appRoot, assertFile, resolveOutputPath } from '../lib/paths.mjs';
+import { openPdfNode, renderPdfPage, closePdfNode } from '../lib/pdf-render.mjs';
+import { linesToSearchablePdf } from '../../src/tools/ocr/core/searchable.js';
+import { linesToPlainRows } from '../../src/tools/ocr/core/convert.js';
+import { linesToDocx, pagesToDocxRows } from '../../src/tools/ocr/core/docx.js';
 
 const OCR_DIR = path.join(appRoot(), 'addons', 'ocr');
 const MODEL = {
@@ -48,6 +52,17 @@ function getService() {
   return servicePromise;
 }
 
+async function recognizeBytes(bytes) {
+  const svc = await getService();
+  const ab = bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength);
+  return svc.recognize(ab);
+}
+
+function fontBytes() {
+  if (!fs.existsSync(FONT)) throw new Error('缺少中文字体（addons/ocr/fonts/NotoSansSC-VF.ttf），无法生成可搜索 PDF/Word');
+  return fs.readFileSync(FONT);
+}
+
 export const statusTool = {
   name: 'ocr_status',
   description: '检查文字识别引擎是否就绪（模型文件、中文字体）。',
@@ -79,10 +94,9 @@ export const recognizeTool = {
       throw new Error(`不支持的图片格式：${ext || '未知'}`);
     }
     const bytes = await fsp.readFile(input);
-    const ab = bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength);
     const svc = await getService();
     const t0 = Date.now();
-    const r = await svc.recognize(ab);
+    const r = await svc.recognize(bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength));
     return {
       ok: true,
       input,
@@ -94,4 +108,113 @@ export const recognizeTool = {
   }
 };
 
-export default [statusTool, recognizeTool];
+export const searchablePdfTool = {
+  name: 'ocr_searchable_pdf',
+  description:
+    '把扫描版 PDF 做成「可搜索 PDF」：每页渲染→OCR→在原文上叠一层隐形文字，'
+    + ' 看起来不变，但 Ctrl+F 能搜、能选中复制。需中文字体加装包。',
+  inputSchema: {
+    type: 'object',
+    required: ['input'],
+    properties: {
+      input: { type: 'string', description: '扫描版 PDF' },
+      scale: { type: 'number', minimum: 0.5, maximum: 4, description: 'OCR 渲染倍率，默认 2' },
+      output: { type: 'string', description: '可选：输出 PDF 路径' },
+      output_dir: { type: 'string', description: '可选：输出目录' },
+      base_name: { type: 'string', description: '可选：输出文件名' }
+    },
+    additionalProperties: false
+  },
+  async handler(args = {}) {
+    const input = assertFile(args.input, 'PDF');
+    const bytes = new Uint8Array(await fsp.readFile(input));
+    const scale = Number(args.scale) || 2;
+    const pdf = await openPdfNode(bytes);
+    const pageLines = [];
+    try {
+      for (let i = 1; i <= pdf.numPages; i += 1) {
+        const { canvas } = await renderPdfPage(pdf, i, { scale });
+        const png = canvas.toBuffer('image/png');
+        const r = await recognizeBytes(png);
+        pageLines.push(r.lines || []);
+      }
+    } finally {
+      await closePdfNode(pdf);
+    }
+    const out = await linesToSearchablePdf({
+      pdfBytes: bytes,
+      pageLines,
+      fontBytes: fontBytes(),
+      renderScale: scale
+    });
+    const base = args.base_name || `${path.basename(input, path.extname(input))}_可搜索`;
+    const target = resolveOutputPath({
+      output: args.output,
+      output_dir: args.output_dir,
+      base_name: base,
+      ext: '.pdf',
+      fallbackDir: path.dirname(input)
+    });
+    await fsp.writeFile(target.path, Buffer.from(out.bytes));
+    return {
+      ok: true,
+      output: target.path,
+      pages: pageLines.length,
+      drawn_fragments: out.drawnFragments,
+      embedded_chars: out.embeddedChars,
+      missing_chars: out.missingChars
+    };
+  }
+};
+
+export const toDocxTool = {
+  name: 'ocr_to_docx',
+  description: '把图片或扫描版 PDF 的识别结果导出成可编辑 Word（.docx，段落纯文本 + 分页）。',
+  inputSchema: {
+    type: 'object',
+    required: ['input'],
+    properties: {
+      input: { type: 'string', description: '图片或扫描版 PDF' },
+      scale: { type: 'number', minimum: 0.5, maximum: 4, description: 'PDF 渲染倍率，默认 2' },
+      output: { type: 'string', description: '可选：输出 docx 路径' },
+      output_dir: { type: 'string', description: '可选：输出目录' },
+      base_name: { type: 'string', description: '可选：输出文件名' }
+    },
+    additionalProperties: false
+  },
+  async handler(args = {}) {
+    const input = assertFile(args.input, '图片/PDF');
+    const ext = path.extname(input).toLowerCase();
+    const pagesRows = [];
+    if (ext === '.pdf') {
+      const bytes = new Uint8Array(await fsp.readFile(input));
+      const pdf = await openPdfNode(bytes);
+      try {
+        for (let i = 1; i <= pdf.numPages; i += 1) {
+          const { canvas } = await renderPdfPage(pdf, i, { scale: Number(args.scale) || 2 });
+          const r = await recognizeBytes(canvas.toBuffer('image/png'));
+          pagesRows.push(linesToPlainRows(r.lines || []));
+        }
+      } finally {
+        await closePdfNode(pdf);
+      }
+    } else {
+      const r = await recognizeBytes(await fsp.readFile(input));
+      pagesRows.push(linesToPlainRows(r.lines || []));
+    }
+    const rows = pagesToDocxRows(pagesRows);
+    const docx = await linesToDocx(rows, { title: path.basename(input) });
+    const base = args.base_name || `${path.basename(input, path.extname(input))}_识别`;
+    const target = resolveOutputPath({
+      output: args.output,
+      output_dir: args.output_dir,
+      base_name: base,
+      ext: '.docx',
+      fallbackDir: path.dirname(input)
+    });
+    await fsp.writeFile(target.path, Buffer.from(docx));
+    return { ok: true, output: target.path, pages: pagesRows.length, lines: rows.length };
+  }
+};
+
+export default [statusTool, recognizeTool, searchablePdfTool, toDocxTool];

@@ -159,19 +159,25 @@ async function main() {
 
     client.notify('notifications/initialized');
 
-    await test('tools/list：第二批工具全部注册（26 个）', async () => {
+    await test('tools/list：第四批工具全部注册（41 个）', async () => {
       const r = await client.request('tools/list', {});
       const names = r.tools.map((t) => t.name).sort();
       const expected = [
+        'ai_upscale',
         'archive_create', 'archive_extract', 'archive_list',
         'asr_status', 'asr_transcribe',
         'audio_convert', 'audio_edit',
+        'doc_convert',
         'file_rename_batch',
-        'image_hide_files', 'image_obfuscate', 'image_unhide_files',
+        'image_compress', 'image_convert', 'image_enhance',
+        'image_hide_files', 'image_obfuscate', 'image_slice', 'image_stitch',
+        'image_unhide_files', 'image_watermark',
+        'libreoffice_status',
         'media_probe',
-        'ocr_recognize', 'ocr_status',
-        'pdf_edit',
-        'pdf_extract_pages', 'pdf_images_to_pdf', 'pdf_merge', 'pdf_page_count', 'pdf_split',
+        'ocr_recognize', 'ocr_searchable_pdf', 'ocr_status', 'ocr_to_docx',
+        'pdf_compress', 'pdf_edit',
+        'pdf_extract_pages', 'pdf_images_to_pdf', 'pdf_merge', 'pdf_office_to_pdf',
+        'pdf_page_count', 'pdf_split', 'pdf_to_images', 'pdf_to_word',
         'sticker_convert',
         'video_compress', 'video_convert',
         'video_download', 'video_download_cancel', 'video_download_status'
@@ -354,6 +360,18 @@ async function main() {
       assert.equal(r.ok, true);
       assert.equal(typeof r.text, 'string');
       assert.ok(Array.isArray(r.lines));
+
+      const pdfSrc = path.join(root, 'ocr-src.pdf');
+      await client.call('pdf_images_to_pdf', { images: [img], output: pdfSrc });
+      const sp = await client.call('ocr_searchable_pdf', {
+        input: pdfSrc, scale: 1, output: path.join(root, 'ocr-searchable.pdf')
+      });
+      assert.equal(fs.readFileSync(sp.output).slice(0, 4).toString('ascii'), '%PDF');
+
+      const docx = await client.call('ocr_to_docx', {
+        input: img, output: path.join(root, 'ocr.docx')
+      });
+      assert.equal(fs.readFileSync(docx.output).slice(0, 2).toString('ascii'), 'PK');
     });
 
     await test('asr_status：加装包与 ffmpeg 就绪', async () => {
@@ -420,6 +438,105 @@ async function main() {
         output: path.join(root, 'decrypted.pdf')
       });
       assert.ok(fs.existsSync(dec.output));
+    });
+
+    await test('pdf_to_images / pdf_compress：真实渲染与压缩', async () => {
+      const img = path.join(root, 'render-src.png');
+      await makePng(img, 200, 100);
+      const srcPdf = path.join(root, 'render-src.pdf');
+      await client.call('pdf_images_to_pdf', { images: [img], output: srcPdf });
+
+      const imgs = await client.call('pdf_to_images', {
+        input: srcPdf, scale: 1, format: 'png', output_dir: path.join(root, 'pdf-images')
+      });
+      assert.equal(imgs.outputs.length, 1);
+      assert.equal(fs.readFileSync(imgs.outputs[0].output).slice(0, 4).toString('hex'), '89504e47');
+
+      const comp = await client.call('pdf_compress', {
+        input: srcPdf, preset: 'strong', output: path.join(root, 'compressed.pdf')
+      });
+      assert.ok(fs.existsSync(comp.output));
+      assert.ok(comp.after > 0);
+    });
+
+    await test('image_compress / convert / watermark / stitch / slice / enhance：Canvas 管线真实产物', async () => {
+      const src = path.join(root, 'canvas-src.png');
+      await makePng(src, 120, 80);
+
+      const comp = await client.call('image_compress', {
+        inputs: [src], format: 'jpg', quality: 60, longest_edge: 100,
+        output_dir: path.join(root, 'img-compress')
+      });
+      assert.ok(fs.existsSync(comp.outputs[0].output));
+      assert.equal(comp.outputs[0].format, 'jpg');
+      assert.equal(Math.max(comp.outputs[0].width, comp.outputs[0].height), 100);
+
+      const conv = await client.call('image_convert', {
+        inputs: [src], target: 'webp', quality: 70, output_dir: path.join(root, 'img-convert')
+      });
+      assert.ok(fs.existsSync(conv.outputs[0].output));
+      assert.equal(fs.readFileSync(conv.outputs[0].output).slice(0, 4).toString('ascii'), 'RIFF');
+
+      const bmp = await client.call('image_convert', {
+        inputs: [src], target: 'bmp', output_dir: path.join(root, 'img-bmp')
+      });
+      assert.equal(fs.readFileSync(bmp.outputs[0].output).slice(0, 2).toString('ascii'), 'BM');
+
+      const ico = await client.call('image_convert', {
+        inputs: [src], target: 'ico', output_dir: path.join(root, 'img-ico')
+      });
+      assert.equal(fs.readFileSync(ico.outputs[0].output).slice(0, 4).toString('hex'), '00000100');
+
+      const heic = await client.call('image_convert', {
+        inputs: [path.join(APP, 'tests', 'assets', 'heic-sample.heic')],
+        target: 'png', output_dir: path.join(root, 'img-heic')
+      });
+      assert.equal(fs.readFileSync(heic.outputs[0].output).slice(0, 4).toString('hex'), '89504e47');
+
+      const tif = await client.call('image_convert', {
+        inputs: [src], target: 'tif', output_dir: path.join(root, 'img-tif')
+      });
+      assert.match(fs.readFileSync(tif.outputs[0].output).slice(0, 4).toString('latin1'), /II\*|MM/);
+
+      const wm = await client.call('image_watermark', {
+        input: src, type: 'text', text: 'MCP', position: 'center', size_percent: 20, opacity: 60,
+        output_dir: path.join(root, 'img-wm')
+      });
+      assert.ok(fs.existsSync(wm.output));
+
+      const s1 = path.join(root, 's1.png');
+      const s2 = path.join(root, 's2.png');
+      await makePng(s1, 60, 40);
+      await makePng(s2, 60, 40);
+      const st = await client.call('image_stitch', {
+        inputs: [s1, s2], direction: 'vertical', gap: 5, output_dir: path.join(root, 'img-stitch')
+      });
+      assert.ok(fs.existsSync(st.output));
+      assert.ok(st.height > 80);
+
+      const sl = await client.call('image_slice', {
+        input: src, rows: 2, cols: 3, gap: 0, margin: 0, output_dir: path.join(root, 'img-slice')
+      });
+      assert.equal(sl.outputs.length, 6);
+      assert.equal(sl.outputs[0].width, 40);
+      assert.equal(sl.outputs[0].height, 40);
+
+      const en = await client.call('image_enhance', {
+        input: src, preset: 'auto', output_dir: path.join(root, 'img-enhance')
+      });
+      assert.ok(fs.existsSync(en.output));
+    });
+
+    await test('libreoffice_status / doc_convert：RTF→PDF 真实转换', async () => {
+      const st = await client.call('libreoffice_status', {});
+      assert.equal(st.found, true);
+      const rtf = path.join(root, 'doc.rtf');
+      await fsp.writeFile(rtf, '{\\rtf1\\ansi\\deff0 {\\fonttbl {\\f0 Arial;}}\\f0 Hello MCP\\par}', 'utf8');
+      const out = await client.call('doc_convert', {
+        inputs: [rtf], target: 'pdf', output_dir: path.join(root, 'doc-out')
+      });
+      assert.ok(fs.existsSync(out.outputs[0].output));
+      assert.equal(fs.readFileSync(out.outputs[0].output).slice(0, 4).toString('ascii'), '%PDF');
     });
 
     await test('video_download：没有授权时拒绝（NEEDS_APPROVAL），不产生下载', async () => {
