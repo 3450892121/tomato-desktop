@@ -6,7 +6,7 @@
 //   · 每个工具真实调用，产物能读回、内容/像素逐字节一致；
 //   · 重名不覆盖（uniqueTargetPath 的约定）。
 import assert from 'node:assert/strict';
-import { spawn } from 'node:child_process';
+import { spawn, spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import fsp from 'node:fs/promises';
 import os from 'node:os';
@@ -109,8 +109,7 @@ class McpClient {
   }
 }
 
-async function makePng(file, width = 64, height = 64) {
-  const canvas = createCanvas(width, height);
+async function makePng(file, width = 64, height = 64) {  const canvas = createCanvas(width, height);
   const ctx = canvas.getContext('2d');
   const img = ctx.createImageData(width, height);
   for (let y = 0; y < height; y += 1) {
@@ -124,6 +123,12 @@ async function makePng(file, width = 64, height = 64) {
   }
   ctx.putImageData(img, 0, 0);
   await fsp.writeFile(file, canvas.toBuffer('image/png'));
+}
+
+const FFMPEG = path.join(APP, 'addons', 'ffmpeg', 'ffmpeg.exe');
+function makeMedia(file, args) {
+  const r = spawnSync(FFMPEG, ['-hide_banner', '-y', ...args, file], { encoding: 'utf8' });
+  assert.equal(r.status, 0, String(r.stderr || 'ffmpeg failed'));
 }
 
 async function readPixels(file) {
@@ -154,14 +159,21 @@ async function main() {
 
     client.notify('notifications/initialized');
 
-    await test('tools/list：第一批 15 个工具全部注册', async () => {
+    await test('tools/list：第二批工具全部注册（26 个）', async () => {
       const r = await client.request('tools/list', {});
       const names = r.tools.map((t) => t.name).sort();
       const expected = [
         'archive_create', 'archive_extract', 'archive_list',
+        'asr_status', 'asr_transcribe',
+        'audio_convert', 'audio_edit',
         'file_rename_batch',
         'image_hide_files', 'image_obfuscate', 'image_unhide_files',
+        'media_probe',
+        'ocr_recognize', 'ocr_status',
+        'pdf_edit',
         'pdf_extract_pages', 'pdf_images_to_pdf', 'pdf_merge', 'pdf_page_count', 'pdf_split',
+        'sticker_convert',
+        'video_compress', 'video_convert',
         'video_download', 'video_download_cancel', 'video_download_status'
       ].sort();
       assert.deepEqual(names, expected);
@@ -290,6 +302,124 @@ async function main() {
       assert.ok(fs.existsSync(path.join(dir, 'doc_01.txt')));
       assert.ok(fs.existsSync(path.join(dir, 'doc_02.txt')));
       assert.ok(!fs.existsSync(a));
+    });
+
+    await test('media_probe / video_convert / video_compress / audio_convert / audio_edit：真实 ffmpeg 链路', async () => {
+      const video = path.join(root, 'clip.mp4');
+      makeMedia(video, ['-f', 'lavfi', '-i', 'testsrc=size=160x120:rate=10', '-t', '0.5', '-pix_fmt', 'yuv420p']);
+      const info = await client.call('media_probe', { path: video });
+      assert.equal(info.ok, true);
+      assert.equal(info.hasVideo, true);
+      assert.ok(info.durationSec > 0);
+
+      const converted = await client.call('video_convert', {
+        inputs: [video], target: 'mp4', quality: 'small', height: 120,
+        output_dir: path.join(root, 'video-out')
+      });
+      assert.equal(converted.outputs.length, 1);
+      assert.ok(fs.existsSync(converted.outputs[0].output));
+
+      const compressed = await client.call('video_compress', {
+        inputs: [video], mode: 'quality', quality: 'small', height: 120,
+        output_dir: path.join(root, 'video-compress')
+      });
+      assert.ok(fs.existsSync(compressed.outputs[0].output));
+
+      const audio = path.join(root, 'tone.wav');
+      makeMedia(audio, ['-f', 'lavfi', '-i', 'sine=frequency=440:duration=0.5', '-ac', '1', '-ar', '16000']);
+      const aconverted = await client.call('audio_convert', {
+        inputs: [audio], target: 'mp3', quality: 'small', output_dir: path.join(root, 'audio-out')
+      });
+      assert.ok(fs.existsSync(aconverted.outputs[0].output));
+
+      const aedited = await client.call('audio_edit', {
+        inputs: [audio], target: 'mp3', quality: 'small',
+        start_ms: 0, end_ms: 300, gain_db: -6, output_dir: path.join(root, 'audio-edit')
+      });
+      assert.ok(fs.existsSync(aedited.output));
+
+      const sticker = await client.call('sticker_convert', {
+        inputs: [video], output: 'gif', fps: 10, width: 160,
+        output_dir: path.join(root, 'sticker')
+      });
+      assert.ok(fs.existsSync(sticker.outputs[0].output));
+    });
+
+    await test('ocr_status / ocr_recognize：引擎能加载并返回结构化结果', async () => {
+      const st = await client.call('ocr_status', {});
+      assert.equal(st.found, true);
+      const img = path.join(root, 'ocr-src.png');
+      await makePng(img, 200, 80);
+      const r = await client.call('ocr_recognize', { input: img });
+      assert.equal(r.ok, true);
+      assert.equal(typeof r.text, 'string');
+      assert.ok(Array.isArray(r.lines));
+    });
+
+    await test('asr_status：加装包与 ffmpeg 就绪', async () => {
+      const st = await client.call('asr_status', {});
+      assert.equal(st.found, true);
+      assert.equal(st.ffmpeg, true);
+    });
+
+    await test('asr_transcribe：合成音频走完整链路（无人声时如实报错）', async () => {
+      const wav = path.join(root, 'asr-tone.wav');
+      makeMedia(wav, ['-f', 'lavfi', '-i', 'sine=frequency=440:duration=0.5', '-ac', '1', '-ar', '16000']);
+      let failed = false;
+      try {
+        await client.call('asr_transcribe', { input: wav });
+      } catch (err) {
+        failed = true;
+        assert.match(String(err.message || ''), /未识别到语音|识别失败/);
+      }
+      assert.equal(failed, true, '纯正弦波不应被识别成正常语音');
+    });
+
+    await test('pdf_edit：旋转 / 水印 / 页码 / 重排 / 加密真实产物', async () => {
+      const p1 = path.join(root, 'edit1.png');
+      const p2 = path.join(root, 'edit2.png');
+      await makePng(p1, 60, 40);
+      await makePng(p2, 60, 40);
+      const src = path.join(root, 'edit-src.pdf');
+      await client.call('pdf_images_to_pdf', { images: [p1, p2], output: src });
+
+      const rot = await client.call('pdf_edit', {
+        input: src, operation: 'rotate', params: { pages: [1], angle: 90 },
+        output: path.join(root, 'rotated.pdf')
+      });
+      assert.ok(fs.existsSync(rot.output));
+
+      const wm = await client.call('pdf_edit', {
+        input: src, operation: 'watermark',
+        params: { text: 'CONFIDENTIAL', fontSize: 18, opacity: 0.2, position: 'center' },
+        output: path.join(root, 'watermark.pdf')
+      });
+      assert.ok(fs.existsSync(wm.output));
+
+      const pn = await client.call('pdf_edit', {
+        input: src, operation: 'page_numbers',
+        params: { format: '{n}/{total}', fontSize: 10 },
+        output: path.join(root, 'page-numbers.pdf')
+      });
+      assert.ok(fs.existsSync(pn.output));
+
+      const ro = await client.call('pdf_edit', {
+        input: src, operation: 'reorder', params: { order: [2, 1] },
+        output: path.join(root, 'reordered.pdf')
+      });
+      assert.ok(fs.existsSync(ro.output));
+
+      const enc = await client.call('pdf_edit', {
+        input: src, operation: 'encrypt', params: { userPassword: '123456' },
+        output: path.join(root, 'encrypted.pdf')
+      });
+      assert.ok(fs.existsSync(enc.output));
+
+      const dec = await client.call('pdf_edit', {
+        input: enc.output, operation: 'decrypt', params: { password: '123456' },
+        output: path.join(root, 'decrypted.pdf')
+      });
+      assert.ok(fs.existsSync(dec.output));
     });
 
     await test('video_download：没有授权时拒绝（NEEDS_APPROVAL），不产生下载', async () => {

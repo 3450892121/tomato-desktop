@@ -34,8 +34,9 @@ stdio 传输：客户端把 MCP server 当子进程启动，通过 stdin/stdout 
 > `TOMATO_USERDATA_DIR` 用于让 MCP 找到 GUI 写的授权文件。
 > 开发态就是 `app/userdata`；打包态应指向 exe 同目录的 `userdata`。
 
-## 第一批工具（15 个）
+## 已接入工具（26 个）
 
+### 第一批（纯 Node）
 | 工具 | 作用 |
 |---|---|
 | `image_obfuscate` | 图片混淆/解混淆（6 模式，逐像素可逆） |
@@ -50,6 +51,23 @@ stdio 传输：客户端把 MCP server 当子进程启动，通过 stdin/stdout 
 | `pdf_extract_pages` | 提取指定页 |
 | `pdf_page_count` | 读取 PDF 页数 |
 | `file_rename_batch` | 批量重命名（默认 `dry_run=true`，先预览） |
+
+### 第二批（媒体 / 本地 AI / PDF 编辑）
+| 工具 | 作用 |
+|---|---|
+| `media_probe` | 读取时长/分辨率/编码/音轨 |
+| `video_convert` | MP4/WebM/MKV/MOV/AVI 互转 |
+| `video_compress` | 画质档 / 目标体积两遍编码 + 自动重跑 |
+| `sticker_convert` | GIF/WebP/APNG ↔ MP4/WebM |
+| `audio_convert` | 21 种音频输出 + 视频提取声音 |
+| `audio_edit` | 截取 / 拼接 / 淡入淡出 / 响度标准化 |
+| `ocr_status` / `ocr_recognize` | 检查 OCR 引擎 / 识别图片文字 |
+| `asr_status` / `asr_transcribe` | 检查语音引擎 / 音频视频转文字 |
+| `pdf_edit` | 水印 / 页码 / 旋转 / 重排 / 加密 / 解密 |
+
+### 受限
+| 工具 | 作用 |
+|---|---|
 | `video_download` | 下载网络视频（**必须先由用户在 GUI 授权**） |
 | `video_download_status` | 查询下载任务 |
 | `video_download_cancel` | 取消下载任务 |
@@ -74,7 +92,8 @@ stdio 传输：客户端把 MCP server 当子进程启动，通过 stdin/stdout 
 
 ## 当前状态
 
-- 第一批（纯 Node）：已实现并通过 `node tests/mcp.test.mjs`（9 项）。
-- 第二批（ffmpeg / OCR / ASR / PDF 编辑）：待做。
-- 第三批（Canvas 类：压缩/增强/水印/拼接/切图/格式转换）：待做。
+- 第一批（纯 Node）：已实现并通过 MCP 冒烟测试。
+- 第二批（ffmpeg / OCR / ASR / PDF 编辑）：已实现并通过 MCP 冒烟测试。
+- 第三批（Canvas 类：图片压缩/增强/水印/拼接/切图/格式转换）：待做。
 - 第四批（文档格式转换 + 打包进产物）：待做。
+- PDF 压缩瘦身暂未接入：它依赖 pdfjs 渲染 + Canvas，放在第三批。
