@@ -45,7 +45,7 @@
 - [FAQ](en/faq.md) — antivirus, offline use, output location, agent troubleshooting
 
 ### Agent / MCP
-- [Agent access (concise)](en/agent.md) — one-click DSH, manual config for other MCP clients, 41 tools, Skill
+- [Agent access (concise)](en/agent.md) — one-click DSH plus manual config for other MCP clients; 41 tools, Skill
 - [Detailed agent guide (Chinese, shipped)](Agent接入说明.md) — full JSON, environment variables, troubleshooting
 - [Security](en/security.md) — path allowlist, audit log, read-only mode, silent execution
 - [MCP server README](../app/mcp/README.md)
