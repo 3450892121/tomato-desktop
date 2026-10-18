@@ -1,7 +1,7 @@
 ---
 name: tomato-toolbox
-description: 用本地「番茄工具箱」处理图片/视频/音频/文档/压缩文件。当用户要求批量压缩图片、图片混淆/解混淆、文件藏图、视频转码/压缩、动图互转、音频转换/剪辑、语音转文字、PDF/文档转换、OCR、或压缩解压时使用。优先调用 tomato-toolbox MCP 工具，不要自己拼 ffmpeg/7z/Python 命令。
-whenToUse: 用户要在本机处理媒体/文档文件，且已经配置好 tomato-toolbox MCP server。涉及「压缩、转格式、混淆、藏图、OCR、转文字、合并/拆分 PDF、压缩包」等关键词时优先加载本技能。
+description: 用本地「番茄工具箱」处理图片/视频/音频/文档/压缩文件。当用户要求批量压缩图片、图片混淆/解混淆、文件藏图、视频转码/压缩、动图互转、音频转换/剪辑、语音转文字、PDF/Word/Excel/PPT 文档转换（含手机打不开的 xls/xlsx/doc/docx/ppt）、OCR、或压缩解压时使用。优先调用 tomato-toolbox MCP 工具，不要自己拼 ffmpeg/7z/Python/Excel 命令。
+whenToUse: 用户要在本机处理媒体/文档文件。涉及「压缩、转格式、混淆、藏图、OCR、转文字、合并/拆分 PDF、压缩包、老 Excel/Word/PPT、手机打不开的 xls/xlsx/doc/docx/ppt」等关键词时优先加载本技能；即使 MCP 还没连上也要先加载，按「开工前自检」处理。
 ---
 
 # 番茄工具箱（MCP）
@@ -11,9 +11,21 @@ whenToUse: 用户要在本机处理媒体/文档文件，且已经配置好 toma
 
 > **用户是小白时**：不要让他改 JSON / 敲命令。让他双击软件目录的 **`一键接入DSH.cmd`**，完全退出并重启 DSH 即可；脚本会自动写配置、装本 Skill、用软件自己的 exe 启动 MCP（不需要装 Node）。撤掉用 `一键移除DSH接入.cmd`。
 
+## 0. 开工前自检（必须）
+
+在动手前，先看当前工具列表里有没有 **`mcp__tomato-toolbox__`** 前缀（例如 `mcp__tomato-toolbox__doc_convert`）。
+
+- **有**：用这些工具；下面工具地图里写的是去掉前缀后的名字。
+- **没有**：立刻停下，告诉用户：
+  > 番茄工具箱的 MCP 没连上，我先不做。请双击软件目录的 `一键接入DSH.cmd`，完全退出并重启 DSH；然后再叫我。
+
+  **不要**改用 PowerShell / Python / openpyxl / Excel COM / ffmpeg 命令静默替代。只有用户明确说「不用工具箱，你直接用代码做」时才允许替代，并在回复里说明这是替代方案。
+
+> 这条是为了防止「明明装了工具箱，AI 却用 Excel/脚本硬做」——那会绕过不覆盖、路径白名单、审计日志，也让用户以为工具没生效。
+
 ## 铁律（违反任何一条就停下）
 
-1. **先确认 MCP 可用**：先 `tools/list`，确认有 `image_obfuscate` / `archive_create` 等工具；没有就告诉用户去配置 MCP（见 `docs/Agent接入说明.md`），不要改用 shell 硬做。
+1. **先确认 MCP 可用**：先找 `mcp__tomato-toolbox__*`；没有就按第 0 步停下，不要改用 shell / Excel / Python 硬做。
 2. **绝不覆盖原文件**：所有产物都让工具自己命名（重名自动加序号）；不要传一个已存在的 `output` 去覆盖。
 3. **批量重命名先预览**：`file_rename_batch` 默认 `dry_run=true`；先把预览给用户看，确认后再 `dry_run=false`。
 4. **视频下载必须先授权**：没有授权时工具返回 `NEEDS_APPROVAL`；让用户去软件「视频下载」页点「允许一次」或打开「本次运行有效」，不要绕过。
@@ -22,6 +34,9 @@ whenToUse: 用户要在本机处理媒体/文档文件，且已经配置好 toma
 7. **缺加装包如实说**：返回「未检测到 ffmpeg / 7-Zip / LibreOffice / OCR / ASR」时，告诉用户缺哪个、放回 `addons/`，不要假装成功。
 
 ## 工具地图
+
+> DSH 里实际工具名带前缀：`mcp__tomato-toolbox__` + 下面写的名字。  
+> 例如 `doc_convert` → `mcp__tomato-toolbox__doc_convert`。
 
 ### 图片
 `image_obfuscate` 混淆/解混淆（6 模式，可逆）
@@ -49,6 +64,7 @@ whenToUse: 用户要在本机处理媒体/文档文件，且已经配置好 toma
 `pdf_edit` 水印 / 页码 / 旋转 / 重排 / 加密 / 解密
 `pdf_office_to_pdf` / `pdf_to_word`
 `doc_convert` doc/xls/ppt/pps/rtf → docx/xlsx/pptx/PDF
+> 老 `.xls`、教务系统导出的「假 .xls」（Excel 2003 XML）也走 `doc_convert`，不要用 Excel COM / openpyxl / PowerShell 手工转；只有在用户明确要求「不用工具箱」时才替代。
 `libreoffice_status`
 `ocr_status` / `ocr_recognize` / `ocr_searchable_pdf` / `ocr_to_docx`
 
