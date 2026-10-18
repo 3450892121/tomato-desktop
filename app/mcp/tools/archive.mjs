@@ -9,12 +9,12 @@ import {
   sevenZipStatus, createArchive, extractArchive, listArchive,
   uniqueArchivePath, makeTempDir
 } from '../../src/tools/archive/core/engine.mjs';
-import { appRoot, assertDir, assertFile } from '../lib/paths.mjs';
+import { portableRoot, assertDir, assertFile } from '../lib/paths.mjs';
 
 const LEVELS = ['store', 'fastest', 'fast', 'normal', 'small', 'extreme'];
 
 async function engineStatus() {
-  const status = await sevenZipStatus(appRoot());
+  const status = await sevenZipStatus(portableRoot());
   if (!status.found) {
     throw new Error('未检测到 7-Zip 加装包（把 addons/7zip 放回软件目录）');
   }

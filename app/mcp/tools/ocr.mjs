@@ -4,13 +4,13 @@
 import fs from 'node:fs';
 import fsp from 'node:fs/promises';
 import path from 'node:path';
-import { appRoot, assertFile, resolveOutputPath } from '../lib/paths.mjs';
+import { portableRoot, assertFile, resolveOutputPath } from '../lib/paths.mjs';
 import { openPdfNode, renderPdfPage, closePdfNode } from '../lib/pdf-render.mjs';
 import { linesToSearchablePdf } from '../../src/tools/ocr/core/searchable.js';
 import { linesToPlainRows } from '../../src/tools/ocr/core/convert.js';
 import { linesToDocx, pagesToDocxRows } from '../../src/tools/ocr/core/docx.js';
 
-const OCR_DIR = path.join(appRoot(), 'addons', 'ocr');
+const OCR_DIR = path.join(portableRoot(), 'addons', 'ocr');
 const MODEL = {
   detection: path.join(OCR_DIR, 'det.onnx'),
   recognition: path.join(OCR_DIR, 'rec.onnx'),

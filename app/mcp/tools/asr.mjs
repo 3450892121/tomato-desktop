@@ -5,11 +5,11 @@ import fs from 'node:fs';
 import fsp from 'node:fs/promises';
 import path from 'node:path';
 import { spawn } from 'node:child_process';
-import { appRoot, assertFile, assertDir, uniqueTargetPath } from '../lib/paths.mjs';
+import { portableRoot, assertFile, assertDir, uniqueTargetPath } from '../lib/paths.mjs';
 import { findFfmpeg, runFfmpeg } from '../lib/ffmpeg-runner.mjs';
 import { srtToText } from '../../src/tools/transcribe/core/plan.js';
 
-const ASR_DIR = path.join(appRoot(), 'addons', 'asr');
+const ASR_DIR = path.join(portableRoot(), 'addons', 'asr');
 const ASR_EXE = path.join(ASR_DIR, 'llama-funasr-sensevoice.exe');
 const ASR_MODEL = path.join(ASR_DIR, 'models', 'sensevoice-small-q8.gguf');
 const ASR_VAD = path.join(ASR_DIR, 'models', 'fsmn-vad.gguf');
@@ -57,7 +57,7 @@ export const transcribeTool = {
     if (!findAsr()) throw new Error('未检测到语音识别加装包（把 addons/asr 放回软件目录）');
     if (!findFfmpeg()) throw new Error('未检测到 ffmpeg（识别前需要它把音频转成 16kHz 单声道）');
 
-    const workRoot = path.join(appRoot(), 'userdata', 'tmp');
+    const workRoot = path.join(portableRoot(), 'userdata', 'tmp');
     const workDir = path.join(workRoot, `asr-mcp-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`);
     await fsp.mkdir(workDir, { recursive: true });
     const wavPath = path.join(workDir, 'in16k.wav');
@@ -72,11 +72,11 @@ export const transcribeTool = {
       }
 
       // 关键：模型/音频都传相对 ASCII 路径 + cwd=软件目录——含中文也安全
-      const rel = (p) => path.relative(appRoot(), p);
+      const rel = (p) => path.relative(portableRoot(), p);
       const srtText = await new Promise((resolve, reject) => {
         const child = spawn(ASR_EXE, ['-m', rel(ASR_MODEL), '--vad', rel(ASR_VAD), '-a', rel(wavPath), '--srt'], {
           windowsHide: true,
-          cwd: appRoot()
+          cwd: portableRoot()
         });
         let stdout = '';
         let stderr = '';

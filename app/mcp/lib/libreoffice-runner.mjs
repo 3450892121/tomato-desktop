@@ -7,10 +7,10 @@ import os from 'node:os';
 import path from 'node:path';
 import { spawn } from 'node:child_process';
 import { pathToFileURL } from 'node:url';
-import { appRoot } from './paths.mjs';
+import { portableRoot } from './paths.mjs';
 
 function findLibreOffice() {
-  const addon = path.join(appRoot(), 'addons', 'libreoffice');
+  const addon = path.join(portableRoot(), 'addons', 'libreoffice');
   const candidates = [
     path.join(addon, 'program', 'soffice.com'),
     path.join(addon, 'program', 'soffice.exe'),
@@ -81,7 +81,7 @@ export async function convertWithLibreOffice({ inputPath, target, mode = 'layout
 
   const workDir = path.join(os.tmpdir(), `tomato-mcp-lo-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`);
   await fsp.mkdir(workDir, { recursive: true });
-  const profileDir = path.join(appRoot(), 'userdata', 'libreoffice-profile');
+  const profileDir = path.join(portableRoot(), 'userdata', 'libreoffice-profile');
   await fsp.mkdir(profileDir, { recursive: true });
 
   const runSoffice = shortPathFor(soffice);

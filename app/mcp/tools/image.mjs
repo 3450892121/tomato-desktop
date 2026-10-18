@@ -25,7 +25,7 @@ import { decodeImageFile } from '../lib/image-node.mjs';
 import {
   pixelsToCanvas, canvasToPixels, canvasToBuffer, loadCanvas, resizePixels, blurPixels
 } from '../lib/canvas-ops.mjs';
-import { appRoot, assertFile, resolveOutputPath, uniqueTargetPath } from '../lib/paths.mjs';
+import { portableRoot, assertFile, resolveOutputPath, uniqueTargetPath } from '../lib/paths.mjs';
 import { convertFile } from '../lib/ffmpeg-runner.mjs';
 
 const QUALITIES = ['high', 'standard', 'small'];
@@ -413,7 +413,7 @@ export const watermarkTool = {
 };
 
 function findRealesrgan() {
-  const dir = path.join(appRoot(), 'addons', 'realesrgan');
+  const dir = path.join(portableRoot(), 'addons', 'realesrgan');
   const exe = path.join(dir, 'realesrgan-ncnn-vulkan.exe');
   return fs.existsSync(exe) ? { dir, exe } : null;
 }

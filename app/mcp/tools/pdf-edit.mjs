@@ -8,9 +8,9 @@ import {
   addTextWatermark, addPageNumbers, rotatePages, reorderPages, encryptPdf
 } from '../../src/tools/pdf-edit/core/ops.js';
 import { PDFDocument } from '../../node_modules/@cantoo/pdf-lib/dist/pdf-lib.esm.js';
-import { appRoot, assertFile, resolveOutputPath } from '../lib/paths.mjs';
+import { portableRoot, assertFile, resolveOutputPath } from '../lib/paths.mjs';
 
-const FONT_PATH = path.join(appRoot(), 'addons', 'ocr', 'fonts', 'NotoSansSC-VF.ttf');
+const FONT_PATH = path.join(portableRoot(), 'addons', 'ocr', 'fonts', 'NotoSansSC-VF.ttf');
 
 function fontBytes() {
   try { return fs.readFileSync(FONT_PATH); } catch { return undefined; }

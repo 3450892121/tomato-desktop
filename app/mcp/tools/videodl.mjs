@@ -9,22 +9,17 @@
 // 本工具只读授权文件；拿不到就返回 NEEDS_APPROVAL，不产生任何下载。
 import fs from 'node:fs';
 import path from 'node:path';
-import { appRoot } from '../lib/paths.mjs';
+import { appRoot, portableRoot } from '../lib/paths.mjs';
 import { checkApproval } from '../../src/tools/videodl/core/agent-approval.mjs';
 
 function userdataDir() {
   const override = process.env.TOMATO_USERDATA_DIR;
   if (override) return path.resolve(override);
-  const dev = path.join(appRoot(), 'userdata');
-  // 打包态：appRoot = <软件目录>/resources/app，userdata 在 <软件目录>/userdata
-  const packaged = path.join(path.dirname(path.dirname(appRoot())), 'userdata');
-  if (fs.existsSync(dev)) return dev;
-  if (fs.existsSync(packaged)) return packaged;
-  return dev;
+  return path.join(portableRoot(), 'userdata');
 }
 
 function findFfmpeg() {
-  const addon = path.join(appRoot(), 'addons', 'ffmpeg', 'ffmpeg.exe');
+  const addon = path.join(portableRoot(), 'addons', 'ffmpeg', 'ffmpeg.exe');
   if (fs.existsSync(addon)) return addon;
   for (const dir of String(process.env.PATH || '').split(path.delimiter)) {
     if (!dir) continue;
@@ -40,7 +35,7 @@ function getManager() {
     managerPromise = import('../../src/tools/videodl/core/manager.mjs').then(({ createVideoDownloader }) => {
       const ffmpegPath = findFfmpeg();
       return createVideoDownloader({
-        addonsRoot: path.join(appRoot(), 'addons'),
+        addonsRoot: path.join(portableRoot(), 'addons'),
         toolRoot: path.join(appRoot(), 'src', 'tools', 'videodl'),
         userdataDir: userdataDir(),
         ffmpegPath,

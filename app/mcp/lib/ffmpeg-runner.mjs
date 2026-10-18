@@ -10,10 +10,10 @@ import path from 'node:path';
 import os from 'node:os';
 import { spawn } from 'node:child_process';
 import { StringDecoder } from 'node:string_decoder';
-import { appRoot, uniqueTargetPath } from './paths.mjs';
+import { portableRoot, uniqueTargetPath } from './paths.mjs';
 
 function candidates() {
-  const out = [path.join(appRoot(), 'addons', 'ffmpeg', 'ffmpeg.exe')];
+  const out = [path.join(portableRoot(), 'addons', 'ffmpeg', 'ffmpeg.exe')];
   for (const dir of String(process.env.PATH || '').split(path.delimiter)) {
     if (dir) out.push(path.join(dir, 'ffmpeg.exe'));
   }

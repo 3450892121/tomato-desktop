@@ -15,6 +15,18 @@ export function appRoot() {
   return path.resolve(HERE, '../..');
 }
 
+/**
+ * 绿色版根目录（addons / userdata 所在层）
+ * - 开发态：app 目录（addons 在 app/addons）
+ * - 打包态：<软件目录>（appRoot = <软件目录>/resources/app；addons 在 <软件目录>/addons）
+ */
+export function portableRoot() {
+  const root = appRoot();
+  const parent = path.dirname(root);
+  if (path.basename(parent).toLowerCase() === 'resources') return path.dirname(parent);
+  return root;
+}
+
 /** 确保目录存在 */
 export async function ensureDir(dir) {
   await fsp.mkdir(dir, { recursive: true });

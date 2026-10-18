@@ -136,6 +136,9 @@ async function runVideodlUiTest(win) {
       engineLine: (document.querySelector('[data-role="engine-line"]') || {}).textContent || '',
       engineHint: (document.querySelector('[data-role="engine-hint"]') || {}).textContent || '',
       autocheck: !!(document.querySelector('[data-role="autocheck"]') || {}).checked,
+      agentAllowed: !!(document.querySelector('[data-role="agent-allow"]') || {}).checked,
+      agentBadge: (document.querySelector('[data-role="agent-badge"]') || {}).textContent || '',
+      agentHint: (document.querySelector('[data-role="agent-hint"]') || {}).textContent || '',
       emptyVisible: /还没有下载记录/.test((document.querySelector('[data-role="list"]') || {}).textContent || ''),
       items
     });
@@ -232,6 +235,41 @@ async function runVideodlUiTest(win) {
     const toggledOn = JSON.parse(await pageState());
     check('自动检查开关可切换', toggledOff.autocheck === false && toggledOn.autocheck === true, `off=${toggledOff.autocheck} on=${toggledOn.autocheck}`);
     await shot('videodl-05-引擎卡片');
+
+    // —— 5b) AI 助手下载授权开关（GUI 写文件、MCP 只读） ——
+    await evalJs('window.desktop.videodlAgentRevoke()');
+    await wait(400);
+    const agentInitial = JSON.parse(await pageState());
+    check('AI 授权初始为每次询问', agentInitial.agentAllowed === false && agentInitial.agentBadge.includes('每次询问'),
+      `allowed=${agentInitial.agentAllowed} badge=${agentInitial.agentBadge}`);
+
+    await click('[data-role="agent-allow"]');
+    await wait(700);
+    const agentOn = JSON.parse(await pageState());
+    const approvalFile = path.join(app.getPath('userData'), 'videodl-agent-approvals.json');
+    let approvalOn = {};
+    try { approvalOn = JSON.parse(fsSync.readFileSync(approvalFile, 'utf8')); } catch { /* 文件不存在 */ }
+    check('打开「本次运行」后写入 session 授权',
+      agentOn.agentAllowed === true && approvalOn.sessionUntil > Date.now(),
+      `allowed=${agentOn.agentAllowed} until=${approvalOn.sessionUntil}`);
+
+    await click('[data-role="agent-allow"]');
+    await wait(700);
+    const agentOff = JSON.parse(await pageState());
+    let approvalOff = {};
+    try { approvalOff = JSON.parse(fsSync.readFileSync(approvalFile, 'utf8')); } catch { /* 文件不存在 */ }
+    check('关闭后撤销 session 授权',
+      agentOff.agentAllowed === false && !(approvalOff.sessionUntil > Date.now()),
+      `allowed=${agentOff.agentAllowed} until=${approvalOff.sessionUntil}`);
+
+    await click('[data-action="agent-once"]');
+    await wait(700);
+    let approvalOnce = {};
+    try { approvalOnce = JSON.parse(fsSync.readFileSync(approvalFile, 'utf8')); } catch { /* 文件不存在 */ }
+    check('「允许一次」写入一次性授权', approvalOnce.onceUntil > Date.now(), `onceUntil=${approvalOnce.onceUntil}`);
+    await evalJs('window.desktop.videodlAgentRevoke()');
+    await wait(400);
+    await shot('videodl-05b-AI授权');
 
     // —— 6) 取消：慢速下载中途点取消 ——
     await evalJs(`(() => {
