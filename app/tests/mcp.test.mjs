@@ -9,6 +9,7 @@ import assert from 'node:assert/strict';
 import { spawn, spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import fsp from 'node:fs/promises';
+import http from 'node:http';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -144,7 +145,12 @@ async function main() {
   const root = tempDir();
   const approvalDir = path.join(root, 'userdata');
   fs.mkdirSync(approvalDir, { recursive: true });
-  const client = new McpClient({ TOMATO_USERDATA_DIR: approvalDir });
+  const client = new McpClient({
+    TOMATO_USERDATA_DIR: approvalDir,
+    HTTP_PROXY: '',
+    HTTPS_PROXY: '',
+    NO_PROXY: '127.0.0.1,localhost'
+  });
 
   try {
     await test('initialize：返回 serverInfo 与 tools 能力', async () => {
@@ -547,6 +553,51 @@ async function main() {
       assert.equal(r.ok, false);
       assert.equal(r.code, 'NEEDS_APPROVAL');
       assert.match(r.message, /授权/);
+    });
+
+    await test('video_download：GUI 授权后能真实下载（MCP 全链路）', async () => {
+      const fixture = path.join(root, 'mcp-dl.mp4');
+      makeMedia(fixture, [
+        '-f', 'lavfi', '-i', 'testsrc=duration=0.5:size=160x120:rate=10',
+        '-f', 'lavfi', '-i', 'sine=frequency=440:duration=0.5',
+        '-c:v', 'libx264', '-pix_fmt', 'yuv420p', '-c:a', 'aac', '-shortest'
+      ]);
+      const server = http.createServer((req, res) => {
+        if (req.url.startsWith('/video.mp4')) {
+          const size = fs.statSync(fixture).size;
+          res.writeHead(200, { 'Content-Type': 'video/mp4', 'Content-Length': size });
+          fs.createReadStream(fixture).pipe(res);
+          return;
+        }
+        res.writeHead(404);
+        res.end();
+      });
+      await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
+      try {
+        const port = server.address().port;
+        await grantSession(approvalDir, 60_000);
+        const started = await client.call('video_download', {
+          url: `http://127.0.0.1:${port}/video.mp4`,
+          output_dir: path.join(root, 'dl-out')
+        });
+        assert.equal(started.ok, true);
+        assert.equal(started.approval.mode, 'session');
+        const jobId = started.job.id;
+
+        let job = null;
+        for (let i = 0; i < 120; i += 1) {
+          await new Promise((r) => setTimeout(r, 500));
+          const s = await client.call('video_download_status', { job_id: jobId });
+          job = s.job;
+          if (job.status === 'done' || job.status === 'error' || job.status === 'cancelled') break;
+        }
+        assert.equal(job && job.status, 'done', job && job.err ? job.err : '下载超时');
+        assert.ok(job.file && fs.existsSync(job.file), '产物不存在');
+        assert.ok(fs.statSync(job.file).size > 1000);
+      } finally {
+        await new Promise((resolve) => server.close(resolve));
+        await revokeAll(approvalDir);
+      }
     });
 
     await test('授权文件：session / once / revoke 语义正确', async () => {
