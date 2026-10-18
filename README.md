@@ -80,7 +80,9 @@
 2. 双击软件目录里的 `一键接入Qoder.cmd`；
 3. 打开 Qoder，**新开一个对话**，说同样的话。
 
-脚本会自动写对应客户端的配置、安装 Skill、用软件自己的 exe 启动 MCP；撤掉分别双击 `一键移除DSH接入.cmd` / `一键移除Qoder接入.cmd`。Qoder 里的工具名前缀是 `mcp__tomato_toolbox__`，DSH 是 `mcp__tomato-toolbox__`。
+脚本会自动写对应客户端的配置、安装 Skill、用软件自己的 exe 启动 MCP；撤掉分别双击 `一键移除DSH接入.cmd` / `一键移除Qoder接入.cmd`（Skill 会一起移除，备份在 `skill-backups/`）。Qoder 里的工具名前缀是 `mcp__tomato_toolbox__`，DSH 是 `mcp__tomato-toolbox__`。
+
+**装好不确定有没有生效？** 双击 `一键体检Agent接入.cmd`：它会检查 DSH / Qoder / Trae / WorkBuddy / ZCode 的配置，并真的启动一遍 MCP 数工具（不用先打开客户端），有问题直接说卡在哪。
 
 其它客户端（Claude Desktop / Trae 等）的配置、工具清单、安全边界见：
 
@@ -93,6 +95,7 @@
 
 ## 四、本次更新
 
+- **Agent 接入体检 + 移除更彻底**：新增 `一键体检Agent接入.cmd` / `verify-agent-mcp.ps1`，检查 DSH / Qoder / Trae / WorkBuddy / ZCode 的配置并真的启动 MCP 数工具；接入脚本写完后会读回校验、失败自动回滚，备份不再互相覆盖；DSH 移除现在会把 Skill 一起移走（备份在 `skill-backups/`）。
 - **Qoder 一键接入**：双击 `一键接入Qoder.cmd`，自动写 `~/.qoder-cn/settings.json`（先备份；其它 MCP 与 providers 保留）、安装 Skill、用软件 exe 启动 MCP；不需要改 JSON、不需要装 Node；`一键移除Qoder接入.cmd` 可撤回。Qoder 里完全退出重开并新开对话即可用 41 个工具。
 - **v2.15.0 MCP 一键接入（DSH）**：双击 `一键接入DSH.cmd`，自动写配置、装 Skill、用软件 exe 启动 MCP；不需要改 JSON、不需要装 Node；`一键移除DSH接入.cmd` 可撤回。
 - **v2.15.0 文档重构**：主 README + 子文档、中文 / English 双语。

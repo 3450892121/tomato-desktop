@@ -11,7 +11,7 @@
 2. 完全退出并重启 DeepSeek Harness；
 3. 在 DSH 里直接说「用番茄工具箱把…」。
 
-脚本会自动写 `~/.dsh/profiles/*/cordis.patch.yml`（先备份）、安装 Skill、用软件自己的 exe 以 Node 模式启动 MCP。撤掉用 `一键移除DSH接入.cmd`。
+脚本会自动写 `~/.dsh/profiles/*/cordis.patch.yml`（先备份）、安装 Skill、用软件自己的 exe 以 Node 模式启动 MCP。撤掉用 `一键移除DSH接入.cmd`（Skill 一起移除，备份在 `~/.dsh/skill-backups/`）。
 
 ## 小白一键接入（Qoder，推荐）
 
@@ -24,6 +24,17 @@
 脚本会自动写 `~/.qoder-cn/settings.json` 的 `mcpServers.tomato-toolbox`（先备份；其它 MCP 与 providers 保留）、安装 Skill 到 `~/.qoder-cn/skills/tomato-toolbox`、用软件自己的 exe 以 Node 模式启动 MCP。撤掉用 `一键移除Qoder接入.cmd`。
 
 > Qoder 工具名前缀是 `mcp__tomato_toolbox__`（下划线）；DSH 是 `mcp__tomato-toolbox__`（横线）。
+
+## 接入体检（推荐）
+
+双击软件目录里的 `一键体检Agent接入.cmd`（或运行 `app/tools/verify-agent-mcp.ps1`）：
+
+- 检查 DSH / Qoder / Trae / WorkBuddy / ZCode / Claude Desktop 的配置、路径、Skill；
+- 对已接入的**真的启动一遍 MCP**，要求返回工具列表（正常 41 个）；
+- 只读、不改配置；`-NoProbe` 跳过启动，`-Json` 输出机器可读结果；
+- 有异常时退出码为 1，可直接接 CI。
+
+`Trae` / `WorkBuddy` / `ZCode` / `Claude` 目前没有一键脚本，体检只报状态。
 
 ## 运行（开发/手动）
 

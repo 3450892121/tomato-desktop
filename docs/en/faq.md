@@ -50,6 +50,9 @@ Download the new zip, extract to a new folder, copy the old `userdata\` over, th
 3. Verify `mcpServers.tomato-toolbox` in `~/.qoder-cn/settings.json`;
 4. The Qoder tool prefix is `mcp__tomato_toolbox__` (underscore).
 
+**Not sure the setup took effect?**
+Double-click `一键体检Agent接入.cmd`. It checks the config and Skill for DSH / Qoder / Trae / WorkBuddy / ZCode, actually starts each MCP server to count tools, and reports healthy / broken / not integrated with the failing step. It never modifies any config.
+
 **Why does it keep returning `NEEDS_APPROVAL`?**
 Video Download asks every time by default. Approve in the Video Download page, or enable the session grant.
 

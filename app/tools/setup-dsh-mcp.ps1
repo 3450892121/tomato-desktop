@@ -7,6 +7,23 @@
 $ErrorActionPreference = 'Stop'
 $utf8 = New-Object System.Text.UTF8Encoding($false)
 
+trap {
+  Write-Host ''
+  Write-Host ('接入失败：' + $_.Exception.Message) -ForegroundColor Red
+  Write-Host '如果配置已被改动，脚本会尽量用备份恢复；没有恢复成功的话，用同目录下的 .tomato-backup-* 手动放回。'
+  exit 1
+}
+
+# 备份文件名绝不覆盖旧的：同一秒里跑两次也不会把第一份备份冲掉
+function Get-UniquePath([string]$basePath) {
+  if (-not (Test-Path -LiteralPath $basePath)) { return $basePath }
+  $i = 2
+  while (Test-Path -LiteralPath ($basePath + '-' + $i)) { $i++ }
+  return ($basePath + '-' + $i)
+}
+
+function Get-Text([string]$p) { return [System.IO.File]::ReadAllText($p, $utf8) }
+
 if (-not $DshRoot) { $DshRoot = Join-Path $env:USERPROFILE '.dsh' }
 if (-not (Test-Path $DshRoot)) { throw "找不到 DSH 数据目录：$DshRoot（请先安装/打开一次 DeepSeek Harness）" }
 
@@ -31,7 +48,6 @@ if (Test-Path (Join-Path $AppDir 'resources\app\mcp\server.mjs')) {
   $cwd = Join-Path $AppDir 'resources\app'
   $userdata = Join-Path $AppDir 'userdata'
   $skillSrc = Join-Path $AppDir 'skills\tomato-toolbox'
-  $env:ELECTRON_RUN_AS_NODE = '1'
 } elseif (Test-Path (Join-Path $AppDir 'mcp\server.mjs')) {
   # 开发树：用 Electron 的 Node 模式
   $exe = Join-Path $AppDir 'node_modules\electron\dist\electron.exe'
@@ -39,7 +55,6 @@ if (Test-Path (Join-Path $AppDir 'resources\app\mcp\server.mjs')) {
   $cwd = $AppDir
   $userdata = Join-Path $AppDir 'userdata'
   $skillSrc = Join-Path (Split-Path $AppDir -Parent) 'skills\tomato-toolbox'
-  $env:ELECTRON_RUN_AS_NODE = '1'
 } else {
   throw "找不到 MCP server（既不是打包版也不是开发树）：$AppDir"
 }
@@ -90,10 +105,10 @@ $startMark
 $endMark
 "@
 
-$old = [System.IO.File]::ReadAllText($configPath, $utf8)
+$old = Get-Text $configPath
 if ($null -eq $old) { $old = '' }
 $stamp = Get-Date -Format 'yyyyMMdd-HHmmss'
-$backup = "$configPath.tomato-backup-$stamp"
+$backup = Get-UniquePath "$configPath.tomato-backup-$stamp"
 
 if ($DryRun) {
   Write-Host "=== DryRun ==="
@@ -110,22 +125,45 @@ if ($DryRun) {
 Copy-Item $configPath $backup -Force
 $clean = $old
 if ($clean.Contains($startMark)) {
-  $pattern = "(?s)\r?\n?" + [regex]::Escape($startMark) + ".*?" + [regex]::Escape($endMark) + "\r?\n?"
-  $clean = [regex]::Replace($clean, $pattern, "`n")
+  if ($clean.Contains($endMark)) {
+    $pattern = "(?s)\r?\n?" + [regex]::Escape($startMark) + ".*?" + [regex]::Escape($endMark) + "\r?\n?"
+    $clean = [regex]::Replace($clean, $pattern, "`n")
+  } else {
+    # 上次写到一半（没有结束标记）：从开始标记处截断，避免重复堆叠
+    $clean = $clean.Substring(0, $clean.IndexOf($startMark))
+  }
 }
 $clean = $clean.TrimEnd()
 $newText = $clean + "`n`n" + $block + "`n"
 [System.IO.File]::WriteAllText($configPath, $newText, $utf8)
 
-# 安装 Skill（DSH 技能目录）
+# 写完必须读回校验：marker、command、server 路径都对，否则用备份回滚
+$check = Get-Text $configPath
+$ok = $check.Contains($startMark) -and $check.Contains($endMark) -and
+      $check.Contains($exeF) -and $check.Contains($serverF) -and
+      ($check.IndexOf($startMark) -lt $check.LastIndexOf($endMark))
+if (-not $ok) {
+  Copy-Item $backup $configPath -Force
+  throw "写入后校验失败，已用备份恢复：$backup"
+}
+
+# 安装 Skill（DSH 技能目录）：旧版先完整备份，再整体替换，避免残留旧文件
 $skillDst = Join-Path $DshRoot 'skills\tomato-toolbox'
+$skillBackup = ''
 $skillInstalled = $false
 if (Test-Path $skillSrc) {
   if (Test-Path $skillDst) {
-    Copy-Item $skillDst "$skillDst.tomato-backup-$stamp" -Recurse -Force
+    $skillBackupRoot = Join-Path $DshRoot 'skill-backups'
+    New-Item -ItemType Directory -Force -Path $skillBackupRoot | Out-Null
+    $skillBackup = Get-UniquePath (Join-Path $skillBackupRoot "tomato-toolbox-$stamp")
+    Copy-Item $skillDst $skillBackup -Recurse -Force
+    Remove-Item $skillDst -Recurse -Force
   }
   New-Item -ItemType Directory -Force -Path $skillDst | Out-Null
   Copy-Item (Join-Path $skillSrc '*') -Destination $skillDst -Recurse -Force
+  if (-not (Test-Path (Join-Path $skillDst 'SKILL.md'))) {
+    throw "Skill 复制后校验失败：$skillDst\SKILL.md 不存在"
+  }
   $skillInstalled = $true
 }
 
@@ -136,12 +174,14 @@ Write-Host '=================================================='
 Write-Host "配置：$configPath"
 Write-Host "备份：$backup"
 Write-Host "启动：$exe"
+Write-Host '校验：已读回配置，命令与 server 路径都正确'
 if ($skillInstalled) { Write-Host "技能：已安装到 $skillDst" }
+if ($skillBackup) { Write-Host "旧技能备份：$skillBackup" }
 Write-Host ''
 Write-Host '下一步：'
 Write-Host '  1. 完全退出并重启 DeepSeek Harness（不是关窗口，是退出程序）'
 Write-Host '  2. 在 DSH 里直接说：“用番茄工具箱把这个文件夹的图片压到 500KB 以内”'
 Write-Host '  3. 视频下载默认每次都要你在软件里点“允许一次”'
 Write-Host ''
-Write-Host '如果 DSH 里没出现工具：重启 DSH，或看 软件目录\Agent接入说明.md'
+Write-Host '不确定接好没有？双击「一键体检Agent接入.cmd」，它会真的启动一遍 MCP 数工具。'
 Write-Host ''

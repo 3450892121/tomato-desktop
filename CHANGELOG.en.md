@@ -3,16 +3,19 @@
 This is a curated English summary of recent releases. The complete, authoritative history is in
 [`CHANGELOG.md`](CHANGELOG.md) (Chinese).
 
-## Unreleased — Qoder one-click setup
+## Unreleased — Qoder one-click setup + agent setup check
 
 - Added `一键接入Qoder.cmd` / `一键移除Qoder接入.cmd` and `setup-qoder-mcp.ps1` / `uninstall-qoder-mcp.ps1`:
   - writes `mcpServers.tomato-toolbox` in `~/.qoder-cn/settings.json` (backup first; other MCP servers and providers preserved);
   - installs the Skill to `~/.qoder-cn/skills/tomato-toolbox`;
   - starts MCP through the app's own executable with `ELECTRON_RUN_AS_NODE=1`;
   - no JSON editing, no commands, no Node.js installation.
+- Added `一键体检Agent接入.cmd` / `verify-agent-mcp.ps1`: read-only check of DSH / Qoder (CN + international) / Trae (CN + international) / WorkBuddy / ZCode / Claude Desktop; validates config paths and Skill, and **actually starts each configured MCP server to count tools** (41 expected). Reports healthy / broken / not integrated, names the failing step, exits 1 on problems (`-NoProbe` skips launching, `-Json` for machine output). Never changes config.
+- Hardened setup/uninstall scripts: backups never overwrite (same-second runs get `-2`, `-3`); read-back verification after writing with automatic rollback; invalid JSON / wrong shape leaves the file byte-identical; Skill install now backs up, removes, then reinstalls and verifies `SKILL.md`; DSH removal now removes the Skill too (backup under `~/.dsh/skill-backups/`) and exits cleanly when DSH is absent.
+- Tests: new `tests/agent-mcp-scripts.test.mjs` (11 cases, wired into `npm test`) covers preservation of other servers/providers/Chinese comments, idempotent re-setup, non-overwriting backups, clean removal, refusal to touch broken configs, creating a missing config, and a real MCP launch from the generated config (41 tools).
+- Verified on the real machine: Qoder called `mcp__tomato_toolbox__libreoffice_status` successfully; after removal + full restart it reported no Tomato tools; after re-setup + restart it reported 41 tools. DSH was removed, verified, and restored byte-for-byte (SHA256 match); still 41 tools.
 - Skill self-check accepts both `mcp__tomato-toolbox__` (DSH) and `mcp__tomato_toolbox__` (Qoder).
-- Verified: setup/remove on a temporary Qoder root preserves other config; real Qoder shows ready with 41 tools; a new conversation called `ocr_recognize` successfully; `npm test` green.
-- Packaging: `pack.js` copies the four Qoder scripts; a full release build is pending.
+- Packaging: `pack.js` copies the Qoder scripts plus the new check script; a full release build is pending.
 
 ## v2.15.0 — 2026-10-18
 

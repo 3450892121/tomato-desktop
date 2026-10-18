@@ -2,7 +2,7 @@
 
 本项目遵循语义化版本（x.y.z）：修 bug → z+1；加功能 → y+1；重要改动 → x+1。
 
-## 未发布（当前开发线）Qoder 一键接入
+## 未发布（当前开发线）Qoder 一键接入 + Agent 接入体检
 
 - **`一键接入Qoder.cmd`（软件目录）**：双击后自动：
   - 定位 Qoder 数据目录（优先 `~/.qoder-cn`，其次 `~/.qoder`），先备份 `settings.json`；
@@ -15,6 +15,15 @@
 - **文档**：`docs/Agent接入说明.md`、`app/mcp/README.md`、`docs/zh|en/agent.md`、FAQ、快速开始、`docs/使用说明.txt`、README 同步 Qoder 一键接入。
 - **打包**：`pack.js` 把 4 个 Qoder 脚本随包复制；Skill 随包。
 - **测试**：临时 Qoder 根目录 setup/remove 往返（保留原 MCP/providers）；真实 Qoder 状态 ready、41 工具；新开对话按「小白一句话」调用 `mcp__tomato_toolbox__ocr_recognize` 成功（识别「番茄工具箱OCR测试」，置信度 0.9975）；`npm test` 全绿（含 MCP 21 项）。
+- **`一键体检Agent接入.cmd` / `verify-agent-mcp.ps1`（新）**：只读体检 DSH / Qoder（CN/国际版）/ Trae（CN/国际版）/ WorkBuddy / 智谱 ZCode / Claude Desktop：查配置、启动程序、MCP server、工作目录、Skill；对已接入的**真的按配置启动 MCP 并要工具列表**（正常 41 个）；输出「正常 / 异常 / 未接入」，异常写明卡在哪一步；异常退出码 1（可接 CI）。`-NoProbe` 只查文件，`-Json` 输出机器可读结果。不改任何配置。
+- **接入/移除脚本加固**：
+  - 写前备份**不再互相覆盖**（同一秒重复运行会加 `-2`、`-3`）；
+  - 写后**读回校验**：DSH 查 marker/命令/server 路径，Qoder 重新解析 JSON 查条目字段；失败自动用备份回滚；
+  - 坏 JSON / `mcpServers` 不是对象时**一个字节都不改**；
+  - Skill 安装改为「旧版整体备份 → 删除 → 重装」，不再残留旧文件；复制后校验 `SKILL.md`；
+  - **DSH 移除现在会把 Skill 一起移除**（备份到 `~/.dsh/skill-backups/`），与 Qoder 行为一致；没装 DSH / 已移除过时友好退出（exit 0），不再抛红字。
+- **测试（新增 `tests/agent-mcp-scripts.test.mjs`，11 项，已挂 `npm test`）**：保留其它 MCP/providers/中文注释、重复接入幂等、备份不覆盖、移除删配置+Skill、坏 JSON / 非对象拒绝改动且文件不变、无配置文件可新建、生成的配置真的能拉起 MCP 并列出 41 个工具。
+- **真机验证（2026-10-18）**：Qoder 新开对话实际调用 `mcp__tomato_toolbox__libreoffice_status` 返回 `{"ok":true,"found":true,...}`；执行移除后完全重启 Qoder，新对话回答「没有」番茄工具；重新接入后重启，Qoder 报告 41 个工具。DSH 在真机上做过「移除 → 校验块消失 → 逐字节恢复原文件（SHA256 一致）」，当前 41 工具正常。
 
 ## v2.15.0（2026-10-18）MCP 一键接入（DSH 首个支持）+ 中英双语文档重构
 

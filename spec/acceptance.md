@@ -296,7 +296,7 @@
 - **网络判定**：无网络环境下，联网用例如实记 `skipped` 且整体 `verified:false`（**不得当通过**）；交付前必须在有网环境跑到 `verified:true`。
 - 证据：`--videodl-test`（`%TEMP%\tomato-videodl-test.json`）+ `--videodl-ui-test`（`%TEMP%\tomato-videodl-ui-test.json`）+ 截图 `shot-videodl-*.png` + 上游 MIT 许可文本随代码在位的清单。
 
-## A44 Agent 入口（MCP，v2.14.0 起；v2.14.1 安全加固；当前开发线增加 Qoder 一键接入）
+## A44 Agent 入口（MCP，v2.14.0 起；v2.14.1 安全加固；当前开发线增加 Qoder 一键接入 + 接入体检）
 - **本地 stdio MCP**：`app/mcp/server.mjs` 能完成 `initialize` / `tools/list` / `tools/call`；41 个工具注册，覆盖 21 个 GUI 工具；**不暴露**视频播放器与软件卸载。
 - **四批能力**：纯 Node（混淆/藏图/压缩/PDF 组装/重命名）、媒体与本地 AI（ffmpeg/OCR/ASR/PDF 编辑）、Canvas 类（压缩/增强/转换/水印/拼接/切图）、文档与下载（PDF→图片/压缩、Office→PDF、PDF→Word、doc_convert、可搜索 PDF、AI 放大）。
 - **视频下载授权**：默认每次询问；无授权时 `video_download` 返回 `NEEDS_APPROVAL` 且零下载；GUI 开「本次运行有效」或「允许一次」后，MCP 能真实下载；授权文件只由 GUI 写、MCP 只读；软件退出清空 session。
@@ -304,9 +304,12 @@
 - **不覆盖**：产物重名加序号；`archive_extract` 拒绝 `overwrite:"replace"`，`file_rename_batch` 拒绝 `conflict:"overwrite"`。
 - **只读模式**：`TOMATO_MCP_READONLY=1` 时只暴露只读工具，写工具被拒。
 - **审计日志**：每次调用写 `userdata/mcp-audit.jsonl`；password/secret/token 脱敏。
-- **小白一键接入（DSH）**：双击 `一键接入DSH.cmd` 自动写 `cordis.patch.yml`（先备份）、安装 Skill、用软件 exe 以 Node 模式启动 MCP；不需要改 JSON/装 Node；`一键移除DSH接入.cmd` 可撤回。
+- **小白一键接入（DSH）**：双击 `一键接入DSH.cmd` 自动写 `cordis.patch.yml`（先备份）、安装 Skill、用软件 exe 以 Node 模式启动 MCP；不需要改 JSON/装 Node；`一键移除DSH接入.cmd` 可撤回（Skill 一起移除，备份在 `~/.dsh/skill-backups/`）。
 - **小白一键接入（Qoder）**：双击 `一键接入Qoder.cmd` 自动写 `~/.qoder-cn/settings.json` 的 `mcpServers.tomato-toolbox`（先备份；保留其它 MCP 与 providers）、安装 Skill 到 `~/.qoder-cn/skills/tomato-toolbox`、用软件 exe 以 Node 模式启动 MCP；不需要改 JSON/装 Node；Qoder 里状态 `ready`、41 个工具，新对话能实际调用；`一键移除Qoder接入.cmd` 可撤回且不破坏其它配置。
+- **接入体检**：`一键体检Agent接入.cmd` / `verify-agent-mcp.ps1` 只读检查 DSH / Qoder / Trae / WorkBuddy / ZCode / Claude Desktop 的配置、路径与 Skill，并对已接入的真的启动 MCP 要工具列表；异常退出码 1 并写明卡在哪一步；`-NoProbe` 跳过启动、`-Json` 输出机器可读结果。
+- **脚本安全性**：备份不覆盖；写后读回校验、失败回滚；坏 JSON / 结构不对时文件字节不变；重复接入幂等；移除可重复执行；Skill 安装/移除都有备份。
+- **测试**：`tests/agent-mcp-scripts.test.mjs` 11 项（夹具目录，不碰真实配置）；真机 Qoder 接入/移除/重接入端到端 + DSH 移除逐字节恢复。
 - **明确不是强制的**：大多数工具调用即执行、没有人工确认弹窗；只有视频下载有闸门；审计是事后记录，不是沙箱。
 - **产物安全**：批量重命名默认 `dry_run=true`；不向 agent 暴露原始 ffmpeg/7z 参数。
 - **打包态**：产物内 `resources/app/mcp`、`node_modules/pdfjs-dist/legacy`、`@napi-rs/canvas`、`heic-decode`、`addons/*` 路径正确；MCP 在产物上能跑工具列表、混淆、压缩、PDF 渲染、HEIC、OCR。
-- 证据：`tests/mcp.test.mjs` **21 项**（含路径拒绝/审计/只读/禁止覆盖）、`tests/pack-mcp-smoke.mjs` 9 项、`--videodl-ui-test` 新增 4 项授权断言、`npm test` 全绿、`--smoke-test` 23 工具；Qoder 端到端（`query_mcp` 状态 ready + 41 工具 + 新对话调用 `mcp__tomato_toolbox__ocr_recognize` 成功）；脚本在临时 Qoder 根目录做过 setup/remove 不破坏原有配置的往返验证；配置与工具清单见 `docs/Agent接入说明.md`、`app/mcp/README.md`。
+- 证据：`tests/mcp.test.mjs` **21 项**（含路径拒绝/审计/只读/禁止覆盖）、`tests/pack-mcp-smoke.mjs` 9 项、`tests/agent-mcp-scripts.test.mjs` **11 项**、`--videodl-ui-test` 新增 4 项授权断言、`npm test` 全绿、`--smoke-test` 23 工具；Qoder 端到端（`query_mcp` 状态 ready + 41 工具 + 新对话调用 `mcp__tomato_toolbox__ocr_recognize` 成功；移除后重启回答「没有」；重接入后重启报 41 工具）；DSH 真机移除后逐字节恢复（SHA256 一致）；`一键体检Agent接入.cmd` 在本机实测 DSH 与 Qoder 均「正常 / 41 工具」，未接入客户端报「未接入」；配置与工具清单见 `docs/Agent接入说明.md`、`app/mcp/README.md`。

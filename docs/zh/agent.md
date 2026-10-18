@@ -24,7 +24,7 @@
 3. 直接说：
    > 用番茄工具箱把这个文件夹的图片压到 500KB 以内
 
-脚本会自动写 `~/.dsh/profiles/*/cordis.patch.yml`（先备份）、把 Skill 装到 `~/.dsh/skills/tomato-toolbox`、用软件自己的 exe 以 Node 模式启动 MCP（不需要系统 Node）。撤掉：双击 `一键移除DSH接入.cmd`（先备份配置；Skill 保留）。
+脚本会自动写 `~/.dsh/profiles/*/cordis.patch.yml`（先备份）、把 Skill 装到 `~/.dsh/skills/tomato-toolbox`、用软件自己的 exe 以 Node 模式启动 MCP（不需要系统 Node）。撤掉：双击 `一键移除DSH接入.cmd`（先备份配置；Skill 一起移除，备份在 `~/.dsh/skill-backups/`）。
 
 ### Qoder
 
@@ -36,6 +36,8 @@
 脚本会自动写 `~/.qoder-cn/settings.json` 的 `mcpServers.tomato-toolbox`（先备份；其它 MCP 与 providers 保留）、把 Skill 装到 `~/.qoder-cn/skills/tomato-toolbox`、用软件自己的 exe 以 Node 模式启动 MCP。撤掉：双击 `一键移除Qoder接入.cmd`。
 
 Qoder 工具名前缀是 `mcp__tomato_toolbox__`；DSH 是 `mcp__tomato-toolbox__`。
+
+**装完先体检**：双击 `一键体检Agent接入.cmd`。它检查 DSH / Qoder / Trae / WorkBuddy / ZCode 的配置与 Skill，并真的启动一遍 MCP 数工具；只读不改配置，异常会写明卡在哪。Trae / WorkBuddy / ZCode / Claude 目前只能手动配置，体检会报「未接入」。
 
 > 旧对话的工具列表在开始时就定了；Qoder 装完必须**新开对话**。其它客户端按下一节手动配置。
 

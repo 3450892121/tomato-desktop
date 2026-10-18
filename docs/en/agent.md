@@ -24,7 +24,7 @@ The Skill lives in `skills/tomato-toolbox/` and teaches the agent when to use to
 3. Ask:
    > Use Tomato Toolbox to compress the images in this folder to under 500 KB.
 
-The script writes `~/.dsh/profiles/*/cordis.patch.yml` (with a backup), installs the Skill to `~/.dsh/skills/tomato-toolbox`, and starts MCP through the app's own executable in Node mode. To undo: double-click `一键移除DSH接入.cmd` (backs up the config; keeps the Skill).
+The script writes `~/.dsh/profiles/*/cordis.patch.yml` (with a backup), installs the Skill to `~/.dsh/skills/tomato-toolbox`, and starts MCP through the app's own executable in Node mode. To undo: double-click `一键移除DSH接入.cmd` (backs up the config; removes the Skill too, backed up under `~/.dsh/skill-backups/`).
 
 ### Qoder
 
@@ -36,6 +36,8 @@ The script writes `~/.dsh/profiles/*/cordis.patch.yml` (with a backup), installs
 The script writes `mcpServers.tomato-toolbox` in `~/.qoder-cn/settings.json` (with a backup; other MCP servers and providers are preserved), installs the Skill to `~/.qoder-cn/skills/tomato-toolbox`, and starts MCP through the app's own executable. To undo: double-click `一键移除Qoder接入.cmd`.
 
 Qoder's tool prefix is `mcp__tomato_toolbox__`; DSH's is `mcp__tomato-toolbox__`.
+
+**Check it after setup**: double-click `一键体检Agent接入.cmd`. It checks configs and Skills for DSH / Qoder / Trae / WorkBuddy / ZCode and actually starts each MCP server to count tools; it is read-only and reports exactly which step failed. Trae / WorkBuddy / ZCode / Claude currently require manual setup and will be reported as "not integrated".
 
 > Existing conversations keep the tool list they started with; after installing, **start a new Qoder conversation**. Other clients use the manual setup below.
 

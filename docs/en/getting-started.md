@@ -27,6 +27,7 @@ Typical layout:
 ├─ 一键移除DSH接入.cmd
 ├─ 一键接入Qoder.cmd
 ├─ 一键移除Qoder接入.cmd
+├─ 一键体检Agent接入.cmd
 ├─ Agent接入说明.md
 ├─ skills\
 ├─ addons\

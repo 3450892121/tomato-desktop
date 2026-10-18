@@ -7,6 +7,22 @@
 $ErrorActionPreference = 'Stop'
 $utf8 = New-Object System.Text.UTF8Encoding($false)
 
+trap {
+  Write-Host ''
+  Write-Host ('接入失败：' + $_.Exception.Message) -ForegroundColor Red
+  Write-Host '如果配置已被改动，脚本会尽量用备份恢复；没有恢复成功的话，用同目录下的 .tomato-backup-* 手动放回。'
+  exit 1
+}
+
+function Get-UniquePath([string]$basePath) {
+  if (-not (Test-Path -LiteralPath $basePath)) { return $basePath }
+  $i = 2
+  while (Test-Path -LiteralPath ($basePath + '-' + $i)) { $i++ }
+  return ($basePath + '-' + $i)
+}
+
+function Get-Text([string]$p) { return [System.IO.File]::ReadAllText($p, $utf8) }
+
 function Resolve-QoderRoot {
   param([string]$Explicit)
   if ($Explicit) {
@@ -91,7 +107,7 @@ $entry = [pscustomobject]([ordered]@{
 $configPath = Join-Path $QoderRoot 'settings.json'
 $raw = ''
 if (Test-Path $configPath) {
-  $raw = [System.IO.File]::ReadAllText($configPath, $utf8)
+  $raw = Get-Text $configPath
 }
 if ([string]::IsNullOrWhiteSpace($raw)) { $raw = '{}' }
 try {
@@ -118,7 +134,8 @@ $json.mcpServers | Add-Member -NotePropertyName 'tomato-toolbox' -NotePropertyVa
 $newText = ($json | ConvertTo-Json -Depth 100) + "`n"
 
 $stamp = Get-Date -Format 'yyyyMMdd-HHmmss'
-$backup = "$configPath.tomato-backup-$stamp"
+$backup = Get-UniquePath "$configPath.tomato-backup-$stamp"
+$configExisted = Test-Path $configPath
 
 if ($DryRun) {
   Write-Host '=== DryRun ==='
@@ -140,8 +157,21 @@ if ($qoderProc) {
   Write-Host ''
 }
 
-if (Test-Path $configPath) { Copy-Item $configPath $backup -Force }
+if ($configExisted) { Copy-Item $configPath $backup -Force }
 [System.IO.File]::WriteAllText($configPath, $newText, $utf8)
+
+# 写完读回校验：JSON 必须还能解析、条目字段必须对，否则回滚
+try {
+  $check = (Get-Text $configPath) | ConvertFrom-Json
+  $checkEntry = $check.mcpServers.'tomato-toolbox'
+  if ($null -eq $checkEntry -or ([string]$checkEntry.command) -ne $exeF -or @($checkEntry.args)[0] -ne $serverF) {
+    throw '条目读回不一致'
+  }
+} catch {
+  if ($configExisted) { Copy-Item $backup $configPath -Force }
+  else { Remove-Item $configPath -Force -ErrorAction SilentlyContinue }
+  throw "写入后校验失败，已回滚：$configPath"
+}
 
 $skillDst = Join-Path $QoderRoot 'skills\tomato-toolbox'
 $skillInstalled = $false
@@ -150,12 +180,15 @@ if (Test-Path $skillSrc) {
   if (Test-Path $skillDst) {
     $skillBackupRoot = Join-Path $QoderRoot 'skill-backups'
     New-Item -ItemType Directory -Force -Path $skillBackupRoot | Out-Null
-    $skillBackup = Join-Path $skillBackupRoot "tomato-toolbox-$stamp"
+    $skillBackup = Get-UniquePath (Join-Path $skillBackupRoot "tomato-toolbox-$stamp")
     Copy-Item $skillDst $skillBackup -Recurse -Force
     Remove-Item $skillDst -Recurse -Force
   }
   New-Item -ItemType Directory -Force -Path $skillDst | Out-Null
   Copy-Item (Join-Path $skillSrc '*') -Destination $skillDst -Recurse -Force
+  if (-not (Test-Path (Join-Path $skillDst 'SKILL.md'))) {
+    throw "Skill 复制后校验失败：$skillDst\SKILL.md 不存在"
+  }
   $skillInstalled = $true
 }
 
@@ -164,8 +197,9 @@ Write-Host '=================================================='
 Write-Host '  番茄工具箱 已接入 Qoder'
 Write-Host '=================================================='
 Write-Host "配置：$configPath"
-if (Test-Path $backup) { Write-Host "备份：$backup" }
+if ($configExisted) { Write-Host "备份：$backup" }
 Write-Host "启动：$exe"
+Write-Host '校验：已读回配置，条目字段正确'
 if ($skillInstalled) { Write-Host "技能：已安装到 $skillDst" }
 if ($skillBackup) { Write-Host "旧技能备份：$skillBackup" }
 Write-Host ''
@@ -175,6 +209,5 @@ Write-Host '  2. 在 Qoder 里新开一个对话，直接说：'
 Write-Host '     “用番茄工具箱把这个文件夹的图片压到 500KB 以内”'
 Write-Host '  3. 视频下载仍然要在软件「视频下载」页授权'
 Write-Host ''
-Write-Host '如果 Qoder 里没有工具：确认已完全退出重开，并且新开的是新对话。'
-Write-Host '详细说明见软件目录的 Agent接入说明.md'
+Write-Host '不确定接好没有？双击「一键体检Agent接入.cmd」，它会真的启动一遍 MCP 数工具。'
 Write-Host ''

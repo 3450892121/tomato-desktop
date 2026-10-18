@@ -26,7 +26,7 @@
 - 把 Skill 装到 `~/.dsh/skills/tomato-toolbox`；
 - 用软件自己的 exe 以 Node 模式启动 MCP，**不需要系统里装 Node**。
 
-想撤掉：双击 **`一键移除DSH接入.cmd`**。
+想撤掉：双击 **`一键移除DSH接入.cmd`**（先备份配置；Skill 会一起移除，备份在 `~/.dsh/skill-backups/`）。
 
 ### Qoder
 
@@ -46,6 +46,19 @@
 > Qoder 里的工具名前缀是 `mcp__tomato_toolbox__`（下划线）；DSH 里是 `mcp__tomato-toolbox__`（横线）。两个客户端都装过也没关系，各自独立。
 
 > 如果 Qoder 里没有工具：确认是**完全退出重开**，并且**新开的是新对话**（旧对话的工具列表在开始时就定了）；或看本文「常见问题」。
+
+### 接入体检（装完不确定有没有生效，先点它）
+
+双击软件目录里的 **`一键体检Agent接入.cmd`**（或运行 `verify-agent-mcp.ps1`）。它会：
+
+- 找出本机装了哪些支持的客户端：DSH、Qoder（CN / 国际版）、Trae（CN / 国际版）、WorkBuddy、智谱 ZCode、Claude Desktop；
+- 对已接入的逐个检查：配置文件在不在、启动程序 / MCP server / 工作目录 / 用户数据目录在不在、Skill 装没装；
+- **真的按配置启动一遍 MCP**，要它返回工具列表（正常是 41 个）——不用先打开客户端；
+- 输出「正常 / 异常 / 未接入」，异常时写明卡在哪一步（路径失效、配置损坏、启动失败等）。
+
+它只读、不改任何配置；Trae / WorkBuddy / ZCode / Claude 目前只有手动配置，体检会如实报「未接入」，不会替你写。
+
+> 参数：`-NoProbe` 只查文件不启动 MCP（更快）；`-Json` 输出机器可读结果。
 
 ---
 

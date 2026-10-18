@@ -531,7 +531,7 @@ DSH：
 2. 看到「已接入」后，**完全退出** DeepSeek Harness（不是关窗口，是退出程序）再打开；
 3. 在 DSH 里直接说：「用番茄工具箱把这个文件夹的图片压到 500KB 以内」。
    - 脚本会自动写 DSH 配置 + 安装 Skill；
-   - 想撤掉：双击「一键移除DSH接入.cmd」。
+   - 想撤掉：双击「一键移除DSH接入.cmd」（Skill 一起移除，备份在 ~/.dsh/skill-backups/）。
 
 Qoder：
 1. **先完全退出 Qoder**（不是关窗口，是退出程序）；
@@ -539,6 +539,10 @@ Qoder：
 3. 打开 Qoder，**新开一个对话**，直接说：「用番茄工具箱把这个文件夹的图片压到 500KB 以内」。
    - 脚本会自动写 Qoder 配置 + 安装 Skill；
    - 想撤掉：双击「一键移除Qoder接入.cmd」。
+
+**装完不确定有没有生效？** 双击「一键体检Agent接入.cmd」：它会检查 DSH / Qoder /
+Trae / WorkBuddy / ZCode 的配置和 Skill，并真的启动一遍 MCP 数工具；只读、不改配置，
+有问题会写明卡在哪（例如路径失效、配置损坏、启动失败）。
 
 **其它客户端 / 手动配置：** 看软件目录里的「Agent接入说明.md」。
 - 配套 Skill（教 AI 怎么按流程用）：软件目录\skills\tomato-toolbox\。

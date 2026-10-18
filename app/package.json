@@ -8,7 +8,7 @@
   "license": "UNLICENSED",
   "scripts": {
     "start": "electron .",
-    "test": "node tests/engine.test.mjs && node tests/taskqueue.test.mjs && node tests/archive.test.mjs && node tests/imghide.test.mjs && node tests/navorder.test.mjs && node tests/uninstall.test.mjs && node tests/settingsschema.test.mjs && node tests/uniquepath.test.mjs && node tests/videodl.test.mjs && node tests/docconvert.test.mjs && node tests/mcp.test.mjs",
+    "test": "node tests/engine.test.mjs && node tests/taskqueue.test.mjs && node tests/archive.test.mjs && node tests/imghide.test.mjs && node tests/navorder.test.mjs && node tests/uninstall.test.mjs && node tests/settingsschema.test.mjs && node tests/uniquepath.test.mjs && node tests/videodl.test.mjs && node tests/docconvert.test.mjs && node tests/mcp.test.mjs && node tests/agent-mcp-scripts.test.mjs",
     "icon": "node tools/make-icon.js",
     "pack": "node tools/pack.js"
   },

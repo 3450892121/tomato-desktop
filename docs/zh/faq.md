@@ -50,6 +50,9 @@ Release 成品包已带齐 ffmpeg、LibreOffice、Real-ESRGAN、FunASR、OCR、7
 3. 确认 `~/.qoder-cn/settings.json` 的 `mcpServers.tomato-toolbox` 存在；
 4. Qoder 里的工具名前缀是 `mcp__tomato_toolbox__`（下划线）。
 
+**接完不确定有没有生效？**
+双击 `一键体检Agent接入.cmd`。它会检查 DSH / Qoder / Trae / WorkBuddy / ZCode 的配置和 Skill，并真的启动一遍 MCP 数工具；最后给出「正常 / 异常 / 未接入」和卡在哪。它不会改任何配置。
+
 **为什么一直 `NEEDS_APPROVAL`？**
 视频下载默认每次授权。到「视频下载」页点「允许一次」，或打开「允许 AI 助手直接下载（本次运行有效）」。
 

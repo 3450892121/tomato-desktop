@@ -80,7 +80,9 @@ The app ships a local MCP server with **41 tools** covering **21 GUI tools** (Vi
 2. Double-click `一键接入Qoder.cmd` in the app folder.
 3. Open Qoder, **start a new conversation**, and ask the same.
 
-The script writes the client config, installs the Skill, and launches MCP through the app's own executable. To undo, double-click `一键移除DSH接入.cmd` / `一键移除Qoder接入.cmd`. Qoder's tool prefix is `mcp__tomato_toolbox__`; DSH's is `mcp__tomato-toolbox__`.
+The script writes the client config, installs the Skill, and launches MCP through the app's own executable. To undo, double-click `一键移除DSH接入.cmd` / `一键移除Qoder接入.cmd` (the Skill is removed too; backups go to `skill-backups/`). Qoder's tool prefix is `mcp__tomato_toolbox__`; DSH's is `mcp__tomato-toolbox__`.
+
+**Not sure it worked?** Double-click `一键体检Agent接入.cmd`: it checks DSH / Qoder / Trae / WorkBuddy / ZCode configs and actually starts each MCP server to count tools — no client restart needed.
 
 For Claude Desktop / Trae and manual setups:
 
@@ -93,6 +95,7 @@ For Claude Desktop / Trae and manual setups:
 
 ## 4. What's new
 
+- **Agent setup check + more thorough removal**: new `一键体检Agent接入.cmd` / `verify-agent-mcp.ps1` checks DSH / Qoder / Trae / WorkBuddy / ZCode configs and really starts MCP to count tools; setup scripts now verify what they wrote and roll back on failure, and backups no longer overwrite each other; DSH removal now removes the Skill too (backed up under `skill-backups/`).
 - **Qoder one-click setup**: double-click `一键接入Qoder.cmd`; it writes `~/.qoder-cn/settings.json` (with a backup; other MCP servers and providers are preserved), installs the Skill, and starts MCP via the app executable. No JSON, no Node.js; `一键移除Qoder接入.cmd` removes it. Fully quit/reopen Qoder and start a new conversation to use all 41 tools.
 - **v2.15.0 DSH one-click setup**: double-click `一键接入DSH.cmd`; it writes the config, installs the Skill, and starts MCP via the app executable. No JSON, no Node.js; `一键移除DSH接入.cmd` removes it.
 - **v2.15.0 documentation overhaul**: main README + sub-documents, Chinese/English.
