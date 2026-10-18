@@ -28,6 +28,7 @@
 
 1. Open [Releases](https://github.com/3450892121/tomato-desktop/releases/latest) and download
    `tomato-desktop-v2.15.0-win64.zip` (~820 MB).
+   Direct link: <https://github.com/3450892121/tomato-desktop/releases/download/v2.15.0/tomato-desktop-v2.15.0-win64.zip>
 2. Extract it anywhere — Desktop, Documents, or a USB drive; non-ASCII paths are fine.
 3. Double-click `番茄图片混淆桌面版.exe`.
 
