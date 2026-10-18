@@ -4,6 +4,7 @@
 )
 
 $ErrorActionPreference = 'Stop'
+$utf8 = New-Object System.Text.UTF8Encoding($false)
 if (-not $DshRoot) { $DshRoot = Join-Path $env:USERPROFILE '.dsh' }
 $profilesRoot = Join-Path $DshRoot 'profiles'
 if (-not (Test-Path $profilesRoot)) { throw "找不到 DSH profiles：$profilesRoot" }
@@ -18,7 +19,7 @@ if (-not (Test-Path $configPath)) { Write-Host "没有找到配置：$configPath
 
 $startMark = '# >>> tomato-toolbox-mcp'
 $endMark = '# <<< tomato-toolbox-mcp'
-$old = Get-Content $configPath -Raw
+$old = [System.IO.File]::ReadAllText($configPath, $utf8)
 if (-not $old.Contains($startMark)) { Write-Host "没有找到番茄工具箱的 MCP 配置，可能已经移除过了。"; exit 0 }
 
 if ($DryRun) {

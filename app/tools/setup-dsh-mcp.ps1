@@ -90,7 +90,7 @@ $startMark
 $endMark
 "@
 
-$old = Get-Content $configPath -Raw -ErrorAction SilentlyContinue
+$old = [System.IO.File]::ReadAllText($configPath, $utf8)
 if ($null -eq $old) { $old = '' }
 $stamp = Get-Date -Format 'yyyyMMdd-HHmmss'
 $backup = "$configPath.tomato-backup-$stamp"

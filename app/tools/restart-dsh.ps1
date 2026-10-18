@@ -30,8 +30,18 @@ $procs = Get-Process 'DeepSeek Harness' -ErrorAction SilentlyContinue
 foreach ($p in $procs) {
   try { $p.CloseMainWindow() | Out-Null } catch {}
 }
-Start-Sleep -Seconds 3
-Get-Process 'DeepSeek Harness' -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
+$exited = $false
+for ($i = 0; $i -lt 20; $i++) {
+  Start-Sleep -Seconds 1
+  if (-not (Get-Process 'DeepSeek Harness' -ErrorAction SilentlyContinue)) { $exited = $true; break }
+}
+if (-not $exited) {
+  Write-Host ''
+  Write-Host 'DSH 没有完全退出（可能只是收进了托盘）。'
+  Write-Host '请右键任务栏托盘里的 DSH 图标 →「退出」，再重新打开 DSH。'
+  Write-Host '本脚本不会强制结束 DSH，避免损坏配置或丢会话。'
+  exit 1
+}
 Start-Sleep -Seconds 2
 
 Start-Process -FilePath $exe
