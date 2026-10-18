@@ -19,12 +19,14 @@ Unzip anywhere — Desktop, Documents, or a USB drive. Non-ASCII paths and space
 Typical layout:
 
 ```text
-番茄图片混淆-桌面版-v2.15.0-win64\
+番茄图片混淆-桌面版-v<version>-win64\
 ├─ 番茄图片混淆桌面版.exe
 ├─ 使用说明.txt
 ├─ 加装包说明.txt
 ├─ 一键接入DSH.cmd
 ├─ 一键移除DSH接入.cmd
+├─ 一键接入Qoder.cmd
+├─ 一键移除Qoder接入.cmd
 ├─ Agent接入说明.md
 ├─ skills\
 ├─ addons\
@@ -63,7 +65,13 @@ DSH users:
 2. Fully quit DSH (not just the window) and reopen it.
 3. Ask: "Use Tomato Toolbox to compress the images in this folder to under 500 KB."
 
-No JSON editing and no Node.js installation required. To remove it, double-click `一键移除DSH接入.cmd`.
+Qoder users:
+
+1. **Fully quit Qoder first.**
+2. Double-click `一键接入Qoder.cmd`.
+3. Open Qoder, **start a new conversation**, and ask the same.
+
+No JSON editing and no Node.js installation required. To remove them, double-click `一键移除DSH接入.cmd` / `一键移除Qoder接入.cmd`.
 
 Other clients: see [Agent access](agent.md).
 

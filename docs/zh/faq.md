@@ -44,6 +44,12 @@ Release 成品包已带齐 ffmpeg、LibreOffice、Real-ESRGAN、FunASR、OCR、7
 3. 确认 `~/.dsh/profiles/*/cordis.patch.yml` 里有 `mcp-tomato-toolbox`；
 4. 看 DSH 日志里的 MCP 报错。
 
+**Qoder 里没有番茄工具箱的工具？**
+1. 确认双击了 `一键接入Qoder.cmd`；
+2. **完全退出** Qoder（不是关窗口）再打开，并**新开一个对话**；
+3. 确认 `~/.qoder-cn/settings.json` 的 `mcpServers.tomato-toolbox` 存在；
+4. Qoder 里的工具名前缀是 `mcp__tomato_toolbox__`（下划线）。
+
 **为什么一直 `NEEDS_APPROVAL`？**
 视频下载默认每次授权。到「视频下载」页点「允许一次」，或打开「允许 AI 助手直接下载（本次运行有效）」。
 

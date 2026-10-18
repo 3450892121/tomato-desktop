@@ -9,15 +9,15 @@ whenToUse: 用户要在本机处理媒体/文档文件。涉及「压缩、转�
 这是一个**本地**工具箱：所有处理都在用户电脑上完成，除了「视频下载」之外不需要联网。
 执行入口是 MCP 工具，不是命令行。**不要自己写 ffmpeg / 7z / Python 命令去替代它**——那会绕过项目的防覆盖、路径安全和格式校验。
 
-> **用户是小白时**：不要让他改 JSON / 敲命令。让他双击软件目录的 **`一键接入DSH.cmd`**，完全退出并重启 DSH 即可；脚本会自动写配置、装本 Skill、用软件自己的 exe 启动 MCP（不需要装 Node）。撤掉用 `一键移除DSH接入.cmd`。
+> **用户是小白时**：不要让他改 JSON / 敲命令。DSH 用 **`一键接入DSH.cmd`**，Qoder 用 **`一键接入Qoder.cmd`**；装完完全退出对应客户端再打开（Qoder 还要新开一个对话）。脚本会自动写配置、装本 Skill、用软件自己的 exe 启动 MCP（不需要装 Node）。撤掉分别用 `一键移除DSH接入.cmd` / `一键移除Qoder接入.cmd`。
 
 ## 0. 开工前自检（必须）
 
-在动手前，先看当前工具列表里有没有 **`mcp__tomato-toolbox__`** 前缀（例如 `mcp__tomato-toolbox__doc_convert`）。
+在动手前，先看当前工具列表里有没有 **`mcp__tomato-toolbox__`** 或 **`mcp__tomato_toolbox__`** 前缀（DSH 用横线，Qoder 用下划线；例如 `mcp__tomato_toolbox__doc_convert`）。
 
 - **有**：用这些工具；下面工具地图里写的是去掉前缀后的名字。
 - **没有**：立刻停下，告诉用户：
-  > 番茄工具箱的 MCP 没连上，我先不做。请双击软件目录的 `一键接入DSH.cmd`，完全退出并重启 DSH；然后再叫我。
+  > 番茄工具箱的 MCP 没连上，我先不做。DSH 请双击软件目录的 `一键接入DSH.cmd` 后完全退出重启；Qoder 请双击 `一键接入Qoder.cmd` 后完全退出重开，并新开一个对话；然后再叫我。
 
   **不要**改用 PowerShell / Python / openpyxl / Excel COM / ffmpeg 命令静默替代。只有用户明确说「不用工具箱，你直接用代码做」时才允许替代，并在回复里说明这是替代方案。
 
@@ -25,7 +25,7 @@ whenToUse: 用户要在本机处理媒体/文档文件。涉及「压缩、转�
 
 ## 铁律（违反任何一条就停下）
 
-1. **先确认 MCP 可用**：先找 `mcp__tomato-toolbox__*`；没有就按第 0 步停下，不要改用 shell / Excel / Python 硬做。
+1. **先确认 MCP 可用**：先找 `mcp__tomato-toolbox__*` / `mcp__tomato_toolbox__*`；没有就按第 0 步停下，不要改用 shell / Excel / Python 硬做。
 2. **绝不覆盖原文件**：所有产物都让工具自己命名（重名自动加序号）；不要传一个已存在的 `output` 去覆盖。
 3. **批量重命名先预览**：`file_rename_batch` 默认 `dry_run=true`；先把预览给用户看，确认后再 `dry_run=false`。
 4. **视频下载必须先授权**：没有授权时工具返回 `NEEDS_APPROVAL`；让用户去软件「视频下载」页点「允许一次」或打开「本次运行有效」，不要绕过。
@@ -35,8 +35,9 @@ whenToUse: 用户要在本机处理媒体/文档文件。涉及「压缩、转�
 
 ## 工具地图
 
-> DSH 里实际工具名带前缀：`mcp__tomato-toolbox__` + 下面写的名字。  
-> 例如 `doc_convert` → `mcp__tomato-toolbox__doc_convert`。
+> 实际工具名带前缀：DSH 是 `mcp__tomato-toolbox__`，Qoder 是 `mcp__tomato_toolbox__` + 下面写的名字。
+>
+> 例如 `doc_convert` → `mcp__tomato_toolbox__doc_convert`（Qoder）或 `mcp__tomato-toolbox__doc_convert`（DSH）。
 
 ### 图片
 `image_obfuscate` 混淆/解混淆（6 模式，可逆）

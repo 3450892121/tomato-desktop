@@ -2,6 +2,20 @@
 
 本项目遵循语义化版本（x.y.z）：修 bug → z+1；加功能 → y+1；重要改动 → x+1。
 
+## 未发布（当前开发线）Qoder 一键接入
+
+- **`一键接入Qoder.cmd`（软件目录）**：双击后自动：
+  - 定位 Qoder 数据目录（优先 `~/.qoder-cn`，其次 `~/.qoder`），先备份 `settings.json`；
+  - 写入 `mcpServers.tomato-toolbox`（stdio，`command` = 软件自己的 exe，`args` = `resources/app/mcp/server.mjs`，`cwd` = `resources/app`，`env` = `ELECTRON_RUN_AS_NODE=1` + `TOMATO_USERDATA_DIR`）；其它 MCP 与 providers 原样保留；
+  - 把 `skills/tomato-toolbox` 装到 `~/.qoder-cn/skills/tomato-toolbox`（旧版备份到 `~/.qoder-cn/skill-backups/`）；
+  - 提示完全退出 Qoder 重开，并新开对话。
+  - **不需要系统装 Node**：用软件 exe 以 Node 模式启动 MCP。
+- **`一键移除Qoder接入.cmd`**：删除受管配置项（先备份），Skill 移到 `skill-backups/`，不动其它 MCP/providers。
+- **Skill**：开工自检同时识别 `mcp__tomato-toolbox__`（DSH）与 `mcp__tomato_toolbox__`（Qoder）。
+- **文档**：`docs/Agent接入说明.md`、`app/mcp/README.md`、`docs/zh|en/agent.md`、FAQ、快速开始、`docs/使用说明.txt`、README 同步 Qoder 一键接入。
+- **打包**：`pack.js` 把 4 个 Qoder 脚本随包复制；Skill 随包。
+- **测试**：临时 Qoder 根目录 setup/remove 往返（保留原 MCP/providers）；真实 Qoder 状态 ready、41 工具；新开对话按「小白一句话」调用 `mcp__tomato_toolbox__ocr_recognize` 成功（识别「番茄工具箱OCR测试」，置信度 0.9975）；`npm test` 全绿（含 MCP 21 项）。
+
 ## v2.15.0（2026-10-18）MCP 一键接入（DSH 首个支持）+ 中英双语文档重构
 
 > 起因：用户追问「我的前提是用户是小白，不懂哪些命令，你满足要求吗」。v2.14.x 虽然功能齐、测试全绿，但接入仍要改 JSON、填路径、懂 `TOMATO_*` 环境变量，不符合小白前提。本版补一键接入。

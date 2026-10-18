@@ -44,6 +44,12 @@ Download the new zip, extract to a new folder, copy the old `userdata\` over, th
 3. Verify `mcp-tomato-toolbox` in `~/.dsh/profiles/*/cordis.patch.yml`;
 4. Check DSH logs for MCP errors.
 
+**Qoder does not show Tomato Toolbox tools.**
+1. Confirm you double-clicked `一键接入Qoder.cmd`;
+2. Fully quit and reopen Qoder, then **start a new conversation**;
+3. Verify `mcpServers.tomato-toolbox` in `~/.qoder-cn/settings.json`;
+4. The Qoder tool prefix is `mcp__tomato_toolbox__` (underscore).
+
 **Why does it keep returning `NEEDS_APPROVAL`?**
 Video Download asks every time by default. Approve in the Video Download page, or enable the session grant.
 

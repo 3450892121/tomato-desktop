@@ -12,7 +12,7 @@
 - [常见问题](zh/faq.md) — 杀毒误报、离线、输出位置、AI 找不到工具
 
 ### Agent / MCP
-- [Agent 接入（简明）](zh/agent.md) — 一键 DSH、手动配置、41 个工具、Skill
+- [Agent 接入（简明）](zh/agent.md) — 一键 DSH / Qoder、手动配置、41 个工具、Skill
 - [Agent 接入说明（详细，随包）](Agent接入说明.md) — 完整 JSON、环境变量、排错
 - [安全说明](zh/security.md) — 路径白名单、审计日志、只读模式、静默执行边界
 - [MCP server README](../app/mcp/README.md) — 工具清单与实现说明
@@ -45,7 +45,7 @@
 - [FAQ](en/faq.md) — antivirus, offline use, output location, agent troubleshooting
 
 ### Agent / MCP
-- [Agent access (concise)](en/agent.md) — one-click DSH plus manual config for other MCP clients; 41 tools, Skill
+- [Agent access (concise)](en/agent.md) — one-click DSH / Qoder plus manual config for other MCP clients; 41 tools, Skill
 - [Detailed agent guide (Chinese, shipped)](Agent接入说明.md) — full JSON, environment variables, troubleshooting
 - [Security](en/security.md) — path allowlist, audit log, read-only mode, silent execution
 - [MCP server README](../app/mcp/README.md)

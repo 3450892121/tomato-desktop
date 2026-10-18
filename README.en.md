@@ -9,8 +9,8 @@
 - **Made for non-technical users**: every tool explains itself, defaults are sensible, and outputs never overwrite the originals.
 - **Mostly offline**: only Video Download needs the network; the other 22 tools work offline.
 - **Interoperable with the Android app**: Image Obfuscate / Deobfuscate works both ways with the "番茄图片混淆" Android app.
-- **Agent-ready**: a local MCP server exposes 41 tools. **MCP is general-purpose** (DSH / Claude Desktop / Qoder / Trae, etc.); DSH additionally has a double-click `一键接入DSH.cmd` with no JSON editing and no Node.js install.
-- **This release**: one-click MCP setup (DSH is the first supported client) + bilingual documentation overhaul; other MCP clients use a one-time JSON config.
+- **Agent-ready**: a local MCP server exposes 41 tools. **MCP is general-purpose** (DSH / Claude Desktop / Qoder / Trae, etc.); DSH and Qoder both have double-click setup (`一键接入DSH.cmd` / `一键接入Qoder.cmd`) with no JSON editing and no Node.js install.
+- **This release**: one-click MCP setup now covers Qoder (`一键接入Qoder.cmd`); the DSH entry remains available.
 
 > **Two names, one app**: the window title says "番茄工具箱"; the executable is `番茄图片混淆桌面版.exe`. It started as a desktop companion for the Android app and grew into a toolbox.
 
@@ -66,15 +66,23 @@ Good first tasks:
 
 The app ships a local MCP server with **41 tools** covering **21 GUI tools** (Video Player and Software Uninstall are intentionally not exposed).
 
-**One-click setup (currently DSH; MCP itself is general-purpose — other clients below):**
+**One-click setup (both DSH and Qoder; MCP itself is general-purpose — other clients below):**
+
+**DSH:**
 
 1. Double-click `一键接入DSH.cmd` in the app folder.
 2. Fully quit and restart DeepSeek Harness (quit the process, not just the window).
 3. Ask: "Use Tomato Toolbox to compress the images in this folder to under 500 KB."
 
-The script writes the DSH config, installs the Skill, and launches MCP through the app's own executable. To undo, double-click `一键移除DSH接入.cmd`.
+**Qoder:**
 
-For Claude Desktop / Qoder / Trae and manual setups:
+1. **Fully quit Qoder first.**
+2. Double-click `一键接入Qoder.cmd` in the app folder.
+3. Open Qoder, **start a new conversation**, and ask the same.
+
+The script writes the client config, installs the Skill, and launches MCP through the app's own executable. To undo, double-click `一键移除DSH接入.cmd` / `一键移除Qoder接入.cmd`. Qoder's tool prefix is `mcp__tomato_toolbox__`; DSH's is `mcp__tomato-toolbox__`.
+
+For Claude Desktop / Trae and manual setups:
 
 - [Agent guide (Chinese, detailed)](docs/Agent接入说明.md)
 - [Agent docs (Chinese)](docs/zh/agent.md) · [Agent docs (English)](docs/en/agent.md)
@@ -83,14 +91,15 @@ For Claude Desktop / Qoder / Trae and manual setups:
 
 > **Security boundary**: Video Download always asks for your approval in the GUI; most other tools execute immediately with no confirmation dialog. MCP has a path allowlist, an audit log, a read-only mode, and no-overwrite rules — but it is **not a sandbox**. See [Security](docs/en/security.md).
 
-## 4. What's new in v2.15.0
+## 4. What's new
 
-- **One-click MCP setup (DSH first)**: double-click `一键接入DSH.cmd`; it writes the config, installs the Skill, and starts MCP via the app executable. No JSON, no Node.js; `一键移除DSH接入.cmd` removes it. MCP itself is general-purpose; other clients use a JSON config.
-- **Documentation overhaul**: main README + sub-documents, Chinese/English, and v2.15.0 release notes.
+- **Qoder one-click setup**: double-click `一键接入Qoder.cmd`; it writes `~/.qoder-cn/settings.json` (with a backup; other MCP servers and providers are preserved), installs the Skill, and starts MCP via the app executable. No JSON, no Node.js; `一键移除Qoder接入.cmd` removes it. Fully quit/reopen Qoder and start a new conversation to use all 41 tools.
+- **v2.15.0 DSH one-click setup**: double-click `一键接入DSH.cmd`; it writes the config, installs the Skill, and starts MCP via the app executable. No JSON, no Node.js; `一键移除DSH接入.cmd` removes it.
+- **v2.15.0 documentation overhaul**: main README + sub-documents, Chinese/English.
 - **v2.14.1 security hardening** (same batch): path allowlist, audit log `userdata/mcp-audit.jsonl`, read-only mode, no-overwrite enforcement.
 - **v2.14.0 agent entry**: local MCP server, 41 tools, video-download approval gate, Skill package.
 
-Full history: [CHANGELOG.md](CHANGELOG.md) (Chinese) / [CHANGELOG.en.md](CHANGELOG.en.md). Release notes: [v2.15.0](docs/en/releases/v2.15.0.md).
+Full history: [CHANGELOG.md](CHANGELOG.md) (Chinese) / [CHANGELOG.en.md](CHANGELOG.en.md). Agent details: [Agent guide](docs/Agent接入说明.md).
 
 ## 5. Light and dark themes
 
@@ -118,8 +127,8 @@ Copy the whole folder. You can also export settings from the Settings dialog and
 **It says an add-on is missing.**
 The release bundle includes ffmpeg, LibreOffice, Real-ESRGAN, FunASR, OCR models, 7-Zip, yt-dlp, and HiBit. If you have a slim distribution without HiBit, see [`docs/加装包说明.txt`](docs/加装包说明.txt) (Chinese) to restore Software Uninstall.
 
-**DSH does not show the tools.**
-Fully quit and restart DSH, then confirm `mcp-tomato-toolbox` exists in `~/.dsh/profiles/*/cordis.patch.yml`. See [Agent guide](docs/Agent接入说明.md).
+**DSH / Qoder does not show the tools.**
+DSH: fully quit and restart DSH, then confirm `mcp-tomato-toolbox` exists in `~/.dsh/profiles/*/cordis.patch.yml`. Qoder: fully quit and reopen, **start a new conversation**, then confirm `mcpServers.tomato-toolbox` exists in `~/.qoder-cn/settings.json`; the Qoder tool prefix is `mcp__tomato_toolbox__`. See [Agent guide](docs/Agent接入说明.md).
 
 **Why does Video Download keep asking for approval?**
 That is intentional. Open the Video Download page and click **Allow once**, or enable **Allow the AI assistant to download (this run)**. The grant expires when the app closes.

@@ -23,12 +23,14 @@ tomato-desktop-v2.15.0-win64.zip   （约 820 MB）
 解压后目录大致是：
 
 ```text
-番茄图片混淆-桌面版-v2.15.0-win64\
+番茄图片混淆-桌面版-v<版本>-win64\
 ├─ 番茄图片混淆桌面版.exe
 ├─ 使用说明.txt
 ├─ 加装包说明.txt
 ├─ 一键接入DSH.cmd
 ├─ 一键移除DSH接入.cmd
+├─ 一键接入Qoder.cmd
+├─ 一键移除Qoder接入.cmd
 ├─ Agent接入说明.md
 ├─ skills\
 ├─ addons\
@@ -72,7 +74,13 @@ DSH 用户：
 2. 完全退出 DSH（不是关窗口）再打开；
 3. 直接说：「用番茄工具箱把这个文件夹的图片压到 500KB 以内」。
 
-不需要改 JSON、不需要装 Node。撤掉双击 `一键移除DSH接入.cmd`。
+Qoder 用户：
+
+1. **先完全退出 Qoder**；
+2. 双击 `一键接入Qoder.cmd`；
+3. 打开 Qoder，**新开一个对话**，说同样的话。
+
+都不需要改 JSON、不需要装 Node。撤掉分别双击 `一键移除DSH接入.cmd` / `一键移除Qoder接入.cmd`。
 
 其它客户端见 [Agent 接入](agent.md)。
 

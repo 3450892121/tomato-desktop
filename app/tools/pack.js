@@ -305,7 +305,7 @@ if (fs.existsSync(skillSrc)) {
   copyTree(skillSrc, path.join(outDir, 'skills', 'tomato-toolbox'));
 }
 // 小白入口：双击脚本自动写 DSH 配置 + 装 Skill，不需要改 JSON/敲命令
-for (const f of ['一键接入DSH.cmd', 'setup-dsh-mcp.ps1', '一键移除DSH接入.cmd', 'uninstall-dsh-mcp.ps1', '一键重启DSH.cmd', 'restart-dsh.ps1']) {
+for (const f of ['一键接入DSH.cmd', 'setup-dsh-mcp.ps1', '一键移除DSH接入.cmd', 'uninstall-dsh-mcp.ps1', '一键重启DSH.cmd', 'restart-dsh.ps1', '一键接入Qoder.cmd', 'setup-qoder-mcp.ps1', '一键移除Qoder接入.cmd', 'uninstall-qoder-mcp.ps1']) {
   const src = path.join(appRoot, 'tools', f);
   if (fs.existsSync(src)) fs.copyFileSync(src, path.join(outDir, f));
 }

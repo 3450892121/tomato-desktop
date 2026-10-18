@@ -9,8 +9,8 @@
 - **给不懂技术的人用**：每个工具页都写了怎么操作，参数有合理默认值，输出不覆盖原文件。
 - **基本不用联网**：除了「视频下载」（它本来就是下载网络视频），其余 22 个工具断网照常工作。
 - **和手机版互通**：「图片混淆」和安卓 App「番茄图片混淆」互相能解开。
-- **也能给 AI 用**：内置本地 MCP server，**MCP 通用**（DSH / Claude Desktop / Qoder / Trae 等），41 个工具；其中 DSH 提供双击 `一键接入DSH.cmd`，不用改 JSON、不用装 Node。
-- **本次更新**：MCP 一键接入（DSH 是首个支持的客户端）+ 中英双语文档重构；其它 MCP 客户端按说明填一次 JSON。
+- **也能给 AI 用**：内置本地 MCP server，**MCP 通用**（DSH / Claude Desktop / Qoder / Trae 等），41 个工具；DSH 与 Qoder 都提供双击一键接入（`一键接入DSH.cmd` / `一键接入Qoder.cmd`），不用改 JSON、不用装 Node。
+- **本次更新**：MCP 一键接入新增 Qoder（`一键接入Qoder.cmd`）；DSH 入口继续可用。
 
 > **两个名字是同一个软件**：界面左上角写的是「番茄工具箱」，解压后双击的 exe 叫 `番茄图片混淆桌面版.exe`。最早是给手机版做电脑版，后来工具越加越多，界面名就改成了工具箱。
 
@@ -66,15 +66,23 @@
 
 软件内置一个本地 MCP server：41 个工具，覆盖 21 个 GUI 工具（视频播放器、软件卸载不暴露）。
 
-**一键接入（目前支持 DSH；MCP 本身通用，其它客户端见下）：**
+**一键接入（DSH / Qoder 都有；MCP 本身通用，其它客户端见下）：**
+
+**DSH：**
 
 1. 双击软件目录里的 `一键接入DSH.cmd`；
 2. 完全退出 DeepSeek Harness（不是关窗口，是退出程序）再打开；
 3. 直接说：「用番茄工具箱把这个文件夹的图片压到 500KB 以内」。
 
-脚本会自动写 DSH 配置、安装 Skill、用软件自己的 exe 启动 MCP；想撤掉双击 `一键移除DSH接入.cmd`。
+**Qoder：**
 
-其它客户端（Claude Desktop / Qoder / Trae 等）的配置、工具清单、安全边界见：
+1. **先完全退出 Qoder**；
+2. 双击软件目录里的 `一键接入Qoder.cmd`；
+3. 打开 Qoder，**新开一个对话**，说同样的话。
+
+脚本会自动写对应客户端的配置、安装 Skill、用软件自己的 exe 启动 MCP；撤掉分别双击 `一键移除DSH接入.cmd` / `一键移除Qoder接入.cmd`。Qoder 里的工具名前缀是 `mcp__tomato_toolbox__`，DSH 是 `mcp__tomato-toolbox__`。
+
+其它客户端（Claude Desktop / Trae 等）的配置、工具清单、安全边界见：
 
 - [Agent 接入说明（中文，详细）](docs/Agent接入说明.md)
 - [Agent 文档（中文）](docs/zh/agent.md) · [Agent docs (English)](docs/en/agent.md)
@@ -83,14 +91,15 @@
 
 > **安全边界**：视频下载默认每次要你在软件里授权；大多数其它工具是「调用即执行」，没有确认弹窗。MCP 有路径白名单、审计日志、只读模式、禁止覆盖，但它**不是沙箱**。详见 [安全说明](docs/zh/security.md)。
 
-## 四、本次更新（v2.15.0）
+## 四、本次更新
 
-- **MCP 一键接入（DSH 首个支持）**：双击 `一键接入DSH.cmd`，自动写配置、装 Skill、用软件 exe 启动 MCP；不需要改 JSON、不需要装 Node；`一键移除DSH接入.cmd` 可撤回。MCP 本身通用，其它客户端按 JSON 配置。
-- **文档重构**：主 README + 子文档、中文 / English 双语、v2.15.0 更新说明。
+- **Qoder 一键接入**：双击 `一键接入Qoder.cmd`，自动写 `~/.qoder-cn/settings.json`（先备份；其它 MCP 与 providers 保留）、安装 Skill、用软件 exe 启动 MCP；不需要改 JSON、不需要装 Node；`一键移除Qoder接入.cmd` 可撤回。Qoder 里完全退出重开并新开对话即可用 41 个工具。
+- **v2.15.0 MCP 一键接入（DSH）**：双击 `一键接入DSH.cmd`，自动写配置、装 Skill、用软件 exe 启动 MCP；不需要改 JSON、不需要装 Node；`一键移除DSH接入.cmd` 可撤回。
+- **v2.15.0 文档重构**：主 README + 子文档、中文 / English 双语。
 - **v2.14.1 安全加固**（同批）：路径白名单、审计日志 `userdata/mcp-audit.jsonl`、只读模式、禁止覆盖。
 - **v2.14.0 Agent 入口**：本地 MCP server、41 个工具、视频下载授权闸门、Skill 包。
 
-完整更新见 [CHANGELOG.md](CHANGELOG.md) / [CHANGELOG.en.md](CHANGELOG.en.md)，本版说明见 [v2.15.0 release notes](docs/zh/releases/v2.15.0.md)。
+完整更新见 [CHANGELOG.md](CHANGELOG.md) / [CHANGELOG.en.md](CHANGELOG.en.md)，Agent 接入细节见 [Agent 接入说明](docs/Agent接入说明.md)。
 
 ## 五、浅色和深色
 
@@ -119,7 +128,7 @@ A：把整个软件文件夹拷走即可。设置可以在「设置」里导出�
 A：Release 成品包已带齐 ffmpeg、LibreOffice、Real-ESRGAN、FunASR、OCR 模型、7-Zip、yt-dlp、HiBit。若你拿到的是精简版（部分分发因许可不带 HiBit），「软件卸载」按 [`docs/加装包说明.txt`](docs/加装包说明.txt) 放回 HiBit 便携版即可。
 
 **Q：AI 里找不到番茄工具箱的工具？**
-A：先确认完全退出并重启了 DSH；再确认 `~/.dsh/profiles/*/cordis.patch.yml` 里有 `mcp-tomato-toolbox`。详见 [Agent 接入说明](docs/Agent接入说明.md)。
+A：DSH：先确认完全退出并重启了 DSH，再确认 `~/.dsh/profiles/*/cordis.patch.yml` 里有 `mcp-tomato-toolbox`。Qoder：先完全退出重开，并**新开一个对话**，再确认 `~/.qoder-cn/settings.json` 的 `mcpServers.tomato-toolbox` 存在；Qoder 里的工具名前缀是 `mcp__tomato_toolbox__`。详见 [Agent 接入说明](docs/Agent接入说明.md)。
 
 **Q：视频下载为什么一直要授权？**
 A：这是有意的安全闸门。到「视频下载」页点「允许一次」，或打开「允许 AI 助手直接下载（本次运行有效）」；关掉软件就失效。

@@ -13,6 +13,18 @@
 
 脚本会自动写 `~/.dsh/profiles/*/cordis.patch.yml`（先备份）、安装 Skill、用软件自己的 exe 以 Node 模式启动 MCP。撤掉用 `一键移除DSH接入.cmd`。
 
+## 小白一键接入（Qoder，推荐）
+
+**不需要改 JSON、不需要敲命令、不需要装 Node。**
+
+1. **先完全退出 Qoder**；
+2. 双击软件目录里的 `一键接入Qoder.cmd`；
+3. 打开 Qoder，**新开一个对话**，直接说「用番茄工具箱把…」。
+
+脚本会自动写 `~/.qoder-cn/settings.json` 的 `mcpServers.tomato-toolbox`（先备份；其它 MCP 与 providers 保留）、安装 Skill 到 `~/.qoder-cn/skills/tomato-toolbox`、用软件自己的 exe 以 Node 模式启动 MCP。撤掉用 `一键移除Qoder接入.cmd`。
+
+> Qoder 工具名前缀是 `mcp__tomato_toolbox__`（下划线）；DSH 是 `mcp__tomato-toolbox__`（横线）。
+
 ## 运行（开发/手动）
 
 ```powershell
@@ -43,6 +55,8 @@ stdio 传输：客户端把 MCP server 当子进程启动，通过 stdin/stdout 
 
 > `TOMATO_USERDATA_DIR` 用于让 MCP 找到 GUI 写的授权文件。
 > 开发态就是 `app/userdata`；打包态应指向 exe 同目录的 `userdata`。
+
+> Qoder 的自定义 MCP 存在 `~/.qoder-cn/settings.json` 的 `mcpServers` 里，条目需要 `"type": "stdio"`，建议带 `cwd`；完整示例见 `docs/Agent接入说明.md`。
 
 ## 已接入工具（41 个）
 

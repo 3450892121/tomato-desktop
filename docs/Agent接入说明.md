@@ -9,9 +9,11 @@
 
 ---
 
-## 零、小白版（DSH，强烈推荐）
+## 零、小白版（一键接入，强烈推荐）
 
 **不需要改 JSON、不需要敲命令、不需要装 Node。**
+
+### DSH（DeepSeek Harness）
 
 1. 双击软件目录里的 **`一键接入DSH.cmd`**；
 2. 看到「已接入」后，**完全退出** DeepSeek Harness（不是关窗口，是退出程序）再打开；
@@ -26,7 +28,24 @@
 
 想撤掉：双击 **`一键移除DSH接入.cmd`**。
 
-> 如果双击后 DSH 里没有工具：确认是完全退出程序再打开；或看本文「常见问题」。
+### Qoder
+
+1. **先完全退出 Qoder**（不是关窗口，是退出程序；装完再打开）；
+2. 双击软件目录里的 **`一键接入Qoder.cmd`**；
+3. 打开 Qoder，**新开一个对话**，直接说：
+   > 用番茄工具箱把这个文件夹的图片压到 500KB 以内
+
+脚本会自动：
+
+- 写 Qoder 的 MCP 配置（`~/.qoder-cn/settings.json` 的 `mcpServers.tomato-toolbox`，先备份；其它 MCP 与 providers 原样保留）；
+- 把 Skill 装到 `~/.qoder-cn/skills/tomato-toolbox`；
+- 用软件自己的 exe 以 Node 模式启动 MCP，**不需要系统里装 Node**。
+
+想撤掉：双击 **`一键移除Qoder接入.cmd`**（先备份；Skill 会一起移除，备份在 `~/.qoder-cn/skill-backups/`）。
+
+> Qoder 里的工具名前缀是 `mcp__tomato_toolbox__`（下划线）；DSH 里是 `mcp__tomato-toolbox__`（横线）。两个客户端都装过也没关系，各自独立。
+
+> 如果 Qoder 里没有工具：确认是**完全退出重开**，并且**新开的是新对话**（旧对话的工具列表在开始时就定了）；或看本文「常见问题」。
 
 ---
 
@@ -81,6 +100,29 @@ node app/mcp/server.mjs
 - `TOMATO_USERDATA_DIR` 指向软件目录的 `userdata`（打包态是 exe 同目录的 `userdata`）。
   它用于让 MCP 读到 GUI 写的「视频下载授权」文件。
 
+### Qoder 手动配置
+
+Qoder 的自定义 MCP 存在 `~/.qoder-cn/settings.json`（国际版是 `~/.qoder/settings.json`）的 `mcpServers` 里。stdio 条目写法：
+
+```json
+{
+  "mcpServers": {
+    "tomato-toolbox": {
+      "type": "stdio",
+      "command": "C:/.../番茄图片混淆桌面版.exe",
+      "args": ["C:/.../resources/app/mcp/server.mjs"],
+      "cwd": "C:/.../resources/app",
+      "env": {
+        "ELECTRON_RUN_AS_NODE": "1",
+        "TOMATO_USERDATA_DIR": "C:/.../userdata"
+      }
+    }
+  }
+}
+```
+
+改完**完全退出 Qoder 再打开**，并新开对话。Qoder 会把工具名前缀规范成 `mcp__tomato_toolbox__`。
+
 ### 配套 Skill（可选但推荐）
 
 仓库里带了一个 Skill 包：`skills/tomato-toolbox/`
@@ -91,6 +133,8 @@ node app/mcp/server.mjs
 它教 agent「什么时候用、按什么顺序用、什么不能做、做完怎么验证」，执行仍然走 MCP 工具。
 
 **DSH**：已经把 `skills/tomato-toolbox/` 复制到 `~/.dsh/skills/tomato-toolbox/`。DSH 刷新技能目录/重启后，在技能列表里能看到 `tomato-toolbox`。
+
+**Qoder**：一键脚本会把 `skills/tomato-toolbox/` 复制到 `~/.qoder-cn/skills/tomato-toolbox/`；完全退出重开并新开对话后，技能列表里能看到 `tomato-toolbox`。
 
 **打包版**：`<软件目录>/skills/tomato-toolbox/` 里也带了一份；`<软件目录>/Agent接入说明.md` 就是本文。
 
@@ -166,6 +210,9 @@ node app/mcp/server.mjs
 
 **Q：agent 说「未知工具」？**
 A：客户端连到的 server 太旧，或配置的路径不对；确认 `app/mcp/server.mjs` 存在并重启客户端。
+
+**Q：Qoder 里没有工具？**
+A：先确认是**完全退出 Qoder 再打开**，并且**新开的是新对话**；再看 `~/.qoder-cn/settings.json` 的 `mcpServers.tomato-toolbox` 是否存在。Qoder 里的工具名前缀是 `mcp__tomato_toolbox__`。
 
 **Q：视频下载一直 `NEEDS_APPROVAL`？**
 A：打开软件「视频下载」页，点「允许一次」，再让 AI 重试；或打开「本次运行有效」开关。

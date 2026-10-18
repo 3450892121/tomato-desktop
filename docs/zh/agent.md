@@ -13,24 +13,31 @@
 
 配套 Skill：`skills/tomato-toolbox/`，教 Agent 何时用、按什么顺序用、什么不能做、做完怎么验证。
 
-## 2. 一键接入（目前支持 DSH；MCP 通用）
+## 2. 一键接入（支持 DSH / Qoder；MCP 通用）
 
-**不需要改 JSON、不需要敲命令、不需要装 Node。** 目前一键脚本只覆盖 DSH；MCP 本身通用，其它客户端见下一节手动配置。
+**不需要改 JSON、不需要敲命令、不需要装 Node。**
+
+### DSH
 
 1. 双击软件目录里的 `一键接入DSH.cmd`；
 2. 看到「已接入」后，**完全退出** DeepSeek Harness（不是关窗口，是退出程序）再打开；
 3. 直接说：
    > 用番茄工具箱把这个文件夹的图片压到 500KB 以内
 
-脚本会自动：
+脚本会自动写 `~/.dsh/profiles/*/cordis.patch.yml`（先备份）、把 Skill 装到 `~/.dsh/skills/tomato-toolbox`、用软件自己的 exe 以 Node 模式启动 MCP（不需要系统 Node）。撤掉：双击 `一键移除DSH接入.cmd`（先备份配置；Skill 保留）。
 
-- 写 `~/.dsh/profiles/*/cordis.patch.yml`（先备份）；
-- 把 Skill 装到 `~/.dsh/skills/tomato-toolbox`；
-- 用软件自己的 exe 以 Node 模式启动 MCP（不需要系统 Node）。
+### Qoder
 
-撤掉：双击 `一键移除DSH接入.cmd`（先备份配置；Skill 保留）。
+1. **先完全退出 Qoder**；
+2. 双击软件目录里的 `一键接入Qoder.cmd`；
+3. 打开 Qoder，**新开一个对话**，直接说：
+   > 用番茄工具箱把这个文件夹的图片压到 500KB 以内
 
-> 一键接入目前只做 DSH。其它客户端按下一节手动配置。
+脚本会自动写 `~/.qoder-cn/settings.json` 的 `mcpServers.tomato-toolbox`（先备份；其它 MCP 与 providers 保留）、把 Skill 装到 `~/.qoder-cn/skills/tomato-toolbox`、用软件自己的 exe 以 Node 模式启动 MCP。撤掉：双击 `一键移除Qoder接入.cmd`。
+
+Qoder 工具名前缀是 `mcp__tomato_toolbox__`；DSH 是 `mcp__tomato-toolbox__`。
+
+> 旧对话的工具列表在开始时就定了；Qoder 装完必须**新开对话**。其它客户端按下一节手动配置。
 
 ## 3. 手动配置（其它客户端）
 
@@ -88,6 +95,29 @@ env:
 }
 ```
 
+### 3.4 Qoder
+
+Qoder 的自定义 MCP 在 `~/.qoder-cn/settings.json`（国际版 `~/.qoder/settings.json`）的 `mcpServers` 里，stdio 条目：
+
+```json
+{
+  "mcpServers": {
+    "tomato-toolbox": {
+      "type": "stdio",
+      "command": "C:/path/to/番茄图片混淆桌面版.exe",
+      "args": ["C:/path/to/resources/app/mcp/server.mjs"],
+      "cwd": "C:/path/to/resources/app",
+      "env": {
+        "ELECTRON_RUN_AS_NODE": "1",
+        "TOMATO_USERDATA_DIR": "C:/path/to/userdata"
+      }
+    }
+  }
+}
+```
+
+改完完全退出 Qoder 再打开，并新开对话。Qoder 会把前缀规范成 `mcp__tomato_toolbox__`。
+
 完整字段、开发树路径、排错见 [`Agent接入说明.md`](../Agent接入说明.md)。
 
 ## 4. 环境变量
@@ -143,6 +173,7 @@ env:
 - 仓库：[`skills/tomato-toolbox/SKILL.md`](../../skills/tomato-toolbox/SKILL.md)
 - 工具参数：[`skills/tomato-toolbox/references/tools.md`](../../skills/tomato-toolbox/references/tools.md)
 - DSH 安装位置：`~/.dsh/skills/tomato-toolbox/`
+- Qoder 安装位置：`~/.qoder-cn/skills/tomato-toolbox/`
 - 打包版：`<软件目录>/skills/tomato-toolbox/`
 - 其它客户端：把整个文件夹放进它的 skills 目录；没有 skills 机制就只配 MCP。
 
@@ -152,6 +183,9 @@ Skill 是**流程指导**，不是执行代码；执行仍走 MCP 工具。
 
 **DSH 里没有工具？**
 完全退出并重启 DSH；确认 `cordis.patch.yml` 里有 `mcp-tomato-toolbox`；看 DSH 日志里的 MCP 报错。
+
+**Qoder 里没有工具？**
+先完全退出重开，并且新开对话；确认 `~/.qoder-cn/settings.json` 的 `mcpServers.tomato-toolbox` 存在；Qoder 里的工具名前缀是 `mcp__tomato_toolbox__`。
 
 **`NEEDS_APPROVAL`？**
 去「视频下载」页授权，再让 Agent 重试。

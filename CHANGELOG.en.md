@@ -3,6 +3,17 @@
 This is a curated English summary of recent releases. The complete, authoritative history is in
 [`CHANGELOG.md`](CHANGELOG.md) (Chinese).
 
+## Unreleased — Qoder one-click setup
+
+- Added `一键接入Qoder.cmd` / `一键移除Qoder接入.cmd` and `setup-qoder-mcp.ps1` / `uninstall-qoder-mcp.ps1`:
+  - writes `mcpServers.tomato-toolbox` in `~/.qoder-cn/settings.json` (backup first; other MCP servers and providers preserved);
+  - installs the Skill to `~/.qoder-cn/skills/tomato-toolbox`;
+  - starts MCP through the app's own executable with `ELECTRON_RUN_AS_NODE=1`;
+  - no JSON editing, no commands, no Node.js installation.
+- Skill self-check accepts both `mcp__tomato-toolbox__` (DSH) and `mcp__tomato_toolbox__` (Qoder).
+- Verified: setup/remove on a temporary Qoder root preserves other config; real Qoder shows ready with 41 tools; a new conversation called `ocr_recognize` successfully; `npm test` green.
+- Packaging: `pack.js` copies the four Qoder scripts; a full release build is pending.
+
 ## v2.15.0 — 2026-10-18
 
 **One-click MCP setup (DSH first); documentation overhaul.**
