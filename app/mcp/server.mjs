@@ -14,7 +14,7 @@ import { tools, findTool, publicToolList, isReadOnlyMode } from './tools/index.m
 import { jsonResult, errorResult } from './lib/result.mjs';
 import { userdataDir } from './lib/paths.mjs';
 
-const SERVER_INFO = { name: 'tomato-toolbox', version: '2.14.1' };
+const SERVER_INFO = { name: 'tomato-toolbox', version: '2.15.0' };
 const SUPPORTED_PROTOCOLS = ['2024-11-05', '2025-03-26', '2025-06-18'];
 const AUDIT_FILE = path.join(userdataDir(), 'mcp-audit.jsonl');
 let clientInfo = null;
@@ -173,3 +173,4 @@ process.on('unhandledRejection', (err) => log('unhandledRejection:', err));
 process.on('uncaughtException', (err) => log('uncaughtException:', err));
 
 log(`server started; ${tools.length} tools: ${tools.map((t) => t.name).join(', ')}`);
+

@@ -2,6 +2,22 @@
 
 本项目遵循语义化版本（x.y.z）：修 bug → z+1；加功能 → y+1；重要改动 → x+1。
 
+## v2.15.0（2026-10-18）小白一键接入 DSH：双击脚本，不用改 JSON/装 Node
+
+> 起因：用户追问「我的前提是用户是小白，不懂哪些命令，你满足要求吗」。v2.14.x 虽然功能齐、测试全绿，但接入仍要改 JSON、填路径、懂 `TOMATO_*` 环境变量，不符合小白前提。本版补一键接入。
+
+- **`一键接入DSH.cmd`（软件目录）**：双击后自动：
+  - 定位 DSH profile 的 `cordis.patch.yml`（优先 `~/.dsh/profiles/desktop`，先备份）；
+  - 写入 `dsh-mcp-client` 的 stdio 配置：`serverName: tomato-toolbox`、`command` = 软件自己的 exe、`args` = `resources/app/mcp/server.mjs`、`env` = `ELECTRON_RUN_AS_NODE=1` + `TOMATO_USERDATA_DIR`、`toolCallTimeoutMs: 3600000`；
+  - 把 `skills/tomato-toolbox` 装到 `~/.dsh/skills/tomato-toolbox`（旧版先备份）；
+  - 提示「完全退出并重启 DSH」。
+  - **不需要系统里装 Node**：用软件 exe 以 Node 模式启动 MCP（已实测 41 个工具）。
+- **`一键移除DSH接入.cmd`**：删除受管配置块（先备份），Skill 保留。
+- **打包**：`pack.js` 把两个 `.cmd` + 两个 `.ps1`、`Agent接入说明.md`、`skills/` 一起放进免安装目录。
+- **文档/Skill**：`docs/使用说明.txt`、`docs/Agent接入说明.md`、`app/mcp/README.md`、`skills/tomato-toolbox/SKILL.md` 都把「双击一键接入」放在最前面；手动 JSON 配置降为开发/其它客户端用。
+- **测试**：临时 DSH profile 上实测脚本写入/移除、打包版与开发版 exe 以 Node 模式启动 MCP 均返回 41 个工具；`npm test`、开发树/产物全量自检沿用 v2.14.1 的 29/29。
+- **限制**：一键接入目前只做 DSH；其它客户端仍需按 `Agent接入说明.md` 填 JSON。
+
 ## v2.14.1（2026-10-18）安全加固：MCP 路径白名单 / 审计日志 / 只读模式 / 禁止覆盖
 
 > 起因：用户追问「怎么保证安全、怎么防 AI 犯蠢、技能是否符合实际、调用是否静默」。审计后确认：v2.14.0 的 MCP 只有视频下载有人工闸门，路径没有白名单、没有审计日志、大多数工具调用即执行；Skill 里「不碰系统目录」「密码不进日志」等表述属于约定而非服务端强制。本版把这些补成强制能力，并把文档改成「强制 / 约定」分开写。

@@ -304,6 +304,7 @@
 - **不覆盖**：产物重名加序号；`archive_extract` 拒绝 `overwrite:"replace"`，`file_rename_batch` 拒绝 `conflict:"overwrite"`。
 - **只读模式**：`TOMATO_MCP_READONLY=1` 时只暴露只读工具，写工具被拒。
 - **审计日志**：每次调用写 `userdata/mcp-audit.jsonl`；password/secret/token 脱敏。
+- **小白一键接入（DSH）**：双击 `一键接入DSH.cmd` 自动写 `cordis.patch.yml`（先备份）、安装 Skill、用软件 exe 以 Node 模式启动 MCP；不需要改 JSON/装 Node；`一键移除DSH接入.cmd` 可撤回。
 - **明确不是强制的**：大多数工具调用即执行、没有人工确认弹窗；只有视频下载有闸门；审计是事后记录，不是沙箱。
 - **产物安全**：批量重命名默认 `dry_run=true`；不向 agent 暴露原始 ffmpeg/7z 参数。
 - **打包态**：产物内 `resources/app/mcp`、`node_modules/pdfjs-dist/legacy`、`@napi-rs/canvas`、`heic-decode`、`addons/*` 路径正确；MCP 在产物上能跑工具列表、混淆、压缩、PDF 渲染、HEIC、OCR。

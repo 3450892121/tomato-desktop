@@ -304,6 +304,11 @@ const skillSrc = path.join(repoRoot, 'skills', 'tomato-toolbox');
 if (fs.existsSync(skillSrc)) {
   copyTree(skillSrc, path.join(outDir, 'skills', 'tomato-toolbox'));
 }
+// 小白入口：双击脚本自动写 DSH 配置 + 装 Skill，不需要改 JSON/敲命令
+for (const f of ['一键接入DSH.cmd', 'setup-dsh-mcp.ps1', '一键移除DSH接入.cmd', 'uninstall-dsh-mcp.ps1']) {
+  const src = path.join(appRoot, 'tools', f);
+  if (fs.existsSync(src)) fs.copyFileSync(src, path.join(outDir, f));
+}
 fs.mkdirSync(path.join(outDir, 'userdata'), { recursive: true });
 
 // —— 5b) 可选加装包（LibreOffice）：存在就一起打包，保证「解压即用全部功能」 ——

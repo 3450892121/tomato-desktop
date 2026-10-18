@@ -18,13 +18,13 @@
 
 ---
 
-## 当前状态（v2.14.1）
+## 当前状态（v2.15.0）
 
 | 项 | 状态 |
 |---|---|
 | **文档格式转换（新，v2.13.0）**：老版 Word/Excel/PPT（doc/xls/ppt/pps）与写字板 RTF → docx/xlsx/pptx/PDF，**含教务系统导出的「假 .xls」（Excel 2003 XML）**——手机打不开的老文档转完就能开；智能模式自动配对目标 | ✅ 可用（引擎为随包 LibreOffice，与「PDF 转格式」共用调用机制；自检含「假 .xls」/真 BIFF .xls/RTF/坏文件夹具的真实 IPC 转换与内容读回，`--doc-test`/`--doc-ui-test` 全绿） |
 | **老格式输入补齐（v2.13.0）**：图片格式转换新增 TIFF/PCX/TGA/PSD/DDS/JPEG2000 输入（随包 ffmpeg 解码）；视频转换新增 asf/3g2/f4v/mts/m2ts；音频转换新增 shn/voc/mka | ✅ 可用（解码器逐一验证在位；`--media-test` oldimage 段全绿） |
-| **Agent 入口（新，v2.14.0；v2.14.1 安全加固）**：本地 MCP server，41 个工具覆盖 21 个 GUI 工具（视频播放器、软件卸载不暴露）；视频下载默认每次授权，授权由 GUI 写、MCP 只读；v2.14.1 增加路径白名单、审计日志、只读模式、禁止覆盖 | ✅ 可用（`tests/mcp.test.mjs` 21 项 + `tests/pack-mcp-smoke.mjs` 9 项；`npm test` 全绿；配置见 `docs/Agent接入说明.md`） |
+| **Agent 入口（新，v2.14.0；v2.14.1 安全加固；v2.15.0 小白一键接入）**：本地 MCP server，41 个工具覆盖 21 个 GUI 工具（视频播放器、软件卸载不暴露）；视频下载默认每次授权，授权由 GUI 写、MCP 只读；路径白名单、审计日志、只读模式、禁止覆盖；DSH 用户双击 `一键接入DSH.cmd` 即可，不用改 JSON/装 Node | ✅ 可用（`tests/mcp.test.mjs` 21 项 + `tests/pack-mcp-smoke.mjs` 9 项；`npm test` 全绿；配置见 `docs/Agent接入说明.md`） |
 | **视频下载（新，v2.12.0）**：粘贴链接下载网络视频——抖音 / 小红书 / B站 / YouTube / 央视频 / yt-dlp 支持的站点 / MP4·M3U8·MPD 直链；引擎可自更新 | ✅ 可用（引擎为随包 yt-dlp，`addons/ytdlp/`；来源 `github.com/Lyee0011/leetools`（MIT）引擎移植 + 界面重画，未移植其 HTTP 服务层；对上游三项加固：**可取消**、**历史落盘**、**引擎自更新校验不过即拒绝**；自检含真实下载、取消清理、历史重启可读、缺包降级） |
 | **导航长按拖动排序（新，v2.11.0）**：左侧**长按约 400ms** 即拿起拖动——拖分组标题移动整个分组（主项目）、拖组内工具在本组内移动（子项目）；快速点击行为不变（切工具 / 展开收起照旧） | ✅ 可用（DOM 序 + 落盘双断言；长按未满就移动 ≥4px＝放弃按压不进入拖拽；拖完 500ms 内的误触 click 被拦下；「↺ 恢复默认顺序」只在排过序时显示；界面测试含拖分组 / 拖工具 / 防误触 / 清空全流程） |
 | **产物瘦身 + 交付质量（v2.11.1）**：产物 2548→1487.5 MB（zip 1050→771.2 MB，删运行期用不到的多语言字典/翻译/DirectML/sourcemap 等）；「添加图片」不再为一张缩略图把整图摊开两次（拖文件夹不再冻结界面）；修掉产物上中文字体读不到（中文水印/页码曾静默降级）；自检假绿加固 | ✅ 可用（最终产物 25 项自检 25/25；LibreOffice 三条转换与裁剪前**逐字节一致**；OCR 在产物上首次通过 `--ocr-poc`；升级路径实测：完整版 LO 旧配置 + 裁剪版 LO 转换逐字节一致） |
@@ -59,7 +59,7 @@
 | **动图与视频互转**：GIF/WebP 动图/APNG ↔ 视频 | ✅ 可用（含聊天表情预设与目标大小自动降档） |
 | ffmpeg / Real-ESRGAN / FunASR / OCR / 7-Zip / HiBit 加装包 | ✅ **全部随主包附带**（见 `addons/` 各目录的许可与来源） |
 | 版本号可见（左上角徽章 / 窗口标题 / 帮助「关于」） | ✅ 可用（随包显示当前版本） |
-| 免安装打包（含图标 / 版本信息 / 压缩包） | ✅ 已产出（最新 v2.14.1：文件夹约 1.6 GB + zip 约 819 MB；打包含产物瘦身约 1005MB） |
+| 免安装打包（含图标 / 版本信息 / 压缩包） | ✅ 已产出（最新 v2.15.0：文件夹约 1.6 GB + zip 约 819 MB；打包含产物瘦身约 1005MB） |
 | 与手机版互相兼容（真机样本实测） | ⏳ **待用手机样本锁定**（工具已就绪，见 `docs/兼容性变体说明.md`） |
 
 ---
@@ -73,11 +73,9 @@
 ### 给 AI 助手用（MCP）
 软件同时提供一个本地 MCP server，支持 MCP 的 agent（DSH / Claude Desktop / Qoder / Trae 等）可以直接调用 41 个工具，覆盖 21 个 GUI 工具（视频播放器、软件卸载不暴露）。
 
-```powershell
-node app/mcp/server.mjs   # 开发态；客户端通过 stdio 启动它
-```
+**小白用户不需要改 JSON/敲命令：** 双击软件目录里的 `一键接入DSH.cmd`，完全退出并重启 DeepSeek Harness 即可；脚本会自动写配置、装 Skill、用软件自己的 exe 启动 MCP（不需要装 Node）。撤掉用 `一键移除DSH接入.cmd`。
 
-客户端配置、工具清单、视频下载授权说明见 [`docs/Agent接入说明.md`](docs/Agent接入说明.md) 与 [`app/mcp/README.md`](app/mcp/README.md)。
+手动配置、工具清单、视频下载授权说明见 [`docs/Agent接入说明.md`](docs/Agent接入说明.md) 与 [`app/mcp/README.md`](app/mcp/README.md)。
 视频下载默认每次都要用户在软件里授权；GUI 写授权、MCP 只读，agent 改不了开关。
 配套 Skill（流程指导）在 [`skills/tomato-toolbox/SKILL.md`](skills/tomato-toolbox/SKILL.md)；打包版在软件目录 `skills/tomato-toolbox/`。
 
@@ -244,3 +242,4 @@ electron . --verify-samples <目录> --key <密钥>
 ## 隐私
 
 不联网、不上传任何图片；没有账号、没有遥测。所有处理都在本机内存中完成，只有点「保存」时才写文件。
+

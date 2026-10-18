@@ -1,6 +1,6 @@
 # agent-mcp — Agent 入口（MCP server）
 
-> 状态：已实现（v2.14.0 起的增量能力）。本文是目标规格与边界，实现见 `app/mcp/`。
+> 状态：已实现（v2.14.0 起；v2.15.0 增加小白一键接入）。本文是目标规格与边界，实现见 `app/mcp/`。
 
 ## 目标
 让同一个软件既给人用（GUI），也给 agent 用（MCP）：
@@ -14,6 +14,7 @@
   - 卸载是破坏性操作 + UAC，必须由人操作。
 - 传输：stdio（一行一条 JSON-RPC 2.0）。不做远程 HTTP、不做多用户/鉴权。
 - 配套 Skill：`skills/tomato-toolbox/`（`SKILL.md` + `references/tools.md`），教 agent 何时用、按什么顺序用、什么不能做、做完怎么验证；执行仍走 MCP 工具。打包版随包在 `<软件目录>/skills/tomato-toolbox/`。
+- 小白一键接入（DSH）：软件目录的 `一键接入DSH.cmd` 自动写 `~/.dsh/profiles/*/cordis.patch.yml`（先备份）、安装 Skill、用软件自己的 exe 以 Node 模式启动 MCP；不需要用户改 JSON/装 Node。`一键移除DSH接入.cmd` 可撤回。
 
 ## 架构
 ```

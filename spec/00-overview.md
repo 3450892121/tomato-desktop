@@ -14,6 +14,7 @@
 > 更新记录：v1.13（2026-10-04）新增「文档格式转换」工具的目标规格（见 `modules/doc-convert.md`）：老版办公文档（doc/xls/ppt/pps/rtf，含教务系统导出的 Excel 2003 XML「假 .xls」）→ docx/xlsx/pptx/PDF，引擎为随包 LibreOffice（与「PDF 转格式」共用调用机制）。同批：图片格式转换输入侧新增老图片格式（TIFF/PCX/TGA/PSD/DDS/JPEG2000，经随包 ffmpeg 解码）；视频/音频转换输入侧补充 asf/3g2/f4v/mts/m2ts 与 shn/voc/mka 等已验证封装。原内容全部保留。
 > 更新记录：v1.14（2026-10-18）新增「Agent 入口（MCP）」目标规格（见 `modules/agent-mcp.md`）：同一套软件既给人用（GUI），也给 agent 用（本地 stdio MCP server）；41 个 MCP 工具覆盖 21 个 GUI 工具（视频播放器、软件卸载不暴露）；视频下载默认每次授权，授权由 GUI 写、MCP 只读。原内容全部保留。
 > 更新记录：v1.15（2026-10-18）Agent 入口安全加固：路径白名单、审计日志、只读模式、禁止覆盖；明确「大多数工具调用即执行、无人工确认弹窗」，Skill 与文档按「强制 / 约定」分开写。原内容全部保留。
+> 更新记录：v1.16（2026-10-18）小白一键接入 DSH：`一键接入DSH.cmd` 自动写 `cordis.patch.yml`、装 Skill、用软件 exe 以 Node 模式启动 MCP；不需要改 JSON/装 Node。`一键移除DSH接入.cmd` 可撤回。原内容全部保留。
 
 ## 项目定位
 把安卓 App「番茄图片混淆」（`番茄图片混淆.apk`）的图片混淆/解混淆能力完整搬到 Windows 电脑上，做成**解压即用的免安装绿色软件**：纯离线、与手机版互相兼容。

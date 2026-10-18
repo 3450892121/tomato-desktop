@@ -3,7 +3,17 @@
 让支持 MCP 的 agent（DSH / Claude Desktop / Qoder / Trae 等）直接调用本软件的本地能力。
 不需要开 GUI；GUI 仍然是给人用的入口，两边共用同一批 core 模块与加装包。
 
-## 运行
+## 小白一键接入（DSH，推荐）
+
+**不需要改 JSON、不需要敲命令、不需要装 Node。**
+
+1. 双击软件目录里的 `一键接入DSH.cmd`；
+2. 完全退出并重启 DeepSeek Harness；
+3. 在 DSH 里直接说「用番茄工具箱把…」。
+
+脚本会自动写 `~/.dsh/profiles/*/cordis.patch.yml`（先备份）、安装 Skill、用软件自己的 exe 以 Node 模式启动 MCP。撤掉用 `一键移除DSH接入.cmd`。
+
+## 运行（开发/手动）
 
 ```powershell
 # 在仓库根目录
