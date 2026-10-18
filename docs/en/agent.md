@@ -13,9 +13,9 @@ The app ships a **local MCP server** so MCP-capable agents (DSH, Claude Desktop,
 
 The Skill lives in `skills/tomato-toolbox/` and teaches the agent when to use tools, in what order, what not to do, and how to verify results.
 
-## 2. One-click DSH setup
+## 2. One-click setup (currently DSH; MCP is general-purpose)
 
-**No JSON editing, no commands, no Node.js installation.**
+**No JSON editing, no commands, no Node.js installation.** The one-click script currently targets DSH only; MCP itself is general-purpose, and other clients use the manual setup below.
 
 1. Double-click `一键接入DSH.cmd` in the app folder.
 2. Fully quit and restart DeepSeek Harness (quit the process, not just the window).

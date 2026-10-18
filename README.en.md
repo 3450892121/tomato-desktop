@@ -9,7 +9,8 @@
 - **Made for non-technical users**: every tool explains itself, defaults are sensible, and outputs never overwrite the originals.
 - **Mostly offline**: only Video Download needs the network; the other 22 tools work offline.
 - **Interoperable with the Android app**: Image Obfuscate / Deobfuscate works both ways with the "番茄图片混淆" Android app.
-- **Agent-ready**: a local MCP server exposes 41 tools. DSH users can double-click `一键接入DSH.cmd`; no JSON editing and no Node.js installation required.
+- **Agent-ready**: a local MCP server exposes 41 tools. **MCP is general-purpose** (DSH / Claude Desktop / Qoder / Trae, etc.); DSH additionally has a double-click `一键接入DSH.cmd` with no JSON editing and no Node.js install.
+- **This release**: one-click MCP setup (DSH is the first supported client) + bilingual documentation overhaul; other MCP clients use a one-time JSON config.
 
 > **Two names, one app**: the window title says "番茄工具箱"; the executable is `番茄图片混淆桌面版.exe`. It started as a desktop companion for the Android app and grew into a toolbox.
 
@@ -65,7 +66,7 @@ Good first tasks:
 
 The app ships a local MCP server with **41 tools** covering **21 GUI tools** (Video Player and Software Uninstall are intentionally not exposed).
 
-**DSH users (recommended; no JSON editing, no Node.js install):**
+**One-click setup (currently DSH; MCP itself is general-purpose — other clients below):**
 
 1. Double-click `一键接入DSH.cmd` in the app folder.
 2. Fully quit and restart DeepSeek Harness (quit the process, not just the window).
@@ -84,7 +85,7 @@ For Claude Desktop / Qoder / Trae and manual setups:
 
 ## 4. What's new in v2.15.0
 
-- **One-click DSH setup**: double-click `一键接入DSH.cmd`; it writes the config, installs the Skill, and starts MCP via the app executable. No JSON, no Node.js; `一键移除DSH接入.cmd` removes it.
+- **One-click MCP setup (DSH first)**: double-click `一键接入DSH.cmd`; it writes the config, installs the Skill, and starts MCP via the app executable. No JSON, no Node.js; `一键移除DSH接入.cmd` removes it. MCP itself is general-purpose; other clients use a JSON config.
 - **Documentation overhaul**: main README + sub-documents, Chinese/English, and v2.15.0 release notes.
 - **v2.14.1 security hardening** (same batch): path allowlist, audit log `userdata/mcp-audit.jsonl`, read-only mode, no-overwrite enforcement.
 - **v2.14.0 agent entry**: local MCP server, 41 tools, video-download approval gate, Skill package.

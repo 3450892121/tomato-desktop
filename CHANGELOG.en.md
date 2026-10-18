@@ -5,7 +5,7 @@ This is a curated English summary of recent releases. The complete, authoritativ
 
 ## v2.15.0 — 2026-10-18
 
-**One-click DSH setup; documentation overhaul.**
+**One-click MCP setup (DSH first); documentation overhaul.**
 
 - Added `一键接入DSH.cmd` / `一键移除DSH接入.cmd`:
   - writes `~/.dsh/profiles/*/cordis.patch.yml` (backup first);
