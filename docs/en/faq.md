@@ -50,6 +50,11 @@ Download the new zip, extract to a new folder, copy the old `userdata\` over, th
 3. Verify `mcpServers.tomato-toolbox` in `~/.qoder-cn/settings.json`;
 4. The Qoder tool prefix is `mcp__tomato_toolbox__` (underscore).
 
+**Trae / WorkBuddy / ZCode does not show the tools.**
+- **Trae**: confirm `一键接入Trae.cmd` ran, then fully quit/reopen and start a **new task**. Tool prefix is `mcp_tomato-toolbox_`.
+- **WorkBuddy**: click **Trust (信任)** once for `tomato-toolbox` under "专家·技能·连接器 → 连接器 → 自定义连接器 → MCP 服务管理"; otherwise the chat cannot see the tools.
+- **ZCode**: press `Ctrl+K`, search "MCP 服务器", and confirm the `tomato-toolbox` toggle is on. If it says no model is available, configure ZCode's own model first (unrelated to the toolbox).
+
 **Not sure the setup took effect?**
 Double-click `一键体检Agent接入.cmd`. It checks the config and Skill for DSH / Qoder / Trae / WorkBuddy / ZCode, actually starts each MCP server to count tools, and reports healthy / broken / not integrated with the failing step. It never modifies any config.
 

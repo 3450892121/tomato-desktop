@@ -66,7 +66,7 @@ Good first tasks:
 
 The app ships a local MCP server with **41 tools** covering **21 GUI tools** (Video Player and Software Uninstall are intentionally not exposed).
 
-**One-click setup (both DSH and Qoder; MCP itself is general-purpose — other clients below):**
+**One-click setup (DSH / Qoder / Trae / WorkBuddy / ZCode):**
 
 **DSH:**
 
@@ -80,11 +80,17 @@ The app ships a local MCP server with **41 tools** covering **21 GUI tools** (Vi
 2. Double-click `一键接入Qoder.cmd` in the app folder.
 3. Open Qoder, **start a new conversation**, and ask the same.
 
-The script writes the client config, installs the Skill, and launches MCP through the app's own executable. To undo, double-click `一键移除DSH接入.cmd` / `一键移除Qoder接入.cmd` (the Skill is removed too; backups go to `skill-backups/`). Qoder's tool prefix is `mcp__tomato_toolbox__`; DSH's is `mcp__tomato-toolbox__`.
+**Trae / WorkBuddy / ZCode:**
+
+1. Fully quit the client.
+2. Double-click `一键接入Trae.cmd` / `一键接入WorkBuddy.cmd` / `一键接入ZCode.cmd`.
+3. WorkBuddy: click **Trust (信任)** once in "MCP 服务管理"; ZCode: press `Ctrl+K`, search "MCP 服务器", confirm the toggle; Trae: reopen and start a new task.
+
+The script writes the client config, installs the Skill, and launches MCP through the app's own executable. To undo, double-click the matching `一键移除…接入.cmd` (the Skill is removed too; backups go to `skill-backups/`). Qoder's tool prefix is `mcp__tomato_toolbox__`; DSH's is `mcp__tomato-toolbox__`.
 
 **Not sure it worked?** Double-click `一键体检Agent接入.cmd`: it checks DSH / Qoder / Trae / WorkBuddy / ZCode configs and actually starts each MCP server to count tools — no client restart needed.
 
-For Claude Desktop / Trae and manual setups:
+For Claude Desktop and manual setups:
 
 - [Agent guide (Chinese, detailed)](docs/Agent接入说明.md)
 - [Agent docs (Chinese)](docs/zh/agent.md) · [Agent docs (English)](docs/en/agent.md)
@@ -95,6 +101,7 @@ For Claude Desktop / Trae and manual setups:
 
 ## 4. What's new
 
+- **Trae / WorkBuddy / ZCode one-click setup**: six new double-click scripts (setup + remove). Trae writes `%APPDATA%\Trae CN\User\mcp.json`; WorkBuddy writes `~/.workbuddy/mcp.json` and needs a one-time **Trust** click; ZCode writes `~/.zcode/cli/config.json` under `mcp.servers`. Every field was verified against the client's own installed schema.
 - **Agent setup check + more thorough removal**: new `一键体检Agent接入.cmd` / `verify-agent-mcp.ps1` checks DSH / Qoder / Trae / WorkBuddy / ZCode configs and really starts MCP to count tools; setup scripts now verify what they wrote and roll back on failure, and backups no longer overwrite each other; DSH removal now removes the Skill too (backed up under `skill-backups/`).
 - **Qoder one-click setup**: double-click `一键接入Qoder.cmd`; it writes `~/.qoder-cn/settings.json` (with a backup; other MCP servers and providers are preserved), installs the Skill, and starts MCP via the app executable. No JSON, no Node.js; `一键移除Qoder接入.cmd` removes it. Fully quit/reopen Qoder and start a new conversation to use all 41 tools.
 - **v2.15.0 DSH one-click setup**: double-click `一键接入DSH.cmd`; it writes the config, installs the Skill, and starts MCP via the app executable. No JSON, no Node.js; `一键移除DSH接入.cmd` removes it.

@@ -47,6 +47,38 @@
 
 > 如果 Qoder 里没有工具：确认是**完全退出重开**，并且**新开的是新对话**（旧对话的工具列表在开始时就定了）；或看本文「常见问题」。
 
+### Trae（CN / 国际版）
+
+1. **先完全退出 Trae**（含托盘；装完再打开）；
+2. 双击软件目录里的 **`一键接入Trae.cmd`**（自动识别 Trae CN 或国际版）；
+3. 打开 Trae，点左上「**新任务**」，直接说：
+   > 用番茄工具箱把这个文件夹的图片压到 500KB 以内
+
+脚本会自动写 `%APPDATA%\Trae CN\User\mcp.json`（国际版是 `%APPDATA%\Trae\User\mcp.json`）的 `mcpServers.tomato-toolbox`，先备份、其它 MCP 原样保留；Skill 装到 `~/.trae-cn/skills/tomato-toolbox`。撤掉用 **`一键移除Trae接入.cmd`**。
+
+> Trae 里的工具名前缀是 `mcp_tomato-toolbox_`（它的命名规则会把横线保留成下划线形式）。
+
+### WorkBuddy（腾讯 CodeBuddy）
+
+1. **先完全退出 WorkBuddy**；
+2. 双击 **`一键接入WorkBuddy.cmd`**；
+3. 打开 WorkBuddy。**第一次必须点一次「信任」**，否则对话里看不到工具：
+   「专家·技能·连接器 → 连接器 → 自定义连接器（右上）→ 打开 MCP 服务管理 → 找到 tomato-toolbox → 点『信任』」；
+4. 新开任务，说同样的话。
+
+脚本写 `~/.workbuddy/mcp.json`（先备份；其它 MCP 保留），Skill 装到 `~/.workbuddy/skills/tomato-toolbox`。撤掉用 **`一键移除WorkBuddy接入.cmd`**。
+
+### 智谱 ZCode
+
+1. **先完全退出 ZCode**；
+2. 双击 **`一键接入ZCode.cmd`**；
+3. 打开 ZCode，按 `Ctrl+K` 搜「**MCP 服务器**」，确认列表里 `tomato-toolbox` 的开关是打开的；
+4. 新开对话，说同样的话。
+
+脚本写 `~/.zcode/cli/config.json` 的 `mcp.servers.tomato-toolbox`（先备份；`plugins` 与其它 server 原样保留），Skill 装到 `~/.zcode/skills/tomato-toolbox`。撤掉用 **`一键移除ZCode接入.cmd`**。
+
+> ZCode 如果提示「当前没有可用模型」，那是它自己的模型没配；和番茄工具箱无关，配好模型后工具就能用。
+
 ### 接入体检（装完不确定有没有生效，先点它）
 
 双击软件目录里的 **`一键体检Agent接入.cmd`**（或运行 `verify-agent-mcp.ps1`）。它会：
@@ -56,7 +88,9 @@
 - **真的按配置启动一遍 MCP**，要它返回工具列表（正常是 41 个）——不用先打开客户端；
 - 输出「正常 / 异常 / 未接入」，异常时写明卡在哪一步（路径失效、配置损坏、启动失败等）。
 
-它只读、不改任何配置；Trae / WorkBuddy / ZCode / Claude 目前只有手动配置，体检会如实报「未接入」，不会替你写。
+它只读、不改任何配置。DSH / Qoder / Trae / WorkBuddy / ZCode 都有一键接入；Claude Desktop 目前只有手动配置，体检会如实报「未接入」。
+
+> 体检只证明「配置对、MCP 能启动、工具列得出来」；WorkBuddy 的「信任」、ZCode 的开关、客户端是否要重开/新开对话，仍要按上面各节做一次。
 
 > 参数：`-NoProbe` 只查文件不启动 MCP（更快）；`-Json` 输出机器可读结果。
 

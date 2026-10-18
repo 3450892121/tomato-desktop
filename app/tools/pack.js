@@ -304,8 +304,8 @@ const skillSrc = path.join(repoRoot, 'skills', 'tomato-toolbox');
 if (fs.existsSync(skillSrc)) {
   copyTree(skillSrc, path.join(outDir, 'skills', 'tomato-toolbox'));
 }
-// 小白入口：双击脚本自动写 DSH 配置 + 装 Skill，不需要改 JSON/敲命令
-for (const f of ['一键接入DSH.cmd', 'setup-dsh-mcp.ps1', '一键移除DSH接入.cmd', 'uninstall-dsh-mcp.ps1', '一键重启DSH.cmd', 'restart-dsh.ps1', '一键接入Qoder.cmd', 'setup-qoder-mcp.ps1', '一键移除Qoder接入.cmd', 'uninstall-qoder-mcp.ps1', '一键体检Agent接入.cmd', 'verify-agent-mcp.ps1']) {
+// 小白入口：双击脚本自动写各客户端配置 + 装 Skill，不需要改 JSON/敲命令
+for (const f of ['一键接入DSH.cmd', 'setup-dsh-mcp.ps1', '一键移除DSH接入.cmd', 'uninstall-dsh-mcp.ps1', '一键重启DSH.cmd', 'restart-dsh.ps1', '一键接入Qoder.cmd', 'setup-qoder-mcp.ps1', '一键移除Qoder接入.cmd', 'uninstall-qoder-mcp.ps1', '一键接入Trae.cmd', '一键移除Trae接入.cmd', '一键接入WorkBuddy.cmd', '一键移除WorkBuddy接入.cmd', '一键接入ZCode.cmd', '一键移除ZCode接入.cmd', 'setup-agent-mcp.ps1', 'uninstall-agent-mcp.ps1', '一键体检Agent接入.cmd', 'verify-agent-mcp.ps1']) {
   const src = path.join(appRoot, 'tools', f);
   if (fs.existsSync(src)) fs.copyFileSync(src, path.join(outDir, f));
 }

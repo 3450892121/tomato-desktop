@@ -281,6 +281,84 @@ await test('写出来的 Qoder 配置能真的拉起 MCP 并列出工具', async
   assert.equal(result.count, 41, `工具数应为 41，实际 ${result.count}`);
 });
 
+const AGENT_SETUP = 'setup-agent-mcp.ps1';
+const AGENT_UNINSTALL = 'uninstall-agent-mcp.ps1';
+
+function makeAgentConfig(tag, content) {
+  const root = tempRoot(tag);
+  const cfg = path.join(root, 'mcp.json');
+  fs.writeFileSync(cfg, content, 'utf8');
+  return { root, cfg, skill: path.join(root, 'skillroot') };
+}
+
+const agentSetup = (client, c) => runScript(AGENT_SETUP, ['-Client', client, '-AppDir', APP, '-ConfigPath', c.cfg, '-SkillRoot', c.skill]);
+const agentRemove = (client, c) => runScript(AGENT_UNINSTALL, ['-Client', client, '-ConfigPath', c.cfg, '-SkillRoot', c.skill]);
+
+await test('Trae：写入/移除都不碰其它 MCP，条目不写 type（Trae schema 没有这个字段）', () => {
+  const c = makeAgentConfig('trae', JSON.stringify({ mcpServers: { other: { command: 'x', args: [] } }, note: '中文保留' }, null, 2));
+  assert.equal(agentSetup('Trae', c).status, 0);
+  const json = JSON.parse(read(c.cfg));
+  const entry = json.mcpServers['tomato-toolbox'];
+  assert.ok(entry, '条目没写进去');
+  assert.equal(entry.type, undefined, 'Trae 条目不该带 type');
+  assert.equal(entry.command.replace(/\\/g, '/').endsWith('electron.exe'), true);
+  assert.equal(json.note, '中文保留');
+  assert.ok(json.mcpServers.other, '误删其它 MCP');
+  assert.equal(agentSetup('Trae', c).status, 0, '重复接入应幂等');
+  assert.ok(listBackups(c.root, 'mcp.json.tomato-backup-').length >= 1);
+  assert.equal(agentRemove('Trae', c).status, 0);
+  const after = JSON.parse(read(c.cfg));
+  assert.equal(after.mcpServers['tomato-toolbox'], undefined);
+  assert.ok(after.mcpServers.other);
+  assert.equal(fs.existsSync(path.join(c.skill, 'skills', 'tomato-toolbox')), false);
+});
+
+await test('WorkBuddy：保留原有 HTTP MCP，条目是 type=stdio，移除后恢复', () => {
+  const c = makeAgentConfig('wb', JSON.stringify({ mcpServers: { 记忆知识库: { url: 'http://127.0.0.1:8791/mcp', type: 'streamableHttp', timeout: 30000 } } }, null, 2));
+  assert.equal(agentSetup('WorkBuddy', c).status, 0);
+  const json = JSON.parse(read(c.cfg));
+  assert.equal(json.mcpServers['tomato-toolbox'].type, 'stdio');
+  assert.equal(json.mcpServers['记忆知识库'].type, 'streamableHttp');
+  assert.ok(fs.existsSync(path.join(c.skill, 'skills', 'tomato-toolbox', 'SKILL.md')));
+  assert.equal(agentRemove('WorkBuddy', c).status, 0);
+  const after = JSON.parse(read(c.cfg));
+  assert.equal(after.mcpServers['tomato-toolbox'], undefined);
+  assert.ok(after.mcpServers['记忆知识库']);
+});
+
+await test('ZCode：写进 mcp.servers，保留 plugins/其它 server，带 timeoutMs', () => {
+  const c = makeAgentConfig('zcode', JSON.stringify({ plugins: { enabledPlugins: { a: true } }, mcp: { servers: { 'jiyi-zhishiku': { type: 'http', url: 'http://127.0.0.1:8791/mcp' } } } }, null, 2));
+  assert.equal(agentSetup('ZCode', c).status, 0);
+  const json = JSON.parse(read(c.cfg));
+  const entry = json.mcp.servers['tomato-toolbox'];
+  assert.equal(entry.type, 'stdio');
+  assert.equal(entry.timeoutMs, 3600000);
+  assert.equal(json.plugins.enabledPlugins.a, true);
+  assert.ok(json.mcp.servers['jiyi-zhishiku']);
+  assert.equal(agentRemove('ZCode', c).status, 0);
+  const after = JSON.parse(read(c.cfg));
+  assert.equal(after.mcp.servers['tomato-toolbox'], undefined);
+  assert.ok(after.mcp.servers['jiyi-zhishiku']);
+});
+
+await test('Trae / WorkBuddy / ZCode：坏 JSON 一律拒绝，文件逐字节不变', () => {
+  for (const client of ['Trae', 'WorkBuddy', 'ZCode']) {
+    const c = makeAgentConfig(`bad-${client}`, '{ "mcpServers": { oops');
+    const r = agentSetup(client, c);
+    assert.notEqual(r.status, 0, `${client} 应该拒绝坏 JSON`);
+    assert.equal(read(c.cfg), '{ "mcpServers": { oops', `${client} 文件被改了`);
+    assert.equal(fs.existsSync(path.join(c.skill, 'skills', 'tomato-toolbox')), false);
+  }
+});
+
+await test('WorkBuddy：写出来的配置能真的拉起 MCP 并列出 41 个工具', async () => {
+  const c = makeAgentConfig('wb-probe', '{}');
+  assert.equal(agentSetup('WorkBuddy', c).status, 0);
+  const entry = JSON.parse(read(c.cfg)).mcpServers['tomato-toolbox'];
+  const result = await probeEntry(entry);
+  assert.equal(result.count, 41, `工具数应为 41，实际 ${result.count}`);
+});
+
 console.log(lines.join('\n'));
 console.log(`\n${fail === 0 ? '全部通过' : '有失败'}：${pass} 通过 / ${fail} 失败`);
 

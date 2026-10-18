@@ -306,9 +306,10 @@
 - **审计日志**：每次调用写 `userdata/mcp-audit.jsonl`；password/secret/token 脱敏。
 - **小白一键接入（DSH）**：双击 `一键接入DSH.cmd` 自动写 `cordis.patch.yml`（先备份）、安装 Skill、用软件 exe 以 Node 模式启动 MCP；不需要改 JSON/装 Node；`一键移除DSH接入.cmd` 可撤回（Skill 一起移除，备份在 `~/.dsh/skill-backups/`）。
 - **小白一键接入（Qoder）**：双击 `一键接入Qoder.cmd` 自动写 `~/.qoder-cn/settings.json` 的 `mcpServers.tomato-toolbox`（先备份；保留其它 MCP 与 providers）、安装 Skill 到 `~/.qoder-cn/skills/tomato-toolbox`、用软件 exe 以 Node 模式启动 MCP；不需要改 JSON/装 Node；Qoder 里状态 `ready`、41 个工具，新对话能实际调用；`一键移除Qoder接入.cmd` 可撤回且不破坏其它配置。
+- **小白一键接入（Trae / WorkBuddy / ZCode）**：`一键接入Trae.cmd` / `一键接入WorkBuddy.cmd` / `一键接入ZCode.cmd` 分别写 Trae 的 `mcp.json`、WorkBuddy 的 `mcp.json`、ZCode 的 `cli\config.json` 的 `mcp.servers`（都先备份、保留其它 MCP/配置），并安装 Skill；字段按各自源码 schema 实现（Trae 无 `type`；ZCode 带 `timeoutMs`）。WorkBuddy 首次必须在界面点「信任」、ZCode 必须打开 MCP 开关，脚本需明确提示。各自 `一键移除…接入.cmd` 可撤回。
 - **接入体检**：`一键体检Agent接入.cmd` / `verify-agent-mcp.ps1` 只读检查 DSH / Qoder / Trae / WorkBuddy / ZCode / Claude Desktop 的配置、路径与 Skill，并对已接入的真的启动 MCP 要工具列表；异常退出码 1 并写明卡在哪一步；`-NoProbe` 跳过启动、`-Json` 输出机器可读结果。
 - **脚本安全性**：备份不覆盖；写后读回校验、失败回滚；坏 JSON / 结构不对时文件字节不变；重复接入幂等；移除可重复执行；Skill 安装/移除都有备份。
-- **测试**：`tests/agent-mcp-scripts.test.mjs` 11 项（夹具目录，不碰真实配置）；真机 Qoder 接入/移除/重接入端到端 + DSH 移除逐字节恢复。
+- **测试**：`tests/agent-mcp-scripts.test.mjs` 16 项（夹具目录，不碰真实配置）；真机 DSH/Qoder/Trae CN/WorkBuddy/ZCode 接入、移除、重接入端到端（ZCode 因未配模型只验到连接与识别）。
 - **明确不是强制的**：大多数工具调用即执行、没有人工确认弹窗；只有视频下载有闸门；审计是事后记录，不是沙箱。
 - **产物安全**：批量重命名默认 `dry_run=true`；不向 agent 暴露原始 ffmpeg/7z 参数。
 - **打包态**：产物内 `resources/app/mcp`、`node_modules/pdfjs-dist/legacy`、`@napi-rs/canvas`、`heic-decode`、`addons/*` 路径正确；MCP 在产物上能跑工具列表、混淆、压缩、PDF 渲染、HEIC、OCR。

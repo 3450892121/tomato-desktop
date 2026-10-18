@@ -540,6 +540,14 @@ Qoder：
    - 脚本会自动写 Qoder 配置 + 安装 Skill；
    - 想撤掉：双击「一键移除Qoder接入.cmd」。
 
+Trae / WorkBuddy / ZCode：
+1. 先完全退出对应客户端；
+2. 分别双击「一键接入Trae.cmd」「一键接入WorkBuddy.cmd」「一键接入ZCode.cmd」；
+3. WorkBuddy 第一次要去「专家·技能·连接器 → 连接器 → 自定义连接器 → MCP 服务管理」
+   找到 tomato-toolbox 点一次「信任」；ZCode 按 Ctrl+K 搜「MCP 服务器」确认开关打开；
+   Trae 重新打开后点「新任务」新开对话；
+   - 想撤掉：双击对应的「一键移除…接入.cmd」。
+
 **装完不确定有没有生效？** 双击「一键体检Agent接入.cmd」：它会检查 DSH / Qoder /
 Trae / WorkBuddy / ZCode 的配置和 Skill，并真的启动一遍 MCP 数工具；只读、不改配置，
 有问题会写明卡在哪（例如路径失效、配置损坏、启动失败）。

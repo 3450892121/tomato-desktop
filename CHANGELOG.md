@@ -2,8 +2,14 @@
 
 本项目遵循语义化版本（x.y.z）：修 bug → z+1；加功能 → y+1；重要改动 → x+1。
 
-## 未发布（当前开发线）Qoder 一键接入 + Agent 接入体检
+## 未发布（当前开发线）Qoder / Trae / WorkBuddy / ZCode 一键接入 + Agent 接入体检
 
+- **Trae / WorkBuddy / ZCode 一键接入（新）**：
+  - `一键接入Trae.cmd`：写 `%APPDATA%\Trae CN\User\mcp.json`（国际版 `%APPDATA%\Trae\User\mcp.json`）的 `mcpServers.tomato-toolbox`，条目 `{command,args,cwd,env}`（Trae schema 没有 `type` 字段，故不写）；Skill 装到 `~/.trae-cn/skills`；
+  - `一键接入WorkBuddy.cmd`：写 `~/.workbuddy/mcp.json`，条目 `{type:"stdio",command,args,cwd,env}`；**首次必须在界面点一次「信任」**（「专家·技能·连接器 → 连接器 → 自定义连接器 → MCP 服务管理」），否则对话里看不到工具；Skill 装到 `~/.workbuddy/skills`；
+  - `一键接入ZCode.cmd`：写 `~/.zcode/cli/config.json` 的 `mcp.servers.tomato-toolbox`，条目 `{type:"stdio",command,args,cwd,env,timeoutMs:3600000}`；Skill 装到 `~/.zcode/skills`；
+  - 三家各自配套 `一键移除…接入.cmd`，移除配置 + Skill（备份到各自的 `skill-backups/`）。
+  - 字段来源：Trae 的设置 schema（`app.mcp.json.command/args/env/cwd`）、WorkBuddy 的 `McpConfigManager.normalizePartialData`（`command` 推断 stdio，`type` 别名表含 stdio）、ZCode 的条目转换函数（`type` 缺省由 `command` 推断 stdio，支持 `env`/`timeoutMs`）——不是照搬别家形状。
 - **`一键接入Qoder.cmd`（软件目录）**：双击后自动：
   - 定位 Qoder 数据目录（优先 `~/.qoder-cn`，其次 `~/.qoder`），先备份 `settings.json`；
   - 写入 `mcpServers.tomato-toolbox`（stdio，`command` = 软件自己的 exe，`args` = `resources/app/mcp/server.mjs`，`cwd` = `resources/app`，`env` = `ELECTRON_RUN_AS_NODE=1` + `TOMATO_USERDATA_DIR`）；其它 MCP 与 providers 原样保留；
@@ -22,8 +28,12 @@
   - 坏 JSON / `mcpServers` 不是对象时**一个字节都不改**；
   - Skill 安装改为「旧版整体备份 → 删除 → 重装」，不再残留旧文件；复制后校验 `SKILL.md`；
   - **DSH 移除现在会把 Skill 一起移除**（备份到 `~/.dsh/skill-backups/`），与 Qoder 行为一致；没装 DSH / 已移除过时友好退出（exit 0），不再抛红字。
-- **测试（新增 `tests/agent-mcp-scripts.test.mjs`，11 项，已挂 `npm test`）**：保留其它 MCP/providers/中文注释、重复接入幂等、备份不覆盖、移除删配置+Skill、坏 JSON / 非对象拒绝改动且文件不变、无配置文件可新建、生成的配置真的能拉起 MCP 并列出 41 个工具。
-- **真机验证（2026-10-18）**：Qoder 新开对话实际调用 `mcp__tomato_toolbox__libreoffice_status` 返回 `{"ok":true,"found":true,...}`；执行移除后完全重启 Qoder，新对话回答「没有」番茄工具；重新接入后重启，Qoder 报告 41 个工具。DSH 在真机上做过「移除 → 校验块消失 → 逐字节恢复原文件（SHA256 一致）」，当前 41 工具正常。
+- **测试（新增 `tests/agent-mcp-scripts.test.mjs`，16 项，已挂 `npm test`）**：保留其它 MCP/providers/中文注释、重复接入幂等、备份不覆盖、移除删配置+Skill、坏 JSON / 非对象拒绝改动且文件不变、无配置文件可新建、Trae 条目不写 type、WorkBuddy 保留 HTTP MCP、ZCode 写嵌套 `mcp.servers` 且保留 plugins、生成的配置真的能拉起 MCP 并列出 41 个工具。
+- **真机验证（2026-10-18）**：Qoder 新开对话实际调用 `mcp__tomato_toolbox__libreoffice_status` 返回 `{"ok":true,"found":true,...}`；执行移除后完全重启 Qoder，新对话回答「没有」番茄工具；重新接入后重启，Qoder 报告 41 个工具。
+  - **Trae CN**：新任务实际调用 `libreoffice_status` 成功；移除 + 重启后回答「没有」；重新接入 + 重启后再次调用成功。
+  - **WorkBuddy**：MCP 服务管理里首次显示「信任」，点击后 `41/41 个工具已启用`，新任务实际调用成功；移除 + 重启后列表里消失；重新接入 + 重启后恢复 `41/41`。
+  - **智谱 ZCode**：MCP 服务器页显示 `tomato-toolbox` 绿灯（stdio），编辑页能正确读回命令/参数/环境变量；移除 + 重启后消失；重新接入 + 重启后恢复绿灯。ZCode 当前没有配模型，所以只验证到「连接 + 识别」，没有在对话里实际调用（不擅自改用户的付费模型配置）。
+  - DSH 在真机上做过「移除 → 校验块消失 → 逐字节恢复原文件（SHA256 一致）」，当前 41 工具正常；`一键体检` 显示 DSH / Qoder CN / Trae CN / WorkBuddy / ZCode 共 5 个「正常 / 41 工具」，Qoder 国际版与 Trae 国际版未接入。
 
 ## v2.15.0（2026-10-18）MCP 一键接入（DSH 首个支持）+ 中英双语文档重构
 

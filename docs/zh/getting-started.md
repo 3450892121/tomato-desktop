@@ -31,6 +31,12 @@ tomato-desktop-v2.15.0-win64.zip   （约 820 MB）
 ├─ 一键移除DSH接入.cmd
 ├─ 一键接入Qoder.cmd
 ├─ 一键移除Qoder接入.cmd
+├─ 一键接入Trae.cmd
+├─ 一键移除Trae接入.cmd
+├─ 一键接入WorkBuddy.cmd
+├─ 一键移除WorkBuddy接入.cmd
+├─ 一键接入ZCode.cmd
+├─ 一键移除ZCode接入.cmd
 ├─ 一键体检Agent接入.cmd
 ├─ Agent接入说明.md
 ├─ skills\

@@ -25,6 +25,16 @@
 
 > Qoder 工具名前缀是 `mcp__tomato_toolbox__`（下划线）；DSH 是 `mcp__tomato-toolbox__`（横线）。
 
+## 小白一键接入（Trae / WorkBuddy / ZCode）
+
+**不需要改 JSON、不需要敲命令、不需要装 Node。**
+
+- **Trae（CN / 国际版）**：双击 `一键接入Trae.cmd` → 完全退出重开 → 「新任务」新对话。写 `%APPDATA%\Trae CN\User\mcp.json`（或国际版 `Trae\User\mcp.json`），条目 `{command,args,cwd,env}`；撤掉用 `一键移除Trae接入.cmd`。
+- **WorkBuddy**：双击 `一键接入WorkBuddy.cmd` → 完全退出重开 → 去「专家·技能·连接器 → 连接器 → 自定义连接器 → MCP 服务管理」，找到 `tomato-toolbox` 点一次「**信任**」（第一次必须点）→ 新开任务。写 `~/.workbuddy/mcp.json`，条目 `{type:"stdio",command,args,cwd,env}`；撤掉用 `一键移除WorkBuddy接入.cmd`。
+- **智谱 ZCode**：双击 `一键接入ZCode.cmd` → 完全退出重开 → `Ctrl+K` 搜「MCP 服务器」确认开关打开 → 新开对话。写 `~/.zcode/cli/config.json` 的 `mcp.servers`，条目 `{type:"stdio",command,args,cwd,env,timeoutMs}`；撤掉用 `一键移除ZCode接入.cmd`。
+
+字段都从各客户端安装包里的配置 schema 核实过，不是照搬别家形状。三家的 Skill 分别装到 `~/.trae-cn/skills`、`~/.workbuddy/skills`、`~/.zcode/skills`。
+
 ## 接入体检（推荐）
 
 双击软件目录里的 `一键体检Agent接入.cmd`（或运行 `app/tools/verify-agent-mcp.ps1`）：
@@ -34,7 +44,7 @@
 - 只读、不改配置；`-NoProbe` 跳过启动，`-Json` 输出机器可读结果；
 - 有异常时退出码为 1，可直接接 CI。
 
-`Trae` / `WorkBuddy` / `ZCode` / `Claude` 目前没有一键脚本，体检只报状态。
+DSH / Qoder / Trae / WorkBuddy / ZCode 都有接入脚本；Claude Desktop 目前只有手动配置。
 
 ## 运行（开发/手动）
 

@@ -37,9 +37,15 @@ The script writes `mcpServers.tomato-toolbox` in `~/.qoder-cn/settings.json` (wi
 
 Qoder's tool prefix is `mcp__tomato_toolbox__`; DSH's is `mcp__tomato-toolbox__`.
 
-**Check it after setup**: double-click `一键体检Agent接入.cmd`. It checks configs and Skills for DSH / Qoder / Trae / WorkBuddy / ZCode and actually starts each MCP server to count tools; it is read-only and reports exactly which step failed. Trae / WorkBuddy / ZCode / Claude currently require manual setup and will be reported as "not integrated".
+### Trae / WorkBuddy / ZCode
 
-> Existing conversations keep the tool list they started with; after installing, **start a new Qoder conversation**. Other clients use the manual setup below.
+**Trae (CN / international)**: double-click `一键接入Trae.cmd`, fully quit/reopen, then start a new task. Writes `%APPDATA%\Trae CN\User\mcp.json` with `{command,args,cwd,env}`; undo with `一键移除Trae接入.cmd`.
+**WorkBuddy**: double-click `一键接入WorkBuddy.cmd`, fully quit/reopen, open "专家·技能·连接器 → 连接器 → 自定义连接器 → MCP 服务管理", click **信任 (Trust)** once for `tomato-toolbox`, then start a new task. Undo with `一键移除WorkBuddy接入.cmd`.
+**ZCode**: double-click `一键接入ZCode.cmd`, fully quit/reopen, press `Ctrl+K`, search "MCP 服务器", confirm the toggle is on, then start a new conversation. Undo with `一键移除ZCode接入.cmd`.
+
+**Check it after setup**: double-click `一键体检Agent接入.cmd`. It checks configs and Skills for DSH / Qoder / Trae / WorkBuddy / ZCode and actually starts each MCP server to count tools; it is read-only and reports exactly which step failed. Claude Desktop still requires manual setup and will be reported as "not integrated".
+
+> Existing conversations keep the tool list they started with; after installing, **start a new conversation**. Other clients use the manual setup below.
 
 ## 3. Manual setup
 

@@ -374,7 +374,8 @@ if ($Json) {
     Write-Host '  注意：体检能证明「配置对、MCP 能启动、工具列得出来」，但不能代替在客户端里新开对话实际调用一次。'
   }
   Write-Host ''
-  Write-Host '说明：Trae / WorkBuddy / ZCode / Claude 目前只有手动配置，本程序只体检、不会替你写配置。'
+  Write-Host '说明：DSH / Qoder / Trae / WorkBuddy / ZCode 都有一键接入脚本；Claude Desktop 目前只有手动配置，本程序只体检、不会替你写配置。'
+  Write-Host '      WorkBuddy 首次要在界面点「信任」；ZCode 要在 MCP 服务器页确认开关打开，否则体检正常但对话里仍看不到工具。'
   Write-Host ''
 }
 

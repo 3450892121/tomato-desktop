@@ -37,9 +37,15 @@
 
 Qoder 工具名前缀是 `mcp__tomato_toolbox__`；DSH 是 `mcp__tomato-toolbox__`。
 
-**装完先体检**：双击 `一键体检Agent接入.cmd`。它检查 DSH / Qoder / Trae / WorkBuddy / ZCode 的配置与 Skill，并真的启动一遍 MCP 数工具；只读不改配置，异常会写明卡在哪。Trae / WorkBuddy / ZCode / Claude 目前只能手动配置，体检会报「未接入」。
+### Trae / WorkBuddy / ZCode
 
-> 旧对话的工具列表在开始时就定了；Qoder 装完必须**新开对话**。其它客户端按下一节手动配置。
+**Trae（CN / 国际版）**：双击 `一键接入Trae.cmd` → 完全退出重开 → 「新任务」新对话。写 `%APPDATA%\Trae CN\User\mcp.json`，条目 `{command,args,cwd,env}`；撤掉用 `一键移除Trae接入.cmd`。
+**WorkBuddy**：双击 `一键接入WorkBuddy.cmd` → 完全退出重开 → 「专家·技能·连接器 → 连接器 → 自定义连接器 → MCP 服务管理」找到 `tomato-toolbox` 点一次「信任」→ 新开任务。撤掉用 `一键移除WorkBuddy接入.cmd`。
+**智谱 ZCode**：双击 `一键接入ZCode.cmd` → 完全退出重开 → `Ctrl+K` 搜「MCP 服务器」确认开关打开 → 新开对话。撤掉用 `一键移除ZCode接入.cmd`。
+
+**装完先体检**：双击 `一键体检Agent接入.cmd`。它检查 DSH / Qoder / Trae / WorkBuddy / ZCode 的配置与 Skill，并真的启动一遍 MCP 数工具；只读不改配置，异常会写明卡在哪。Claude Desktop 目前只能手动配置，体检会报「未接入」。
+
+> 旧对话的工具列表在开始时就定了；Qoder / Trae / WorkBuddy / ZCode 装完都要**新开对话**。其它客户端按下一节手动配置。
 
 ## 3. 手动配置（其它客户端）
 

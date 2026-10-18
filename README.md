@@ -66,7 +66,7 @@
 
 软件内置一个本地 MCP server：41 个工具，覆盖 21 个 GUI 工具（视频播放器、软件卸载不暴露）。
 
-**一键接入（DSH / Qoder 都有；MCP 本身通用，其它客户端见下）：**
+**一键接入（DSH / Qoder / Trae / WorkBuddy / ZCode 都有）：**
 
 **DSH：**
 
@@ -80,11 +80,17 @@
 2. 双击软件目录里的 `一键接入Qoder.cmd`；
 3. 打开 Qoder，**新开一个对话**，说同样的话。
 
-脚本会自动写对应客户端的配置、安装 Skill、用软件自己的 exe 启动 MCP；撤掉分别双击 `一键移除DSH接入.cmd` / `一键移除Qoder接入.cmd`（Skill 会一起移除，备份在 `skill-backups/`）。Qoder 里的工具名前缀是 `mcp__tomato_toolbox__`，DSH 是 `mcp__tomato-toolbox__`。
+**Trae / WorkBuddy / ZCode：**
+
+1. 先完全退出对应客户端；
+2. 分别双击 `一键接入Trae.cmd` / `一键接入WorkBuddy.cmd` / `一键接入ZCode.cmd`；
+3. WorkBuddy 第一次要在「MCP 服务管理」里点一次「信任」；ZCode 按 `Ctrl+K` 搜「MCP 服务器」确认开关打开；Trae 重新打开后「新任务」新对话。
+
+脚本会自动写对应客户端的配置、安装 Skill、用软件自己的 exe 启动 MCP；撤掉双击对应的 `一键移除…接入.cmd`（Skill 会一起移除，备份在 `skill-backups/`）。Qoder 里的工具名前缀是 `mcp__tomato_toolbox__`，DSH 是 `mcp__tomato-toolbox__`。
 
 **装好不确定有没有生效？** 双击 `一键体检Agent接入.cmd`：它会检查 DSH / Qoder / Trae / WorkBuddy / ZCode 的配置，并真的启动一遍 MCP 数工具（不用先打开客户端），有问题直接说卡在哪。
 
-其它客户端（Claude Desktop / Trae 等）的配置、工具清单、安全边界见：
+其它客户端（Claude Desktop 等）的配置、工具清单、安全边界见：
 
 - [Agent 接入说明（中文，详细）](docs/Agent接入说明.md)
 - [Agent 文档（中文）](docs/zh/agent.md) · [Agent docs (English)](docs/en/agent.md)
@@ -95,6 +101,7 @@
 
 ## 四、本次更新
 
+- **Trae / WorkBuddy / ZCode 一键接入**：新增 6 个双击脚本（接入/移除各一）。Trae 写 `%APPDATA%\Trae CN\User\mcp.json`；WorkBuddy 写 `~/.workbuddy/mcp.json` 且首次要在界面点一次「信任」；ZCode 写 `~/.zcode/cli/config.json` 的 `mcp.servers`。三家字段都从各自安装包 schema 核实。
 - **Agent 接入体检 + 移除更彻底**：新增 `一键体检Agent接入.cmd` / `verify-agent-mcp.ps1`，检查 DSH / Qoder / Trae / WorkBuddy / ZCode 的配置并真的启动 MCP 数工具；接入脚本写完后会读回校验、失败自动回滚，备份不再互相覆盖；DSH 移除现在会把 Skill 一起移走（备份在 `skill-backups/`）。
 - **Qoder 一键接入**：双击 `一键接入Qoder.cmd`，自动写 `~/.qoder-cn/settings.json`（先备份；其它 MCP 与 providers 保留）、安装 Skill、用软件 exe 启动 MCP；不需要改 JSON、不需要装 Node；`一键移除Qoder接入.cmd` 可撤回。Qoder 里完全退出重开并新开对话即可用 41 个工具。
 - **v2.15.0 MCP 一键接入（DSH）**：双击 `一键接入DSH.cmd`，自动写配置、装 Skill、用软件 exe 启动 MCP；不需要改 JSON、不需要装 Node；`一键移除DSH接入.cmd` 可撤回。

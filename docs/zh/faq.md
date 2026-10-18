@@ -50,6 +50,11 @@ Release 成品包已带齐 ffmpeg、LibreOffice、Real-ESRGAN、FunASR、OCR、7
 3. 确认 `~/.qoder-cn/settings.json` 的 `mcpServers.tomato-toolbox` 存在；
 4. Qoder 里的工具名前缀是 `mcp__tomato_toolbox__`（下划线）。
 
+**Trae / WorkBuddy / ZCode 里没有工具？**
+- **Trae**：确认双击了 `一键接入Trae.cmd`，完全退出重开，并且是**新任务/新对话**；工具名前缀是 `mcp_tomato-toolbox_`。
+- **WorkBuddy**：第一次要去「专家·技能·连接器 → 连接器 → 自定义连接器 → MCP 服务管理」找到 `tomato-toolbox` 点一次「**信任**」，否则对话里看不到工具。
+- **ZCode**：按 `Ctrl+K` 搜「MCP 服务器」，确认 `tomato-toolbox` 开关是打开的；如果顶部提示「当前没有可用模型」，先配好 ZCode 自己的模型（和工具箱无关）。
+
 **接完不确定有没有生效？**
 双击 `一键体检Agent接入.cmd`。它会检查 DSH / Qoder / Trae / WorkBuddy / ZCode 的配置和 Skill，并真的启动一遍 MCP 数工具；最后给出「正常 / 异常 / 未接入」和卡在哪。它不会改任何配置。
 
