@@ -269,6 +269,13 @@ async function main() {
       walk(extractDir);
       const texts = found.map((p) => fs.readFileSync(p, 'utf8')).sort();
       assert.deepEqual(texts, ['hello a', 'hello b']);
+
+      await assert.rejects(
+        () => client.call('archive_extract', {
+          archives: [archive], output_dir: extractDir, overwrite: 'replace'
+        }),
+        /不允许覆盖/
+      );
     });
 
     await test('pdf_images_to_pdf / pdf_page_count / pdf_split：图片→PDF→拆页', async () => {
@@ -314,6 +321,15 @@ async function main() {
       assert.ok(fs.existsSync(path.join(dir, 'doc_01.txt')));
       assert.ok(fs.existsSync(path.join(dir, 'doc_02.txt')));
       assert.ok(!fs.existsSync(a));
+
+      await assert.rejects(
+        () => client.call('file_rename_batch', {
+          items: [path.join(dir, 'doc_01.txt')],
+          rule: { mode: 'seq', prefix: 'x_', start: 1, digits: 2 },
+          conflict: 'overwrite', dry_run: false
+        }),
+        /不允许覆盖/
+      );
     });
 
     await test('media_probe / video_convert / video_compress / audio_convert / audio_edit：真实 ffmpeg 链路', async () => {
@@ -614,6 +630,58 @@ async function main() {
       await grantOnce(dir, 60_000);
       assert.equal((await checkApproval(dir)).mode, 'once');
       assert.equal((await checkApproval(dir)).ok, false, 'once 必须用完即焚');
+    });
+
+    await test('路径白名单：允许根之外的读写都拒绝', async () => {
+      const outside = path.join('C:\\Windows', 'win.ini');
+      await assert.rejects(
+        () => client.call('image_obfuscate', {
+          input: outside, mode: 'b', direction: 'encrypt', key: 'x'
+        }),
+        /不在允许范围/
+      );
+      const src = path.join(root, 'safe-src.png');
+      await makePng(src);
+      await assert.rejects(
+        () => client.call('image_obfuscate', {
+          input: src, mode: 'b', direction: 'encrypt', key: 'x',
+          output: path.join('C:\\Windows', 'evil.png')
+        }),
+        /不在允许范围/
+      );
+    });
+
+    await test('审计日志：调用可追溯、密码脱敏', async () => {
+      const file = path.join(approvalDir, 'mcp-audit.jsonl');
+      assert.ok(fs.existsSync(file), '没有生成 mcp-audit.jsonl');
+      const lines = fs.readFileSync(file, 'utf8').trim().split(/\r?\n/).filter(Boolean).map((l) => JSON.parse(l));
+      assert.ok(lines.some((l) => l.tool === 'image_obfuscate' && l.ok === true));
+      const hide = lines.find((l) => l.tool === 'image_hide_files');
+      assert.ok(hide, '没有 image_hide_files 的审计记录');
+      assert.equal(hide.args.password, '***');
+      assert.ok(hide.client && hide.client.name, '审计没有记录 clientInfo');
+    });
+
+    await test('只读模式：只列只读工具，写工具被拒绝', async () => {
+      const ro = new McpClient({
+        TOMATO_USERDATA_DIR: approvalDir,
+        TOMATO_MCP_READONLY: '1',
+        HTTP_PROXY: '', HTTPS_PROXY: '', NO_PROXY: '127.0.0.1,localhost'
+      });
+      try {
+        await ro.request('initialize', {
+          protocolVersion: '2024-11-05', capabilities: {}, clientInfo: { name: 'readonly-test', version: '1' }
+        });
+        ro.notify('notifications/initialized');
+        const list = await ro.request('tools/list', {});
+        assert.ok(!list.tools.some((t) => t.name === 'image_obfuscate'), '只读模式不应列出写工具');
+        assert.ok(list.tools.some((t) => t.name === 'media_probe'), '只读模式应保留 media_probe');
+        const call = await ro.request('tools/call', { name: 'image_obfuscate', arguments: {} });
+        assert.equal(call.isError, true);
+        assert.match(call.content[0].text, /只读模式/);
+      } finally {
+        ro.close();
+      }
     });
   } finally {
     client.close();

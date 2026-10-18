@@ -7,7 +7,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { spawn } from 'node:child_process';
 import { pathToFileURL } from 'node:url';
-import { portableRoot } from './paths.mjs';
+import { portableRoot, assertFile } from './paths.mjs';
 
 function findLibreOffice() {
   const addon = path.join(portableRoot(), 'addons', 'libreoffice');
@@ -76,7 +76,9 @@ export function libreofficeStatus() {
 export async function convertWithLibreOffice({ inputPath, target, mode = 'layout' }) {
   const soffice = findLibreOffice();
   if (!soffice) return { ok: false, message: '未检测到 LibreOffice（把 addons/libreoffice 放回软件目录）' };
-  if (!fs.existsSync(inputPath)) return { ok: false, message: '找不到输入文件' };
+  let inputAbs;
+  try { inputAbs = assertFile(inputPath, '输入文档'); }
+  catch (err) { return { ok: false, message: err.message }; }
   const t = ['pdf', 'docx', 'xlsx', 'pptx'].includes(target) ? target : 'pdf';
 
   const workDir = path.join(os.tmpdir(), `tomato-mcp-lo-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`);
@@ -85,12 +87,12 @@ export async function convertWithLibreOffice({ inputPath, target, mode = 'layout
   await fsp.mkdir(profileDir, { recursive: true });
 
   const runSoffice = shortPathFor(soffice);
-  const sizeMb = await fsp.stat(inputPath).then((s) => s.size / (1024 * 1024)).catch(() => 0);
+  const sizeMb = await fsp.stat(inputAbs).then((s) => s.size / (1024 * 1024)).catch(() => 0);
   const timeoutMs = Math.min(30 * 60 * 1000, Math.max(5 * 60 * 1000, Math.round(sizeMb * 60 * 1000)));
 
   const args = ['--headless', '--norestore', '--invisible', `-env:UserInstallation=${pathToFileURL(profileDir).href}`];
-  if (t === 'docx' && /\.pdf$/i.test(inputPath)) args.push('--infilter=writer_pdf_import');
-  args.push('--convert-to', t, '--outdir', workDir, inputPath);
+  if (t === 'docx' && /\.pdf$/i.test(inputAbs)) args.push('--infilter=writer_pdf_import');
+  args.push('--convert-to', t, '--outdir', workDir, inputAbs);
 
   const t0 = Date.now();
   const res = await new Promise((resolve) => {

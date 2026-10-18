@@ -29,12 +29,12 @@ const SERVER = path.join(RELEASE, 'resources', 'app', 'mcp', 'server.mjs');
 const USERDATA = path.join(os.tmpdir(), `tomato-pack-mcp-${process.pid}`);
 
 class Client {
-  constructor() {
+  constructor(extraEnv = {}) {
     this.child = spawn(process.execPath, [SERVER], {
       cwd: path.join(RELEASE, 'resources', 'app'),
       stdio: ['pipe', 'pipe', 'pipe'],
       windowsHide: true,
-      env: { ...process.env, TOMATO_USERDATA_DIR: USERDATA }
+      env: { ...process.env, TOMATO_USERDATA_DIR: USERDATA, ...extraEnv }
     });
     this.buf = '';
     this.nextId = 1;
@@ -147,6 +147,19 @@ async function main() {
         output: path.join(root, 'enc.png')
       });
       assert.ok(fs.existsSync(enc.output));
+    });
+
+    await test('路径白名单 + 审计日志：产物内也生效', async () => {
+      await assert.rejects(
+        () => client.call('image_obfuscate', {
+          input: path.join('C:\\Windows', 'win.ini'), mode: 'b', direction: 'encrypt', key: 'x'
+        }),
+        /不在允许范围/
+      );
+      const audit = path.join(USERDATA, 'mcp-audit.jsonl');
+      assert.ok(fs.existsSync(audit), '产物内没有生成 mcp-audit.jsonl');
+      const lines = fs.readFileSync(audit, 'utf8').trim().split(/\r?\n/).filter(Boolean).map((l) => JSON.parse(l));
+      assert.ok(lines.some((l) => l.tool === 'image_obfuscate' && l.ok === true));
     });
 
     await test('archive_create/list：产物内 addons/7zip 路径正确', async () => {

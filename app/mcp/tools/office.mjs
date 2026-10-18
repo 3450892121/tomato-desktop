@@ -5,7 +5,7 @@ import fsp from 'node:fs/promises';
 import path from 'node:path';
 import { planOne, TARGETS } from '../../src/tools/doc-convert/core/plan.mjs';
 import { convertWithLibreOffice, libreofficeStatus } from '../lib/libreoffice-runner.mjs';
-import { assertFile, resolveOutputPath, uniqueTargetPath } from '../lib/paths.mjs';
+import { assertFile, assertDir, resolveOutputPath, uniqueTargetPath } from '../lib/paths.mjs';
 
 export const statusTool = {
   name: 'libreoffice_status',
@@ -33,7 +33,7 @@ export const docConvertTool = {
   },
   async handler(args = {}) {
     if (!libreofficeStatus().found) throw new Error('未检测到 LibreOffice（把 addons/libreoffice 放回软件目录）');
-    const outDir = path.resolve(args.output_dir);
+    const outDir = assertDir(args.output_dir, '输出目录');
     await fsp.mkdir(outDir, { recursive: true });
     const outputs = [];
     for (const raw of Array.isArray(args.inputs) ? args.inputs : []) {

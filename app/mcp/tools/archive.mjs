@@ -124,12 +124,15 @@ export const extractTool = {
       archives: { type: 'array', items: { type: 'string' }, minItems: 1, description: '压缩包路径列表' },
       output_dir: { type: 'string', description: '解压输出目录' },
       password: { type: 'string', description: '可选：压缩包密码' },
-      overwrite: { type: 'string', enum: ['skip', 'replace'], description: '同名文件策略，默认 skip' },
+      overwrite: { type: 'string', enum: ['skip'], description: 'MCP 侧固定不覆盖；保留字段只为兼容，传 replace 会被拒绝' },
       tree: { type: 'string', enum: ['keep', 'flatten'], description: '目录结构，默认 keep' }
     },
     additionalProperties: false
   },
   async handler(args = {}) {
+    if (args.overwrite && args.overwrite !== 'skip') {
+      throw new Error('MCP 侧不允许覆盖已有文件；需要覆盖请在软件界面里操作');
+    }
     const status = await engineStatus();
     const outputDir = assertDir(args.output_dir, '输出目录');
     const archives = (Array.isArray(args.archives) ? args.archives : []).map((p) => {
@@ -140,7 +143,7 @@ export const extractTool = {
       archives,
       outputDir,
       password: String(args.password || ''),
-      overwrite: args.overwrite === 'replace' ? 'replace' : 'skip',
+      overwrite: 'skip',
       tree: args.tree === 'flatten' ? 'flatten' : 'keep'
     });
     if (!plan.ok) throw new Error(plan.message || '解压参数不合法');

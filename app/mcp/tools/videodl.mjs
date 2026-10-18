@@ -9,14 +9,8 @@
 // 本工具只读授权文件；拿不到就返回 NEEDS_APPROVAL，不产生任何下载。
 import fs from 'node:fs';
 import path from 'node:path';
-import { appRoot, portableRoot } from '../lib/paths.mjs';
+import { appRoot, portableRoot, assertDir, userdataDir } from '../lib/paths.mjs';
 import { checkApproval } from '../../src/tools/videodl/core/agent-approval.mjs';
-
-function userdataDir() {
-  const override = process.env.TOMATO_USERDATA_DIR;
-  if (override) return path.resolve(override);
-  return path.join(portableRoot(), 'userdata');
-}
 
 function findFfmpeg() {
   const addon = path.join(portableRoot(), 'addons', 'ffmpeg', 'ffmpeg.exe');
@@ -63,7 +57,7 @@ export const downloadTool = {
   },
   async handler(args = {}) {
     const url = String(args.url || '').trim();
-    const outputDir = String(args.output_dir || '').trim();
+    const outputDir = assertDir(args.output_dir, '保存目录');
     if (!url) throw new Error('缺少 url');
     if (!outputDir || !path.isAbsolute(outputDir)) throw new Error('output_dir 必须是绝对路径');
 

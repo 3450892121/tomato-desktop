@@ -2,6 +2,11 @@
 
 > 41 个工具，覆盖 21 个 GUI 工具。所有工具都通过本地 MCP server 执行。
 > 返回统一带 `ok`；成功通常有 `output` / `outputs` / `path`，失败是 `isError` 或 `{ ok:false, message }`。
+>
+> 安全相关环境变量：
+> - `TOMATO_MCP_ALLOWED_ROOTS`：路径白名单（默认用户目录/临时目录/软件目录；分号分隔）。
+> - `TOMATO_MCP_READONLY=1`：只读模式，只暴露查询/状态类工具。
+> - `TOMATO_USERDATA_DIR`：userdata 位置（审计日志 `mcp-audit.jsonl` 与视频下载授权都在这）。
 
 ## 图片
 
@@ -158,7 +163,8 @@
 
 ### file_rename_batch
 - 必填：`items`（路径数组或 `{path,mtimeMs}`）、`rule`
-- 可选：`sort`（none|time-asc|time-desc）、`conflict`（skip|overwrite|auto）、`dry_run`（默认 true）
+- 可选：`sort`（none|time-asc|time-desc）、`conflict`（skip|auto）、`dry_run`（默认 true）
+- 说明：MCP 侧不允许 `conflict:"overwrite"`；需要覆盖请让用户去软件界面。
 - rule：`{mode:"seq",prefix,start,digits,keepName}` / `{mode:"replace",find,replace,useRegex}` / `{mode:"affix",prefix,suffix}` / `{mode:"date",pattern}`
 
 ### archive_create
@@ -167,7 +173,8 @@
 
 ### archive_extract
 - 必填：`archives`、`output_dir`
-- 可选：`password`、`overwrite`（skip|replace）、`tree`（keep|flatten）
+- 可选：`password`、`overwrite`（只允许 skip）、`tree`（keep|flatten）
+- 说明：MCP 侧不允许 `overwrite:"replace"`；需要覆盖请让用户去软件界面。
 
 ### archive_list
 - 必填：`archive`

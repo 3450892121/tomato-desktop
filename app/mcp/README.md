@@ -95,17 +95,31 @@ stdio 传输：客户端把 MCP server 当子进程启动，通过 stdin/stdout 
 
 这是**服务端强制**，不是「agent 在聊天里问一句」。
 
-## 安全约定
+## 安全约定（强制 vs 约定）
 
-- 所有产物重名自动加序号，绝不覆盖已有文件（`uniqueTargetPath`）。
+### 服务端强制
+- **路径白名单**：读写默认只允许「用户目录 / 系统临时目录 / 软件目录」。需要别的盘/目录，设 `TOMATO_MCP_ALLOWED_ROOTS`（分号分隔）。
+- **不覆盖**：产物重名自动加序号（`uniqueTargetPath`）；`archive_extract` 拒绝 `overwrite:"replace"`，`file_rename_batch` 拒绝 `conflict:"overwrite"`。
+- **不删文件**：没有删除工具。
+- **只读模式**：`TOMATO_MCP_READONLY=1` 时只暴露 `media_probe` / `archive_list` / `pdf_page_count` / `ocr_recognize` / status 等只读工具。
+- **审计日志**：每次调用写 `userdata/mcp-audit.jsonl`；password/secret/token 字段脱敏。
+- **视频下载授权**：只有 GUI 能写授权文件，MCP 只读；无授权返回 `NEEDS_APPROVAL`。
+
+### 不是强制（使用前要知道）
+- **大多数工具是调用即执行**，没有人工确认弹窗；只有视频下载有闸门。
+- **密码会进入客户端上下文**；审计日志脱敏不等于客户端看不到。
+- **审计是事后记录**，不能阻止一次错误调用。
+- **不是沙箱**：MCP 进程以当前用户权限运行，白名单只挡明显越界路径。
+
+### 其它
 - 不向 agent 暴露原始 `ffmpeg` / `7z` 参数，只接受高层参数，避免命令注入。
 - 批量重命名默认只预览；`dry_run=false` 才落盘。
-- 密码类参数不写日志。
-- 第一批只支持 PNG/JPG/WebP 图片；HEIC/AVIF/TIFF 等留给后续「图片格式转换」批次。
+- 不需要常驻后台：stdio 子进程，客户端关闭即退出；不监听端口、不装服务。
 
 ## 当前状态
 
 - 第一~四批全部接入：共 41 个 MCP 工具，覆盖 21 个 GUI 工具（视频播放器、软件卸载按需求不暴露）。
-- MCP 冒烟测试：18 项，含真实 ffmpeg / OCR / ASR / LibreOffice / pdfjs 渲染 / Canvas 像素管线 / 授权后真实下载。
+- MCP 冒烟测试：**21 项**，含真实 ffmpeg / OCR / ASR / LibreOffice / pdfjs 渲染 / Canvas 像素管线 / 授权后真实下载 / 路径白名单 / 审计日志 / 只读模式。
 - 现有 `npm test` 保持全绿。
-- **打包产物已实测**：`node tests/pack-mcp-smoke.mjs` 8/8（产物内 41 个工具、addons 路径、pdfjs legacy、@napi-rs/canvas、heic-decode、OCR 全部可用）。
+- **打包产物已实测**：`node tests/pack-mcp-smoke.mjs` 9/9（产物内 41 个工具、addons 路径、pdfjs legacy、@napi-rs/canvas、heic-decode、OCR 全部可用）。
+

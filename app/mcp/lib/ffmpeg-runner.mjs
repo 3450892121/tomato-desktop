@@ -10,7 +10,7 @@ import path from 'node:path';
 import os from 'node:os';
 import { spawn } from 'node:child_process';
 import { StringDecoder } from 'node:string_decoder';
-import { portableRoot, uniqueTargetPath } from './paths.mjs';
+import { portableRoot, uniqueTargetPath, assertAllowed } from './paths.mjs';
 
 function candidates() {
   const out = [path.join(portableRoot(), 'addons', 'ffmpeg', 'ffmpeg.exe')];
@@ -159,7 +159,7 @@ export async function convertFile({
   durationMs = 0, timeoutMs, onProgress
 }) {
   if (!fs.existsSync(inputPath)) return { ok: false, message: '找不到输入文件' };
-  const dir = outputDir || path.dirname(inputPath);
+  const dir = assertAllowed(outputDir || path.dirname(inputPath), '输出目录');
   await fsp.mkdir(dir, { recursive: true });
   const base = baseName || path.basename(inputPath, path.extname(inputPath));
   const target = uniqueTargetPath(dir, base, ext);
@@ -184,7 +184,7 @@ export async function convertTwoPass({
   durationMs = 0, timeoutMs, onProgress
 }) {
   if (!fs.existsSync(inputPath)) return { ok: false, message: '找不到输入文件' };
-  const dir = outputDir || path.dirname(inputPath);
+  const dir = assertAllowed(outputDir || path.dirname(inputPath), '输出目录');
   await fsp.mkdir(dir, { recursive: true });
   const base = baseName || path.basename(inputPath, path.extname(inputPath));
   const target = uniqueTargetPath(dir, base, ext);
@@ -226,7 +226,7 @@ export async function convertMulti({
   const inputs = (Array.isArray(inputPaths) ? inputPaths : []).filter(Boolean);
   if (inputs.length < 2) return { ok: false, message: '拼接至少需要 2 个文件' };
   for (const p of inputs) if (!fs.existsSync(p)) return { ok: false, message: `找不到输入文件：${p}` };
-  const dir = outputDir || path.dirname(inputs[0]);
+  const dir = assertAllowed(outputDir || path.dirname(inputs[0]), '输出目录');
   await fsp.mkdir(dir, { recursive: true });
   const target = uniqueTargetPath(dir, baseName, ext);
   const inputArgs = [];

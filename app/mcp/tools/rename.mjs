@@ -3,15 +3,16 @@
 // 默认 dry_run=true：先给预览，agent 确认后再真正改名。
 import fsp from 'node:fs/promises';
 import path from 'node:path';
-import { buildRenamePlan, sortItems, RENAME_MODES, SORT_MODES, CONFLICT_MODES } from '../../src/tools/batch-rename/core/plan.js';
+import { buildRenamePlan, sortItems, RENAME_MODES, SORT_MODES } from '../../src/tools/batch-rename/core/plan.js';
 import { applyRenamePlan } from '../../src/shared/rename-apply.mjs';
+import { assertAllowed } from '../lib/paths.mjs';
 
 async function normalizeItems(raw) {
   const out = [];
   for (const item of Array.isArray(raw) ? raw : []) {
     const p = typeof item === 'string' ? item : (item && item.path);
     if (!p) continue;
-    const abs = path.resolve(String(p));
+    const abs = assertAllowed(p, '重命名文件');
     let mtimeMs = item && Number(item.mtimeMs);
     if (!Number.isFinite(mtimeMs) || mtimeMs <= 0) {
       try { mtimeMs = (await fsp.stat(abs)).mtimeMs; } catch { mtimeMs = 0; }
@@ -79,22 +80,26 @@ export default {
         additionalProperties: false
       },
       sort: { type: 'string', enum: SORT_MODES.map((m) => m.value), description: '排序方式，默认 none' },
-      conflict: { type: 'string', enum: CONFLICT_MODES.map((m) => m.value), description: '冲突策略，默认 skip' },
+      conflict: { type: 'string', enum: ['skip', 'auto'], description: '冲突策略：跳过或自动编号；MCP 侧不允许覆盖' },
       dry_run: { type: 'boolean', description: '默认 true；false 才真正改名' }
     },
     additionalProperties: false
   },
 
   async handler(args = {}) {
+    if (args.conflict === 'overwrite') {
+      throw new Error('MCP 侧不允许覆盖已有文件；需要覆盖请在软件界面里操作');
+    }
     const items = await normalizeItems(args.items);
     if (items.length === 0) throw new Error('items 不能为空');
     const sorted = sortItems(items, args.sort || 'none');
     const existing = await collectExisting(sorted);
+    const conflict = args.conflict === 'auto' ? 'auto' : 'skip';
     const plan = buildRenamePlan({
       items: sorted,
       rule: args.rule || {},
       existingPaths: existing,
-      conflictMode: args.conflict || 'skip'
+      conflictMode: conflict
     });
 
     const dryRun = args.dry_run !== false;

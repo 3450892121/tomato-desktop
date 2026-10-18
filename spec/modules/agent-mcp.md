@@ -33,16 +33,29 @@ Agent ──MCP(stdio)────┘
 - 软件退出时清空 session 授权（不跨重启）。
 - agent 不能通过任何 MCP 工具修改该文件。
 
-## 安全约定
-- 所有产物走 `uniqueTargetPath`：重名加序号，绝不覆盖。
+## 安全约定（强制 vs 约定）
+### 服务端强制
+- **路径白名单**：读写默认只允许「用户目录 / 系统临时目录 / 软件目录」；其它目录需 `TOMATO_MCP_ALLOWED_ROOTS` 显式放行。白名单外的输入/输出直接拒绝。
+- **不覆盖**：所有产物走 `uniqueTargetPath`；`archive_extract` 拒绝 `overwrite:"replace"`，`file_rename_batch` 拒绝 `conflict:"overwrite"`。
+- **不删文件**：MCP 不提供删除工具。
+- **只读模式**：`TOMATO_MCP_READONLY=1` 时只暴露只读工具（media_probe / archive_list / pdf_page_count / ocr_recognize / status 类），写工具既不列出也拒绝。
+- **审计日志**：每次 `tools/call` 写 `userdata/mcp-audit.jsonl`；password/secret/token 字段脱敏；记录客户端 clientInfo。
+- **视频下载授权**：只有 GUI 能写授权文件，MCP 只读；无授权返回 `NEEDS_APPROVAL`。
+
+### 不是强制（必须在文档/技能里说清）
+- 大多数工具是**调用即执行**，没有人工确认弹窗；只有视频下载有闸门。
+- 密码会进入客户端上下文；审计脱敏不等于客户端看不到。
+- 审计是事后记录，不能阻止一次错误调用。
+- **不是沙箱**：MCP 以当前用户权限运行；白名单只挡明显越界路径。
+
+### 其它
 - 不向 agent 暴露原始 `ffmpeg` / `7z` 参数，只接受高层参数。
 - 批量重命名默认 `dry_run=true`；`false` 才落盘。
-- 密码类参数不写日志。
-- 路径必须是调用方显式给出的绝对路径；不做隐式系统目录写入。
+- 不需要常驻后台：stdio 子进程，客户端关闭即退出；不监听端口、不装服务。
 
 ## 验收
-- `node tests/mcp.test.mjs`：18 项，含真实 ffmpeg / OCR / ASR / LibreOffice / pdfjs 渲染 / Canvas 像素管线 / 授权后真实下载。
-- `node tests/pack-mcp-smoke.mjs`：8 项，在打包产物上验证 41 个工具、addons 路径、pdfjs legacy、@napi-rs/canvas、heic-decode、OCR。
+- `node tests/mcp.test.mjs`：**21 项**，含真实 ffmpeg / OCR / ASR / LibreOffice / pdfjs 渲染 / Canvas 像素管线 / 授权后真实下载 / 路径白名单 / 审计日志 / 只读模式 / 禁止覆盖。
+- `node tests/pack-mcp-smoke.mjs`：9 项，在打包产物上验证 41 个工具、addons 路径、pdfjs legacy、@napi-rs/canvas、heic-decode、OCR、路径白名单与审计日志。
 - `npm test`：现有纯逻辑测试 + MCP 测试全绿。
 - `--smoke-test`：GUI 23 个工具仍正常。
 
@@ -50,3 +63,4 @@ Agent ──MCP(stdio)────┘
 - 不做远程 MCP、不做云端 OCR/ASR、不做账号体系。
 - 不把播放器/卸载做成 agent 工具。
 - 不承诺与 GUI 的每个像素细节完全一致（Canvas 管线已按同一套 core 规则重实现，测试以产物可读/尺寸/格式/逐字节为主）。
+

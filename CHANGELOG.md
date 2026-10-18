@@ -2,6 +2,19 @@
 
 本项目遵循语义化版本（x.y.z）：修 bug → z+1；加功能 → y+1；重要改动 → x+1。
 
+## v2.14.1（2026-10-18）安全加固：MCP 路径白名单 / 审计日志 / 只读模式 / 禁止覆盖
+
+> 起因：用户追问「怎么保证安全、怎么防 AI 犯蠢、技能是否符合实际、调用是否静默」。审计后确认：v2.14.0 的 MCP 只有视频下载有人工闸门，路径没有白名单、没有审计日志、大多数工具调用即执行；Skill 里「不碰系统目录」「密码不进日志」等表述属于约定而非服务端强制。本版把这些补成强制能力，并把文档改成「强制 / 约定」分开写。
+
+- **路径白名单**：`app/mcp/lib/paths.mjs` 的 `assertAllowed` 统一校验所有读写路径；默认只允许「用户目录 / 系统临时目录 / 软件目录」；其它目录需 `TOMATO_MCP_ALLOWED_ROOTS` 显式放行（分号分隔）。`assertFile` / `assertDir` / `resolveOutputPath` / ffmpeg / LibreOffice / 重命名 / 视频下载输出目录都走这一层。
+- **审计日志**：`server.mjs` 每次 `tools/call` 追加 `userdata/mcp-audit.jsonl`（时间、工具、参数、耗时、结果、客户端 clientInfo）；`password/secret/token` 字段递归脱敏；写失败只打 stderr，不影响工具。
+- **只读模式**：`TOMATO_MCP_READONLY=1` 时 `tools/list` 只列只读工具（media_probe / archive_list / pdf_page_count / ocr_recognize / status 类），写工具既不列出也拒绝调用。
+- **禁止覆盖**：`archive_extract` 拒绝 `overwrite:"replace"`；`file_rename_batch` 拒绝 `conflict:"overwrite"`；要覆盖请用 GUI。视频下载原本就 `--no-overwrites` + `wx`。
+- **明确静默边界**：大多数工具没有人工确认弹窗，只有视频下载有授权闸门；审计是事后记录，不是沙箱。该结论同时写进 Skill 与 Agent 接入说明。
+- **Skill 修正**：`skills/tomato-toolbox/SKILL.md` 新增「服务端强制 / 不是强制」两栏；修正「不碰系统目录」「密码不进日志」「所有产物不覆盖」等过度表述；补充 `TOMATO_MCP_ALLOWED_ROOTS` / `TOMATO_MCP_READONLY` / 审计日志说明。
+- **测试**：`tests/mcp.test.mjs` 18→**21 项**（新增路径白名单拒绝、审计日志与密码脱敏、只读模式、禁止覆盖）；`npm test` 全绿；`tests/pack-mcp-smoke.mjs` 9 项；开发树与产物全量自检 29/29。
+- 文档：`docs/Agent接入说明.md` 新增「需要常驻后台吗」「服务端强制 / 不是强制」；`app/mcp/README.md`、`spec/modules/agent-mcp.md`、`spec/acceptance.md` A44 同步。
+
 ## v2.14.0（2026-10-18）新增 Agent 入口（本地 MCP server）+ 视频下载授权闸门 + Skill 包
 
 > 目标：同一套软件，人点 GUI，agent 走 MCP；不复制业务逻辑，共用 core 与加装包。视频下载是唯一联网能力，必须由人授权。

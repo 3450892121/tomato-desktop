@@ -25,7 +25,7 @@ import { decodeImageFile } from '../lib/image-node.mjs';
 import {
   pixelsToCanvas, canvasToPixels, canvasToBuffer, loadCanvas, resizePixels, blurPixels
 } from '../lib/canvas-ops.mjs';
-import { portableRoot, assertFile, resolveOutputPath, uniqueTargetPath } from '../lib/paths.mjs';
+import { portableRoot, assertFile, assertDir, resolveOutputPath, uniqueTargetPath } from '../lib/paths.mjs';
 import { convertFile } from '../lib/ffmpeg-runner.mjs';
 
 const QUALITIES = ['high', 'standard', 'small'];
@@ -195,7 +195,7 @@ export const sliceTool = {
     const realPlan = computeCells({ width: src.width, height: src.height, rows, cols, gap, margin });
     if (realPlan.cells.length === 0) throw new Error(realPlan.warnings[0] || '图片太小，无法切分');
 
-    const outDir = path.resolve(args.output_dir || path.dirname(input));
+    const outDir = assertDir(args.output_dir || path.dirname(input), '输出目录');
     await fsp.mkdir(outDir, { recursive: true });
     const base = args.base_name || path.basename(input, path.extname(input));
     const names = namingForCells({ baseName: base, rows, cols, order: args.order === 'column' ? 'column' : 'row' });
@@ -421,6 +421,7 @@ function findRealesrgan() {
 async function runAiUpscale({ input, scale, model, outputDir }) {
   const bin = findRealesrgan();
   if (!bin) throw new Error('未检测到 AI 放大加装包（把 addons/realesrgan 放回软件目录）');
+  const outDir = outputDir ? assertDir(outputDir, '输出目录') : path.dirname(input);
   const work = await fsp.mkdtemp(path.join(os.tmpdir(), 'tomato-mcp-ai-'));
   const outPath = path.join(work, 'out.png');
   try {
@@ -447,7 +448,7 @@ async function runAiUpscale({ input, scale, model, outputDir }) {
     }
     const img = await loadImage(await fsp.readFile(outPath));
     const base = path.basename(String(input), path.extname(String(input)));
-    const target = uniqueTargetPath(outputDir || path.dirname(String(input)), `${base}_AI放大${scale}x`, '.png');
+    const target = uniqueTargetPath(outDir, `${base}_AI放大${scale}x`, '.png');
     const bytes = await fsp.readFile(outPath);
     await fsp.writeFile(target, bytes);
     return { ok: true, output: target, width: img.width, height: img.height, scale, model, ms: Date.now() - t0 };
@@ -480,7 +481,7 @@ export const enhanceTool = {
     if (preset.ai) {
       const res = await runAiUpscale({
         input, scale: preset.ai.scale, model: preset.ai.model,
-        outputDir: args.output_dir ? path.resolve(args.output_dir) : undefined
+        outputDir: args.output_dir ? assertDir(args.output_dir, '输出目录') : undefined
       });
       return { ...res, preset: preset.id };
     }
@@ -612,7 +613,7 @@ export const aiUpscaleTool = {
       input,
       scale: [2, 3, 4].includes(Number(args.scale)) ? Number(args.scale) : 4,
       model: typeof args.model === 'string' && args.model ? args.model : 'realesrgan-x4plus',
-      outputDir: args.output_dir ? path.resolve(args.output_dir) : undefined
+      outputDir: args.output_dir ? assertDir(args.output_dir, '输出目录') : undefined
     });
   }
 };
