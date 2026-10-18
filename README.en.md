@@ -21,14 +21,14 @@
 | Version | **v2.15.0** |
 | OS | Windows 10 / 11, 64-bit |
 | Install | **Portable**: unzip and run; delete the folder to uninstall |
-| Size | ~820 MB zip, ~1.6 GB extracted |
+| Size | ~810 MB zip, ~1.6 GB extracted |
 | Network | Only Video Download needs it; everything else works offline |
 | License | MIT (see [`LICENSE`](LICENSE)); third-party notices in [`THIRD-PARTY-NOTICES.md`](THIRD-PARTY-NOTICES.md) |
 
 ## 1. Download and run
 
 1. Open [Releases](https://github.com/3450892121/tomato-desktop/releases/latest) and download
-   `tomato-desktop-v2.15.0-win64.zip` (~820 MB).
+   `tomato-desktop-v2.15.0-win64.zip` (~810 MB).
    Direct link: <https://github.com/3450892121/tomato-desktop/releases/download/v2.15.0/tomato-desktop-v2.15.0-win64.zip>
 2. Extract it anywhere — Desktop, Documents, or a USB drive; non-ASCII paths are fine.
 3. Double-click `番茄图片混淆桌面版.exe`.
@@ -192,3 +192,4 @@ Results land in `%TEMP%\tomato-*.json`; check `pass:true` / `ok:true`. See [Buil
 - Third-party components and ported sources (leetools, SheetJS, pdf.js, ffmpeg, LibreOffice, 7-Zip, yt-dlp, etc.): see [`THIRD-PARTY-NOTICES.md`](THIRD-PARTY-NOTICES.md).
 - The obfuscation modes and file-in-image container are independently implemented; no third-party app code, assets, or installers are included.
 - Do not use this software to infringe others' rights or circumvent lawful technical measures. Provided "as is", without warranty.
+

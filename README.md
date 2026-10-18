@@ -21,14 +21,14 @@
 | 版本 | **v2.15.0** |
 | 系统 | Windows 10 / 11，64 位 |
 | 安装 | **免安装**：解压就能用，删掉文件夹就是卸载 |
-| 体积 | 压缩包约 820 MB，解压后约 1.6 GB |
+| 体积 | 压缩包约 810 MB，解压后约 1.6 GB |
 | 联网 | 只有「视频下载」需要联网，其余断网可用 |
 | 许可 | MIT（见 [`LICENSE`](LICENSE)），第三方声明见 [`THIRD-PARTY-NOTICES.md`](THIRD-PARTY-NOTICES.md) |
 
 ## 一、下载和打开
 
 1. 打开 [Releases](https://github.com/3450892121/tomato-desktop/releases/latest)，下载
-   `tomato-desktop-v2.15.0-win64.zip`（约 820 MB）。
+   `tomato-desktop-v2.15.0-win64.zip`（约 810 MB）。
    直链：<https://github.com/3450892121/tomato-desktop/releases/download/v2.15.0/tomato-desktop-v2.15.0-win64.zip>
 2. 解压到任意文件夹——桌面、文档、U 盘都行，路径里有中文也没关系。
 3. 双击 `番茄图片混淆桌面版.exe`。
@@ -192,3 +192,4 @@ npm test
 - 第三方组件与移植来源（leetools、SheetJS、pdf.js、ffmpeg、LibreOffice、7-Zip、yt-dlp 等）及分发义务：见 [`THIRD-PARTY-NOTICES.md`](THIRD-PARTY-NOTICES.md)。
 - 图片混淆模式与图夹容器的互通实现为独立编写，不含第三方应用的代码、资源或安装包。
 - 请勿用本软件侵犯他人权益或规避合法的技术措施。软件按「原样」提供，不含任何担保。
+
