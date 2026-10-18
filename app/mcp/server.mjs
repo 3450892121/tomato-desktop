@@ -11,7 +11,7 @@ import readline from 'node:readline';
 import { tools, findTool, publicToolList } from './tools/index.mjs';
 import { jsonResult, errorResult } from './lib/result.mjs';
 
-const SERVER_INFO = { name: 'tomato-toolbox', version: '2.13.0' };
+const SERVER_INFO = { name: 'tomato-toolbox', version: '2.14.0' };
 const SUPPORTED_PROTOCOLS = ['2024-11-05', '2025-03-26', '2025-06-18'];
 
 function send(message) {

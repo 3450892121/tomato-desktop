@@ -1,6 +1,6 @@
 # agent-mcp — Agent 入口（MCP server）
 
-> 状态：已实现（v2.13.0 起的增量能力）。本文是目标规格与边界，实现见 `app/mcp/`。
+> 状态：已实现（v2.14.0 起的增量能力）。本文是目标规格与边界，实现见 `app/mcp/`。
 
 ## 目标
 让同一个软件既给人用（GUI），也给 agent 用（MCP）：
@@ -13,6 +13,7 @@
   - 播放器是看画面的交互；「准备可播放副本」已由视频转换覆盖；
   - 卸载是破坏性操作 + UAC，必须由人操作。
 - 传输：stdio（一行一条 JSON-RPC 2.0）。不做远程 HTTP、不做多用户/鉴权。
+- 配套 Skill：`skills/tomato-toolbox/`（`SKILL.md` + `references/tools.md`），教 agent 何时用、按什么顺序用、什么不能做、做完怎么验证；执行仍走 MCP 工具。打包版随包在 `<软件目录>/skills/tomato-toolbox/`。
 
 ## 架构
 ```

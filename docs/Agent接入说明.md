@@ -60,6 +60,21 @@ node app/mcp/server.mjs
 - `TOMATO_USERDATA_DIR` 指向软件目录的 `userdata`（打包态是 exe 同目录的 `userdata`）。
   它用于让 MCP 读到 GUI 写的「视频下载授权」文件。
 
+### 配套 Skill（可选但推荐）
+
+仓库里带了一个 Skill 包：`skills/tomato-toolbox/`
+
+- `SKILL.md`：铁律、41 个工具地图、8 个常用配方、故障排查；
+- `references/tools.md`：每个工具的完整参数。
+
+它教 agent「什么时候用、按什么顺序用、什么不能做、做完怎么验证」，执行仍然走 MCP 工具。
+
+**DSH**：已经把 `skills/tomato-toolbox/` 复制到 `~/.dsh/skills/tomato-toolbox/`。DSH 刷新技能目录/重启后，在技能列表里能看到 `tomato-toolbox`。
+
+**打包版**：`<软件目录>/skills/tomato-toolbox/` 里也带了一份；`<软件目录>/Agent接入说明.md` 就是本文。
+
+**其它客户端**：把 `skills/tomato-toolbox/` 整个文件夹放到该客户端的 skills 目录；没有 skills 机制的客户端可以忽略——只配 MCP 也能用，只是少了一层流程指导。
+
 ---
 
 ## 三、视频下载的授权

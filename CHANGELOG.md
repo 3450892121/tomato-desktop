@@ -2,6 +2,23 @@
 
 本项目遵循语义化版本（x.y.z）：修 bug → z+1；加功能 → y+1；重要改动 → x+1。
 
+## v2.14.0（2026-10-18）新增 Agent 入口（本地 MCP server）+ 视频下载授权闸门 + Skill 包
+
+> 目标：同一套软件，人点 GUI，agent 走 MCP；不复制业务逻辑，共用 core 与加装包。视频下载是唯一联网能力，必须由人授权。
+
+- **本地 MCP server**（`app/mcp/`，stdio JSON-RPC）：`initialize` / `tools/list` / `tools/call`；独立 Node 进程，不需要开窗口。**41 个 MCP 工具覆盖 21 个 GUI 工具**；按需求**不暴露**视频播放器与软件卸载（播放器的「准备可播放副本」已由视频转换覆盖）。
+- **四批能力**：
+  - 第一批（纯 Node）：混淆、文件藏图、压缩/解压、PDF 组装、批量重命名；
+  - 第二批：ffmpeg 媒体（探测/视频转换/视频压缩/动图互转/音频转换/音频剪辑）、OCR、ASR、PDF 编辑；
+  - 第三批：Canvas 类（图片压缩/变清晰/格式转换/水印/拼接/切图）——Node 版 `@napi-rs/canvas` 像素管线；
+  - 第四批：PDF→图片/压缩、Office→PDF、PDF→Word、文档格式转换、可搜索 PDF / OCR→Word、AI 放大。
+- **视频下载授权闸门**：默认每次询问；软件「视频下载」页可开「允许 AI 助手直接下载（本次运行有效）」或点「允许一次」。授权文件 `userdata/videodl-agent-approvals.json` **只由 GUI 写、MCP 只读**；无授权时 `video_download` 返回 `NEEDS_APPROVAL`，零下载；软件退出清空 session 授权。
+- **打包态路径修正**：新增 `portableRoot()` 区分开发态 `app/addons` 与打包态 `<软件目录>/addons`；`pack.js` 把 `mcp/`、`pdfjs-dist/legacy/build` 一并带入产物（`@napi-rs/canvas`、`heic-decode`、OCR/ASR/LibreOffice/7-Zip 原本已随包）。
+- **Skill 包**：`skills/tomato-toolbox/SKILL.md` + `references/tools.md`（铁律、41 工具地图、8 个配方、故障排查）；已安装到 `~/.dsh/skills/tomato-toolbox/`，DSH 技能目录刷新后可用。
+- **测试**：`tests/mcp.test.mjs` 18 项（含真实 ffmpeg/OCR/ASR/LibreOffice/pdfjs/Canvas/授权后真实下载）；`tests/pack-mcp-smoke.mjs` 8 项（在 release 产物上验证 41 工具、addons 路径、pdfjs legacy、canvas、heic、OCR）；`--videodl-ui-test` 新增 4 项授权开关断言；`npm test` 全绿；`--smoke-test` 23 工具。
+- **文档**：新增 `spec/modules/agent-mcp.md`、`docs/Agent接入说明.md`、`app/mcp/README.md`、`skills/tomato-toolbox/*`；更新 `README.md` / `AGENTS.md` / `spec/00-overview.md` / `spec/acceptance.md`（A44）。
+- **已知限制**：MCP 不暴露播放器/卸载；真实的第三方 MCP 客户端兼容性未逐一实测；AI 放大仍需 Vulkan 显卡；PDF 解密在 MCP 侧用 pdf-lib（GUI 侧仍用 pdfjs 复验）。
+
 ## v2.13.0（2026-10-04）新增第 23 个工具「文档格式转换」：老文档转新格式（起因：教务系统的「假 .xls」）；图片/音视频老格式输入补齐
 
 > 起因：用户发来一份教务系统导出的 `.xls`（2019 年 WPS 保存），问「能不能把这种转成通用的格式，其他老格式也上网查一下——现在有些设备打不开」。实测该文件扩展名 `.xls` 但内容是 **Excel 2003 XML（SpreadsheetML）**——「假 .xls」，Excel 打开会弹格式警告、手机端按扩展名判断直接打不开。据此立项并调研了常见老格式清单。

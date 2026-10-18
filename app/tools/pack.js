@@ -295,6 +295,15 @@ const readmeSrc = path.join(repoRoot, 'docs', '使用说明.txt');
 if (fs.existsSync(readmeSrc)) {
   fs.copyFileSync(readmeSrc, path.join(outDir, '使用说明.txt'));
 }
+// Agent 接入说明 + Skill 包：让「给 AI 用」和软件一起交付
+const agentReadmeSrc = path.join(repoRoot, 'docs', 'Agent接入说明.md');
+if (fs.existsSync(agentReadmeSrc)) {
+  fs.copyFileSync(agentReadmeSrc, path.join(outDir, 'Agent接入说明.md'));
+}
+const skillSrc = path.join(repoRoot, 'skills', 'tomato-toolbox');
+if (fs.existsSync(skillSrc)) {
+  copyTree(skillSrc, path.join(outDir, 'skills', 'tomato-toolbox'));
+}
 fs.mkdirSync(path.join(outDir, 'userdata'), { recursive: true });
 
 // —— 5b) 可选加装包（LibreOffice）：存在就一起打包，保证「解压即用全部功能」 ——

@@ -295,3 +295,11 @@
 - **缺包降级**：隐藏 `addons/ytdlp` 且无更新版引擎时，工具给出放置说明与「检查更新」，软件不崩、其余工具不受影响。
 - **网络判定**：无网络环境下，联网用例如实记 `skipped` 且整体 `verified:false`（**不得当通过**）；交付前必须在有网环境跑到 `verified:true`。
 - 证据：`--videodl-test`（`%TEMP%\tomato-videodl-test.json`）+ `--videodl-ui-test`（`%TEMP%\tomato-videodl-ui-test.json`）+ 截图 `shot-videodl-*.png` + 上游 MIT 许可文本随代码在位的清单。
+
+## A44 Agent 入口（MCP，v2.14.0）
+- **本地 stdio MCP**：`app/mcp/server.mjs` 能完成 `initialize` / `tools/list` / `tools/call`；41 个工具注册，覆盖 21 个 GUI 工具；**不暴露**视频播放器与软件卸载。
+- **四批能力**：纯 Node（混淆/藏图/压缩/PDF 组装/重命名）、媒体与本地 AI（ffmpeg/OCR/ASR/PDF 编辑）、Canvas 类（压缩/增强/转换/水印/拼接/切图）、文档与下载（PDF→图片/压缩、Office→PDF、PDF→Word、doc_convert、可搜索 PDF、AI 放大）。
+- **视频下载授权**：默认每次询问；无授权时 `video_download` 返回 `NEEDS_APPROVAL` 且零下载；GUI 开「本次运行有效」或「允许一次」后，MCP 能真实下载；授权文件只由 GUI 写、MCP 只读；软件退出清空 session。
+- **产物安全**：所有产物重名加序号、不覆盖；批量重命名默认 `dry_run=true`；不向 agent 暴露原始 ffmpeg/7z 参数。
+- **打包态**：产物内 `resources/app/mcp`、`node_modules/pdfjs-dist/legacy`、`@napi-rs/canvas`、`heic-decode`、`addons/*` 路径正确；MCP 在产物上能跑工具列表、混淆、压缩、PDF 渲染、HEIC、OCR。
+- 证据：`tests/mcp.test.mjs` 18 项、`tests/pack-mcp-smoke.mjs` 8 项、`--videodl-ui-test` 新增 4 项授权断言、`npm test` 全绿、`--smoke-test` 23 工具；配置与工具清单见 `docs/Agent接入说明.md`、`app/mcp/README.md`。

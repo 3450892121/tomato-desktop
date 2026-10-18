@@ -12,6 +12,7 @@
 > 更新记录：v1.11（2026-09-21）新增「软件卸载」工具的目标规格（见 `modules/uninstall.md`）：随包内置 HiBit Uninstaller 官方便携版（`addons/hibit/`），工具页一键以**管理员身份**启动（Windows 标准 RunAs + 系统 UAC 确认，不静默提权）；只做启动页，不在本软件内重复实现卸载/残留扫描；左侧新增「系统」分组。原内容全部保留。
 > 更新记录：v1.12（2026-09-26）新增「视频下载」工具的目标规格（见 `modules/videodl.md`）：粘贴链接下载网络视频（抖音/小红书/B站/YouTube/央视频/直链），引擎为随包 yt-dlp（可自更新）；来源为 `github.com/Lyee0011/leetools`（MIT）的引擎移植 + 界面重画。这是本软件**第一个天生需要联网**的工具（用户确认接受），其余工具保持离线可用，不受影响。原内容全部保留。
 > 更新记录：v1.13（2026-10-04）新增「文档格式转换」工具的目标规格（见 `modules/doc-convert.md`）：老版办公文档（doc/xls/ppt/pps/rtf，含教务系统导出的 Excel 2003 XML「假 .xls」）→ docx/xlsx/pptx/PDF，引擎为随包 LibreOffice（与「PDF 转格式」共用调用机制）。同批：图片格式转换输入侧新增老图片格式（TIFF/PCX/TGA/PSD/DDS/JPEG2000，经随包 ffmpeg 解码）；视频/音频转换输入侧补充 asf/3g2/f4v/mts/m2ts 与 shn/voc/mka 等已验证封装。原内容全部保留。
+> 更新记录：v1.14（2026-10-18）新增「Agent 入口（MCP）」目标规格（见 `modules/agent-mcp.md`）：同一套软件既给人用（GUI），也给 agent 用（本地 stdio MCP server）；41 个 MCP 工具覆盖 21 个 GUI 工具（视频播放器、软件卸载不暴露）；视频下载默认每次授权，授权由 GUI 写、MCP 只读。原内容全部保留。
 
 ## 项目定位
 把安卓 App「番茄图片混淆」（`番茄图片混淆.apk`）的图片混淆/解混淆能力完整搬到 Windows 电脑上，做成**解压即用的免安装绿色软件**：纯离线、与手机版互相兼容。
@@ -71,6 +72,7 @@
 | 语音转文字 | `modules/transcribe.md` | 音频/视频 → 文字（中英日韩粤自动识别；字幕 SRT 可选；asr 加装包随包） |
 | 文件压缩与解压 | `modules/archive.md` | 多格式压缩/解压（主流 + 非主流双向、RAR 等仅解压）、密码、分卷、免解压预览（7zip 加装包随包） |
 | 软件卸载 | `modules/uninstall.md` | 一键启动随包内置的 HiBit 卸载工具（管理员权限；含残留清理） |
+| Agent 入口（MCP） | `modules/agent-mcp.md` | 本地 stdio MCP server；41 个工具覆盖 21 个 GUI 工具（播放器/卸载不暴露）；视频下载 GUI 写授权、MCP 只读 |
 
 ## 代码结构约定（新增工具时只动 tools/ 与 registry 一行）
 ```
